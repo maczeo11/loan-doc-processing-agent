@@ -29,3 +29,7 @@ class SQSQueue(QueuePort):
 
     def fail(self, handle: str, retryable: bool) -> None:
         pass
+
+
+# Backward compatibility alias
+SQSQueueAdapter = SQSQueue

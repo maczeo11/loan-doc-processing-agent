@@ -236,3 +236,18 @@ def find_phrase_evidence(
         )
     finally:
         doc.close()
+
+
+def extract_all_pages_content(pdf_input: Union[str, bytes]) -> List[Dict[str, Any]]:
+    """
+    Extracts structured page content and layout dictionaries for all pages in a document.
+    Convenience method used by fact extractors and node pipelines.
+    """
+    doc = open_pdf_document(pdf_input)
+    try:
+        page_count = len(doc)
+    finally:
+        doc.close()
+
+    return [extract_page_content(pdf_input, p) for p in range(1, page_count + 1)]
+

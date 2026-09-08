@@ -36,6 +36,7 @@ class LoanApplicationState(TypedDict):
     # Raw document references in storage
     document_ids: List[str]
     document_manifest: Dict[str, str]  # doc_id -> storage_uri
+    document_bytes: Optional[Dict[str, bytes]]
     classified_types: Dict[str, str]  # doc_id -> doc_type
 
     # Extracted structured facts

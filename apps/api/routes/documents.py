@@ -24,25 +24,7 @@ from apps.api.config import settings
 from apps.api.db.models import ApplicationModel, DocumentModel, utc_now
 from apps.api.db.session import get_db
 from apps.api.storage import get_storage
-from adapters.storage.base import StoragePort
-
-try:
-    from adapters.storage.base import build_storage_key
-except ImportError:
-    # Graceful fallback if storage team's PR has not yet merged to adapters.storage.base
-    def build_storage_key(application_id: str, document_id: str, original_filename: str) -> str:
-        """
-        Build canonical storage key: dossiers/{application_id}/{document_id}_{sanitized_filename}
-        """
-        clean_name = os.path.basename(original_filename.replace("\\", "/"))
-        clean_name = re.sub(r"[^a-zA-Z0-9_\.-]", "_", clean_name)
-        clean_name = clean_name.lstrip(".")
-        if not clean_name:
-            clean_name = "document"
-        return f"dossiers/{application_id}/{document_id}_{clean_name}"
-
-    import adapters.storage.base as _storage_base
-    _storage_base.build_storage_key = build_storage_key
+from adapters.storage.base import StoragePort, build_storage_key
 
 logger = logging.getLogger("finscan.documents")
 
@@ -188,7 +170,11 @@ async def upload_document(
         sha256_digest = hasher.hexdigest()
 
         # 5. Store file through StoragePort via build_storage_key
-        storage_key = build_storage_key(id, doc_id, file.filename)
+        storage_key = build_storage_key(
+            application_id=id,
+            document_id=doc_id,
+            filename=file.filename,
+        )
         spooled_file.seek(0)
 
         try:

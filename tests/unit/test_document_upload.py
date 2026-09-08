@@ -103,7 +103,8 @@ def test_storage_dependency_returns_local_adapter(monkeypatch):
     monkeypatch.setattr(settings, "STORAGE_BACKEND", "local")
     storage = get_storage()
     assert isinstance(storage, LocalFileSystemStorage)
-    assert storage.base_dir == settings.STORAGE_BASE_DIR
+    from pathlib import Path
+    assert Path(storage.base_dir) == Path(settings.STORAGE_BASE_DIR).resolve()
 
 
 def test_storage_dependency_returns_s3_adapter(monkeypatch):

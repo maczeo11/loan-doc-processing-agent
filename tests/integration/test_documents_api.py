@@ -216,7 +216,9 @@ async def test_upload_with_real_local_filesystem_adapter(test_env):
         doc = (await session.execute(
             select(DocumentModel).where(DocumentModel.id == doc_id)
         )).scalar_one()
-        expected_uri = f"file://{settings.STORAGE_BASE_DIR}/dossiers/{app_id}/{doc_id}_bank_stmt.pdf"
+        from pathlib import Path
+        expected_path = Path(settings.STORAGE_BASE_DIR).resolve() / "dossiers" / app_id / f"{doc_id}_bank_stmt.pdf"
+        expected_uri = f"file://{expected_path.as_posix()}"
         assert doc.storage_uri == expected_uri
 
 
@@ -286,9 +288,9 @@ async def test_route_uses_build_storage_key_canonical_function(test_env):
     calls = []
     real_build_key = doc_route_module.build_storage_key
 
-    def spy_build_storage_key(application_id, document_id, original_filename):
-        calls.append((application_id, document_id, original_filename))
-        return real_build_key(application_id, document_id, original_filename)
+    def spy_build_storage_key(application_id, document_id, filename, **kwargs):
+        calls.append((application_id, document_id, filename))
+        return real_build_key(application_id=application_id, document_id=document_id, filename=filename)
 
     with patch.object(doc_route_module, "build_storage_key", side_effect=spy_build_storage_key):
         files = {"file": ("id_proof.pdf", io.BytesIO(b"%PDF-1.4 id proof bytes"), "application/pdf")}

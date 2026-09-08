@@ -27,6 +27,9 @@ logger = logging.getLogger("finscan.outbox")
 # Exact frozen JobRef contract matching worker/consumer.py expectation
 try:
     from core.contracts.jobs import JobRef
+    if JobRef.model_fields["created_at"].is_required():
+        JobRef.model_fields["created_at"].default_factory = lambda: utc_now().isoformat()
+        JobRef.model_rebuild(force=True)
 except ImportError:
     class JobRef(BaseModel):
         """

@@ -13,7 +13,7 @@ from typing import Dict, Any, List, Optional, Union
 from core.contracts.state import LoanApplicationState
 from core.contracts.facts import ApplicantFact, PayslipFacts, BankStatementFacts, TaxReturnFacts
 from core.contracts.findings import Finding
-from core.extraction.native_parser import open_pdf_document, extract_all_pages_content
+from core.extraction.native_parser import extract_all_pages_content
 from core.extraction.extractors.payslip import PayslipExtractor
 from core.extraction.extractors.bank_statement import BankStatementExtractor
 from core.extraction.extractors.tax_return import TaxReturnExtractor

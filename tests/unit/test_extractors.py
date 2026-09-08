@@ -6,7 +6,6 @@ Unit tests for domain fact extractors:
 - IdCardExtractor
 """
 
-import pytest
 from core.contracts.facts import PayslipFacts, BankStatementFacts, TaxReturnFacts, ApplicantFact
 from core.extraction.extractors.payslip import PayslipExtractor
 from core.extraction.extractors.bank_statement import BankStatementExtractor

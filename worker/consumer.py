@@ -12,7 +12,7 @@ Rules from AGENTS.md & HLD:
 
 import time
 import logging
-from typing import Optional, Dict, Any
+from typing import Optional, Dict
 from adapters.queue.base import QueuePort, Delivery
 from adapters.storage.base import StoragePort
 from adapters.storage.local_fs import LocalFileSystemStorage

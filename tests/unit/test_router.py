@@ -17,7 +17,6 @@ from core.extraction.router import (
 )
 from core.extraction.paddle_parser import (
     get_paddle_ocr_engine,
-    extract_scanned_text_with_ocr,
 )
 
 

@@ -12,7 +12,7 @@ Invariants & Guarantees from AGENTS.md:
 
 import logging
 import os
-from typing import List, Dict, Any, Union, Optional
+from typing import List, Dict, Any, Union
 from core.contracts.evidence import EvidenceRef
 from core.extraction.native_parser import (
     extract_native_text_with_coordinates,

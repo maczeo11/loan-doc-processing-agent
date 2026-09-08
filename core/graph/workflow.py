@@ -11,7 +11,6 @@ from core.contracts.state import LoanApplicationState
 from core.graph.nodes import (
     triage_and_validate_node,
     extract_fields_node,
-    extract_facts_node,
     evaluate_rules_node,
     retrieve_policy_node,
     synthesize_summary_node,

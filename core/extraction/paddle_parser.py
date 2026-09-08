@@ -10,9 +10,7 @@ Invariants & Guarantees:
 """
 
 import logging
-from typing import List, Union, Optional
-import io
-import fitz
+from typing import List, Union
 from core.contracts.evidence import EvidenceRef
 from core.extraction.native_parser import open_pdf_document, validate_and_clamp_bbox
 

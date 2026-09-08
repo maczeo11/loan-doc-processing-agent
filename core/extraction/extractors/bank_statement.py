@@ -17,7 +17,6 @@ from typing import List, Dict, Any
 from core.extraction.extractors.base import (
     BaseExtractor,
     parse_monetary_amount,
-    make_unknown_evidence,
     find_text_match_with_evidence,
 )
 from core.contracts.facts import BankStatementFacts, MoneyFact
@@ -28,8 +27,6 @@ class BankStatementExtractor(BaseExtractor):
     """Extracts balance, salary deposits, and account metadata from bank statements."""
 
     def extract(self, doc_id: str, pages: List[Dict[str, Any]]) -> BankStatementFacts:
-        fallback_ev = make_unknown_evidence(doc_id, "bank_statement")
-
         # 1. Account Holder
         holder_name, _ = find_text_match_with_evidence(
             pages,

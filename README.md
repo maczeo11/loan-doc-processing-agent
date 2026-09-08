@@ -100,102 +100,116 @@ FinScan AI is organized as a **modular monolith with ports and adapters**, ensur
 
 ---
 
-## 👥 Team Work Breakdown & Responsibilities (8 Members)
+## 👥 Team Work Breakdown & Ownership (8 Members)
 
-To guarantee zero merge conflicts and smooth parallel development, every teammate has dedicated directory ownership. **Only edit files in your assigned directories.**
+| Member | Owns |
+| :--- | :--- |
+| **1. Manjunath** | API contracts and generated client, integration, CI, release checklist and demo. Keeps the evaluation harness. |
+| **2. Bhanu Teja** | LangGraph worker — leases, pause/resume, recovery. Designs the SQS + DLQ and S3 layout. Model serving inside the worker. **Lead:** architecture, gate calls, viva. |
+| **3. Jeevan** | PDF text with coordinates, OCR routing, evidence extraction and page-span validation. |
+| **4. Sravanthi** | Synthetic dossier generator with ground truth, plus the deterministic rules — completeness, salary, tax and bank arithmetic. |
+| **5. Karthik** | Classifier training (baseline vs. encoder) on the local GPU, splits and evaluation, MLflow, release bundle. |
+| **6. Balaji** | FastAPI, PostgreSQL/outbox. **Host cloud:** EC2, Caddy HTTPS, Compose, provisions SQS/S3/IAM, stop-start and teardown. Bundle rollback and version stamping. |
+| **7. Akshaya** | Reviewer SPA — three-pane dashboard, evidence overlays, corrections, PDF/JSON export. |
+| **8. Sai Mokshith** | Hybrid RAG with citation checks, injection guardrails, the 40-question set, integrated QA. |
 
 ---
 
-### 1. Bhanu Teja — Team Lead & Integrator, Async Cloud
-* **Assigned Folders:** `worker/`, `adapters/`, `infra/`, root files (`Makefile`, `pyproject.toml`, `AGENTS.md`)
-* **Branch Prefix:** `feat/worker-*`, `feat/cloud-*`
+### 1. Manjunath — Contracts, API Client, Integration & Evaluation Harness
+* **Assigned Folders:** `core/contracts/`, `tests/`, `.github/workflows/` (CI), generated API client
+* **Branch Prefix:** `feat/contracts-*`, `feat/ci-*`, `feat/integration-*`
 * **Core Responsibilities:**
-  1. Maintain the worker execution engine (`worker/consumer.py`, `worker/main.py`) driving LangGraph with atomic leases and acknowledge-last commits.
-  2. Implement queue adapters (`adapters/queue/pg_queue.py` and `sqs_queue.py`) with 3-attempt ceiling and DLQ safety.
-  3. Manage Docker Compose orchestration (`infra/docker-compose.yml`) and cloud deployment.
-  4. Perform code reviews and merge all pull requests into `main`.
+  1. API contracts single source of truth in `core/contracts/` (`evidence.py`, `facts.py`, `findings.py`, `state.py`).
+  2. Generate typed API client from OpenAPI schema (no handwritten fetch calls).
+  3. Continuous Integration (CI) configuration, test automation pipelines, and regression gates.
+  4. Keeps and runs the evaluation harness against frozen benchmarks.
+  5. Coordinates release checklist and demo rehearsal.
 
 ---
 
-### 2. Manjunath — API Endpoints, Contracts & Graph Orchestration
-* **Assigned Folders:** `apps/api/routes/`, `core/contracts/`, `core/graph/`
-* **Branch Prefix:** `feat/api-*`, `feat/graph-*`, `feat/contracts-*`
+### 2. Bhanu Teja — Team Lead, LangGraph Agent Core & Async Worker
+* **Assigned Folders:** `core/graph/`, `worker/`, `adapters/` (storage, queue, llm), root architecture (`AGENTS.md`, `Makefile`, `pyproject.toml`)
+* **Branch Prefix:** `feat/graph-*`, `feat/worker-*`, `feat/cloud-*`
 * **Core Responsibilities:**
-  1. Build FastAPI REST endpoints in `apps/api/routes/applications.py`, `documents.py`, and `review.py`.
-  2. Guard and evolve Pydantic schemas in `core/contracts/` (`evidence.py`, `facts.py`, `findings.py`, `state.py`) in coordination with Bhanu.
-  3. Wire the LangGraph `StateGraph` nodes and conditional edges in `core/graph/workflow.py` and `core/graph/nodes.py`.
-  4. Implement `interrupt()` for human underwriter sign-off.
+  1. **LangGraph Worker Core:** StateGraph workflow (`core/graph/workflow.py`, `nodes.py`), state transitions, and `interrupt()` human-review checkpoints.
+  2. **Worker Resilience:** Consumer loop (`worker/consumer.py`, `main.py`) with atomic leases, acknowledge-last commits, recovery, and DLQ handling.
+  3. **Cloud & Async Design:** Architecture of SQS + DLQ and S3 layout behind clean adapter interfaces.
+  4. **Model Serving:** Local model serving fallback (Qwen GGUF) inside the worker runtime.
+  5. **Team Leadership:** System architecture, code review / gating calls for all PRs, and viva defense.
 
 ---
 
-### 3. Jeevan — Document Parsing, OCR Routing & Extractors
+### 3. Jeevan — PDF Text Extraction, OCR Routing & Evidence Extraction
 * **Assigned Folders:** `core/extraction/`
 * **Branch Prefix:** `feat/ocr-*`, `feat/extract-*`
 * **Core Responsibilities:**
-  1. Implement PDF text extraction using PyMuPDF (`core/extraction/native_parser.py`) preserving word coordinates.
-  2. Implement local CPU PaddleOCR fallback (`core/extraction/paddle_parser.py`) for scanned/raster pages.
-  3. Implement page router (`core/extraction/router.py`) to auto-detect native vs scanned pages.
-  4. Write fact extractors in `core/extraction/extractors/` (`payslip.py`, `bank_statement.py`, `tax_return.py`, `id_card.py`) ensuring **every extracted fact carries an `EvidenceRef`**.
+  1. PDF text extraction with exact word coordinates using PyMuPDF (`core/extraction/native_parser.py`).
+  2. Local CPU PaddleOCR fallback (`core/extraction/paddle_parser.py`) for scanned documents.
+  3. Dynamic OCR routing (`core/extraction/router.py`) prioritizing native text $\rightarrow$ PaddleOCR $\rightarrow$ capped Textract fallback.
+  4. Structured fact extractors in `core/extraction/extractors/` (`payslip.py`, `bank_statement.py`, `tax_return.py`, `id_card.py`).
+  5. Page-span and bounding-box validation ensuring **no fact is accepted without an `EvidenceRef`**.
 
 ---
 
-### 4. Sravanthi — Deterministic Rules Engine, Synthetic Data & Reporting
-* **Assigned Folders:** `core/rules/`, `core/reporting/`, `data/`
-* **Branch Prefix:** `feat/rules-*`, `feat/reporting-*`, `feat/data-*`
+### 4. Sravanthi — Synthetic Dossiers, Ground Truth & Deterministic Rules
+* **Assigned Folders:** `scripts/generate_dossiers.py`, `data/`, `core/rules/`, `core/reporting/`
+* **Branch Prefix:** `feat/rules-*`, `feat/data-*`, `feat/reporting-*`
 * **Core Responsibilities:**
-  1. Implement deterministic rules in `core/rules/`:
-     - `completeness.py`: Verify all mandatory documents are present.
-     - `salary_audit.py`: Reconcile payslip net salary with bank deposits within $\le 5\%$ tolerance.
-     - `tax_audit.py`: Cross-check tax return gross income with annualized payslip earnings.
+  1. Synthetic loan dossier generator with ground truth manifests and deliberate inconsistency injection (`scripts/generate_dossiers.py`, `data/synthetic_dossiers/`).
+  2. **Deterministic Rules Engine (`core/rules/`):**
+     - `completeness.py`: Verify presence of all required documents in dossier.
+     - `salary_audit.py`: Reconcile payslip net salary against verified bank payroll deposits ($\le 5\%$ tolerance).
+     - `tax_audit.py`: Cross-check tax return gross income against payslip annualized figures.
      - `identity.py`: Fuzzy-match PAN and applicant names across all documents.
-  2. Maintain synthetic applicant dossiers with injected discrepancies in `data/synthetic_dossiers/`.
-  3. Implement Credit Appraisal Memo (CAM) builder and JSON/PDF export in `core/reporting/`.
+  3. Credit Appraisal Memo (CAM) builder and narrative assembly in `core/reporting/memo_builder.py`.
 
 ---
 
-### 5. Karthik — Document Classifier ML & Evaluation
+### 5. Karthik — Document Classifier ML, Splits, MLflow & Release Bundle
 * **Assigned Folders:** `ml/`
 * **Branch Prefix:** `feat/ml-*`, `feat/classifier-*`
 * **Core Responsibilities:**
-  1. Build and train baseline document classifier (`ml/classifier/baseline_tfidf.py`) using `scikit-learn` (TF-IDF + Logistic Regression).
-  2. Build challenger classifier (`ml/classifier/challenger_distilbert.py`) using a lightweight DistilBERT encoder.
-  3. Write evaluation harness (`ml/classifier/evaluate.py`) benchmarking Macro-F1 ($\ge 0.90$), latency, and RAM footprint.
-  4. Export winning model bundle to `ml/artifacts/` (`.joblib`).
+  1. Train document classifier baseline on local GPU: TF-IDF + Logistic Regression (`ml/classifier/baseline_tfidf.py`).
+  2. Train challenger model: DistilBERT-class sequence encoder (`ml/classifier/challenger_distilbert.py`, seq 256, batch 2–4).
+  3. Dataset splits and frozen manifest evaluation (`ml/classifier/evaluate.py`).
+  4. Track experiments with MLflow, benchmark Macro-F1 ($\ge 0.90$) vs latency vs RAM footprint.
+  5. Package and serialize winning release bundle into `ml/artifacts/` (`.joblib`).
 
 ---
 
-### 6. Balaji — Database Models, Outbox Pattern & Infrastructure
-* **Assigned Folders:** `apps/api/db/`, `infra/`
-* **Branch Prefix:** `feat/db-*`, `feat/infra-*`
+### 6. Balaji — FastAPI Backend, PostgreSQL Outbox & Host Cloud Infrastructure
+* **Assigned Folders:** `apps/api/`, `infra/`
+* **Branch Prefix:** `feat/api-*`, `feat/db-*`, `feat/infra-*`
 * **Core Responsibilities:**
-  1. Implement PostgreSQL schema tables in `apps/api/db/models.py` (`applications`, `documents`, `jobs`, `audit_events`).
-  2. Manage async session pools in `apps/api/db/session.py`.
-  3. Implement transactional outbox pattern to atomically commit application status changes and queue events.
-  4. Configure rate limiting and token bucket spend guards in API routes.
+  1. Build FastAPI REST endpoints (`apps/api/main.py`, `routes/applications.py`, `documents.py`, `review.py`).
+  2. PostgreSQL schema, migrations, and transactional outbox table (`apps/api/db/models.py`, `session.py`).
+  3. Atomic Redis token buckets, rate limiting, and spend guards.
+  4. **Host Cloud Operations:** EC2 t4g provisioning, Caddy HTTPS reverse proxy (`infra/Caddyfile`), Docker Compose (`infra/docker-compose.yml`), SQS/S3/IAM setup, scheduled stop-start, teardown, bundle rollback, and version stamping.
 
 ---
 
-### 7. Akshaya — Frontend Underwriter Reviewer SPA (React + Vite + pdf.js)
-* **Assigned Folders:** `apps/ui/`
+### 7. Akshaya — Reviewer SPA (React + Vite + pdf.js)
+* **Assigned Folders:** `apps/ui/`, `core/reporting/exporter.py`
 * **Branch Prefix:** `feat/ui-*`
 * **Core Responsibilities:**
-  1. Build the underwriter dashboard in React 18, Vite, TypeScript, and Tailwind CSS (`apps/ui/src/App.tsx`).
-  2. Implement split-pane layout: original PDF viewer on the left, audit findings & sign-off on the right.
-  3. Integrate `pdf.js` to render visual bounding-box highlights using `EvidenceRef` coordinates (`x0, y0, x1, y1`).
-  4. Connect action buttons: **Approve**, **Flag Discrepancy**, and **Request Info** to `POST /applications/{id}/review`.
-  5. Build chat panel for RAG policy queries against `POST /applications/{id}/questions`.
+  1. Build underwriter reviewer SPA using React 18, Vite, TypeScript, and Tailwind CSS (`apps/ui/`).
+  2. Three-pane dashboard: dossier document index, center PDF viewer, and right audit findings & actions.
+  3. Visual evidence bounding-box overlays on PDF pages using `pdf.js` and `EvidenceRef` coordinates.
+  4. HITL corrections, question-answering chat panel, and human sign-off triggers (`POST /applications/{id}/review`).
+  5. PDF and JSON dossier audit export download integration.
 
 ---
 
-### 8. Sai Mokshith — Hybrid RAG, Policy Knowledge & Grounding QA
+### 8. Sai Mokshith — Hybrid RAG, Citation Checks, Injection Guardrails & QA
 * **Assigned Folders:** `core/rag/`, `policies/`, `eval/`
 * **Branch Prefix:** `feat/rag-*`, `feat/eval-*`
 * **Core Responsibilities:**
-  1. Implement token-aware passage chunking (250–400 tokens) in `core/rag/chunking.py` preserving page provenance.
-  2. Implement isolated FAISS exact vector index and BM25 lexical search in `core/rag/indexer.py` and `retriever.py`.
-  3. Implement Reciprocal Rank Fusion (RRF) to combine dense and lexical scores: $\sum \frac{1}{60 + \text{rank}}$.
-  4. Implement strict citation grounding check (`core/rag/grounding.py`) that drops ungrounded claims and abstains if evidence is absent.
-  5. Maintain frozen 30-question evaluation set in `eval/questions.json`.
+  1. Passage chunking (250–400 tokens) with strict metadata provenance (`core/rag/chunking.py`).
+  2. Isolated FAISS exact index and BM25 lexical search fused with Reciprocal Rank Fusion (RRF) (`core/rag/retriever.py`, `indexer.py`).
+  3. Hard index isolation: application documents vs authoritative policy library (`policies/`).
+  4. Citation grounding validator (`core/rag/grounding.py`): verify all claims cite retrieved chunks from authorized dossiers; drop ungrounded claims.
+  5. Prompt injection guardrails on untrusted PDF inputs.
+  6. Maintain and run the frozen 40-question benchmark set (`eval/questions.json`) for integrated QA.
 
 ---
 

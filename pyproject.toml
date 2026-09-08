@@ -33,3 +33,8 @@ dependencies = [
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["core*", "adapters*", "worker*", "apps*", "ml*"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+

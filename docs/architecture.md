@@ -20,15 +20,14 @@ FinScan AI is a GenAI-assisted loan document verification and underwriting agent
 
 | Component | Directory | Owner | Responsibilities |
 |---|---|---|---|
-| **API & Database** | `apps/api/` | Balaji & Manjunath | FastAPI endpoints, PostgreSQL schema, outbox, rate limiting |
-| **Reviewer SPA** | `apps/ui/` | Akshaya | React + Vite + Tailwind, pdf.js bounding box viewer, sign-off actions |
-| **Worker & Queue** | `worker/` & `adapters/queue/` | Bhanu Teja | Lease management, LangGraph execution, acknowledge-last, DLQ |
-| **Extraction & OCR** | `core/extraction/` | Jeevan | PyMuPDF text layer, PaddleOCR CPU fallback, field extraction with EvidenceRef |
-| **Rules Engine** | `core/rules/` | Sravanthi | Completeness, salary reconciliation, tax audit, identity matching |
-| **Document Classifier** | `ml/classifier/` | Karthik | TF-IDF baseline vs DistilBERT challenger |
-| **RAG & Grounding** | `core/rag/` | Sai Mokshith | BM25 + BGE-small dense retrieval, FAISS exact, grounding validator |
-| **Graph Orchestration** | `core/graph/` | Manjunath & Bhanu Teja | LangGraph StateGraph, node wiring, interrupt() checkpoints |
-| **Reporting** | `core/reporting/` | Sravanthi & Balaji | Credit Appraisal Memo assembly, JSON/PDF export |
+| **Contracts & CI** | `core/contracts/`, `tests/` | Manjunath | API contracts, generated client, integration, CI, release checklist, evaluation harness |
+| **LangGraph & Worker** | `core/graph/`, `worker/`, `adapters/` | Bhanu Teja | Worker leases, pause/resume, recovery, SQS+DLQ/S3 layout, model serving. **Lead:** architecture, gate calls, viva |
+| **Extraction & OCR** | `core/extraction/` | Jeevan | PDF text with coordinates, OCR routing, evidence extraction, page-span validation |
+| **Rules & Synthetic Data** | `core/rules/`, `data/`, `scripts/` | Sravanthi | Synthetic dossier generator with ground truth, deterministic completeness/salary/tax/bank rules |
+| **Classifier ML** | `ml/` | Karthik | Classifier training (baseline vs encoder) on local GPU, splits/eval, MLflow, release bundle |
+| **FastAPI & Host Cloud** | `apps/api/`, `infra/` | Balaji | FastAPI, PostgreSQL/outbox. **Host cloud:** EC2, Caddy HTTPS, Compose, SQS/S3/IAM, rollback/stamping |
+| **Reviewer SPA** | `apps/ui/` | Akshaya | Three-pane dashboard, evidence overlays, corrections, PDF/JSON export |
+| **Hybrid RAG & QA** | `core/rag/`, `policies/`, `eval/` | Sai Mokshith | Hybrid RAG with citation checks, injection guardrails, the 40-question set, integrated QA |
 
 ---
 

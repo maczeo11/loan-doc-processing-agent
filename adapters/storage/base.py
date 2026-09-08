@@ -2,11 +2,11 @@
 StoragePort: Storage abstraction protocol for local filesystem and AWS S3.
 """
 
-from typing import Protocol, BinaryIO
+from typing import Protocol, BinaryIO, Union
 
 
 class StoragePort(Protocol):
-    def put(self, key: str, data: BinaryIO) -> str:
+    def put(self, key: str, data: Union[BinaryIO, bytes]) -> str:
         """Store an object and return its URI."""
         ...
 

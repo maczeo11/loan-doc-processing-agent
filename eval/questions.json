@@ -1,10 +1,10 @@
 {
   "benchmark_name": "FinScan AI RAG & Grounding Frozen Benchmark",
   "version": "1.0",
-  "total_questions": 40,
+  "total_questions": 30,
   "splits": {
-    "dev": 24,
-    "held_out": 16
+    "dev": 18,
+    "held_out": 12
   },
   "questions": [
     {

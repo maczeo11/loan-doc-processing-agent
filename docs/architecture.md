@@ -27,7 +27,7 @@ FinScan AI is a GenAI-assisted loan document verification and underwriting agent
 | **Classifier ML** | `ml/` | Karthik | Classifier training (baseline vs encoder) on local GPU, splits/eval, MLflow, release bundle |
 | **FastAPI & Host Cloud** | `apps/api/`, `infra/` | Balaji | FastAPI, PostgreSQL/outbox. **Host cloud:** EC2, Caddy HTTPS, Compose, SQS/S3/IAM, rollback/stamping |
 | **Reviewer SPA** | `apps/ui/` | Akshaya | Three-pane dashboard, evidence overlays, corrections, PDF/JSON export |
-| **Hybrid RAG & QA** | `core/rag/`, `policies/`, `eval/` | Sai Mokshith | Hybrid RAG with citation checks, injection guardrails, the 40-question set, integrated QA |
+| **Hybrid RAG & QA** | `core/rag/`, `policies/`, `eval/` | Sai Mokshith | Hybrid RAG with citation checks, injection guardrails, the 30-question set, integrated QA |
 
 ---
 

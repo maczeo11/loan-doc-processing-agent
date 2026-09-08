@@ -111,7 +111,7 @@ FinScan AI is organized as a **modular monolith with ports and adapters**, ensur
 | **5. Karthik** | Classifier training (baseline vs. encoder) on the local GPU, splits and evaluation, MLflow, release bundle. |
 | **6. Balaji** | FastAPI, PostgreSQL/outbox. **Host cloud:** EC2, Caddy HTTPS, Compose, provisions SQS/S3/IAM, stop-start and teardown. Bundle rollback and version stamping. |
 | **7. Akshaya** | Reviewer SPA — three-pane dashboard, evidence overlays, corrections, PDF/JSON export. |
-| **8. Sai Mokshith** | Hybrid RAG with citation checks, injection guardrails, the 40-question set, integrated QA. |
+| **8. Sai Mokshith** | Hybrid RAG with citation checks, injection guardrails, the 30-question set, integrated QA. |
 
 ---
 
@@ -209,7 +209,7 @@ FinScan AI is organized as a **modular monolith with ports and adapters**, ensur
   3. Hard index isolation: application documents vs authoritative policy library (`policies/`).
   4. Citation grounding validator (`core/rag/grounding.py`): verify all claims cite retrieved chunks from authorized dossiers; drop ungrounded claims.
   5. Prompt injection guardrails on untrusted PDF inputs.
-  6. Maintain and run the frozen 40-question benchmark set (`eval/questions.json`) for integrated QA.
+  6. Maintain and run the frozen 30-question benchmark set (`eval/questions.json`, 18 dev / 12 held-out) for integrated QA.
 
 ---
 

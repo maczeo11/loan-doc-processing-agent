@@ -8,7 +8,6 @@ Verifies:
 """
 
 from unittest.mock import MagicMock
-import pytest
 from adapters.llm.opencode import OpenCodeZenLLM
 from adapters.llm.local_qwen import LocalQwenLLM
 

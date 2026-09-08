@@ -2,7 +2,6 @@
 Summary assembly and Credit Appraisal Memo generation.
 """
 
-from typing import List
 from core.contracts.state import LoanApplicationState
 
 

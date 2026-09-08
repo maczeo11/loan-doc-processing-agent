@@ -8,7 +8,7 @@ Rules from AGENTS.md:
 """
 
 from abc import ABC, abstractmethod
-from typing import Dict, Any, Optional
+from typing import Any
 from pydantic import BaseModel
 
 

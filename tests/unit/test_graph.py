@@ -2,7 +2,6 @@
 Unit tests for LangGraph StateGraph nodes, workflow, and human-in-the-loop interrupt.
 """
 
-import pytest
 from langgraph.checkpoint.memory import MemorySaver
 from core.contracts.state import LoanApplicationState
 from core.contracts.evidence import EvidenceRef, BoundingBox

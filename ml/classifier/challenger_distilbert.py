@@ -15,7 +15,7 @@ Constraints from AGENTS.md:
 - Evaluated against TF-IDF baseline on macro-F1 and memory footprint.
 """
 
-from typing import Dict, Any, List, Optional
+from typing import Dict, List, Optional
 import os
 
 

@@ -9,12 +9,11 @@ Rules from AGENTS.md:
 - All facts carry EvidenceRef provenance.
 """
 
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List
 import datetime
 from core.contracts.state import LoanApplicationState, StatusTransition, ApplicationStatus
 from core.contracts.findings import Finding
 from core.contracts.facts import MoneyFact, PayslipFacts, BankStatementFacts, TaxReturnFacts, ApplicantFact
-from core.contracts.evidence import EvidenceRef, BoundingBox
 from core.rules.completeness import evaluate_completeness
 from core.rules.salary_audit import audit_salary_vs_bank
 from core.rules.tax_audit import audit_tax_vs_income
@@ -23,7 +22,6 @@ from core.extraction.extractors.payslip import PayslipExtractor
 from core.extraction.extractors.bank_statement import BankStatementExtractor
 from core.extraction.extractors.tax_return import TaxReturnExtractor
 from core.extraction.extractors.id_card import IdCardExtractor
-from core.reporting.memo_builder import build_appraisal_memo
 from core.rag.grounding import validate_citations
 
 
@@ -258,7 +256,7 @@ def synthesize_summary_node(state: LoanApplicationState) -> Dict[str, Any]:
         summary_lines.append(f"  *{finding.reason}*")
 
     summary_lines.append("")
-    summary_lines.append(f"#### Authoritative Policy Citations")
+    summary_lines.append("#### Authoritative Policy Citations")
     summary_lines.append(f"Referenced guidelines: {', '.join(chunks) if chunks else 'None'}")
 
     return {

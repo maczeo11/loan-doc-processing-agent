@@ -8,8 +8,6 @@ Verifies:
 """
 
 from unittest.mock import MagicMock
-import json
-import pytest
 from core.contracts.jobs import JobRef
 from adapters.queue.pg_queue import PostgresQueue
 from adapters.queue.sqs_queue import SQSQueue

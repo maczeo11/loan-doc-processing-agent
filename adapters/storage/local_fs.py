@@ -11,7 +11,7 @@ Provides:
 import os
 import hashlib
 from pathlib import Path
-from typing import BinaryIO, Union, Optional
+from typing import BinaryIO, Union
 from adapters.storage.base import StoragePort
 
 

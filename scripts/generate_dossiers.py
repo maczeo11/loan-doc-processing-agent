@@ -7,7 +7,7 @@ injecting controlled anomalies (salary inflation, name mismatch, missing docs) f
 import os
 import json
 import random
-from typing import Dict, Any, List
+from typing import Dict, Any
 
 SAMPLE_APPLICANTS = [
     {

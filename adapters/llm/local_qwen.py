@@ -7,7 +7,7 @@ Guarantees full offline functionality for Day 6 failure and network-outage tests
 
 import os
 import logging
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 from adapters.llm.base import LLMPort
 
 logger = logging.getLogger("finscan.adapters.llm.qwen")

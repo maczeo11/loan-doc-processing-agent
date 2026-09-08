@@ -13,8 +13,6 @@ Verifies AGENTS.md rules:
 import time
 import threading
 from typing import List, Tuple
-import pytest
-from pydantic import BaseModel
 from adapters.queue.base import QueuePort, Delivery
 from core.contracts.jobs import JobRef
 from core.contracts.evidence import EvidenceRef, BoundingBox

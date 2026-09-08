@@ -8,7 +8,7 @@ Orchestrates the sequential loan document processing pipeline with:
 - Human-in-the-loop interrupt() checkpoint before human underwriter review
 """
 
-from typing import Optional, Literal
+from typing import Literal
 from langgraph.graph import StateGraph, END
 from core.contracts.state import LoanApplicationState
 from core.graph.nodes import (
@@ -36,7 +36,7 @@ def route_after_triage(state: LoanApplicationState) -> Literal["ocr_and_classify
 def build_application_graph(checkpointer=None, enable_interrupt: bool = True):
     """
     Constructs and compiles the authoritative Loan Processing StateGraph.
-    
+
     Args:
         checkpointer: Optional persistence checkpointer (e.g. PostgresSaver or MemorySaver).
         enable_interrupt: If True and checkpointer is provided, pauses before human_review.

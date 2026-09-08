@@ -8,9 +8,9 @@ Endpoints:
 - GET  /applications/{id}/export
 """
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, status
 from pydantic import BaseModel
-from typing import Optional, List, Dict, Any
+from typing import Optional
 
 router = APIRouter(prefix="/applications", tags=["Applications"])
 

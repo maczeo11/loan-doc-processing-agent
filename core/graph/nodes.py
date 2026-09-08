@@ -13,7 +13,7 @@ from typing import Dict, Any, List, Optional
 import datetime
 from core.contracts.state import LoanApplicationState, StatusTransition, ApplicationStatus
 from core.contracts.findings import Finding
-from core.contracts.facts import MoneyFact
+from core.contracts.facts import MoneyFact, PayslipFacts, BankStatementFacts, TaxReturnFacts, ApplicantFact
 from core.contracts.evidence import EvidenceRef, BoundingBox
 from core.rules.completeness import evaluate_completeness
 from core.rules.salary_audit import audit_salary_vs_bank
@@ -149,7 +149,33 @@ def evaluate_rules_node(state: LoanApplicationState) -> Dict[str, Any]:
 
     # 2. Salary vs Bank Credit Reconciliation
     payslip = state.get("payslip")
+    if isinstance(payslip, dict):
+        try:
+            payslip = PayslipFacts.model_validate(payslip)
+        except Exception:
+            pass
+
     bank = state.get("bank_statement")
+    if isinstance(bank, dict):
+        try:
+            bank = BankStatementFacts.model_validate(bank)
+        except Exception:
+            pass
+
+    tax_return = state.get("tax_return")
+    if isinstance(tax_return, dict):
+        try:
+            tax_return = TaxReturnFacts.model_validate(tax_return)
+        except Exception:
+            pass
+
+    applicant = state.get("applicant")
+    if isinstance(applicant, dict):
+        try:
+            applicant = ApplicantFact.model_validate(applicant)
+        except Exception:
+            pass
+
     payslip_net = payslip.net_salary if payslip else None
     bank_credit = None
     if bank:
@@ -164,7 +190,6 @@ def evaluate_rules_node(state: LoanApplicationState) -> Dict[str, Any]:
     findings.append(salary_finding)
 
     # 3. Tax Return vs Stated Earnings
-    tax_return = state.get("tax_return")
     itr_gross = tax_return.gross_total_income if tax_return else None
     annual_gross = (
         MoneyFact(
@@ -179,7 +204,6 @@ def evaluate_rules_node(state: LoanApplicationState) -> Dict[str, Any]:
     findings.append(tax_finding)
 
     # 4. Identity & KYC Consistency
-    applicant = state.get("applicant")
     payslip_emp_name = payslip.employee_name if payslip else None
     bank_holder_name = bank.account_holder if bank else None
     id_finding = audit_identity_consistency(applicant, payslip_emp_name, bank_holder_name)

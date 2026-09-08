@@ -17,6 +17,7 @@ from typing import Optional, Dict, Any
 from adapters.queue.base import QueuePort, Delivery
 from core.contracts.jobs import JobRef
 from core.contracts.state import LoanApplicationState
+from core.contracts.facts import PayslipFacts, BankStatementFacts, TaxReturnFacts, ApplicantFact
 from core.graph.workflow import build_application_graph
 
 logger = logging.getLogger("finscan.worker")
@@ -148,6 +149,35 @@ class ApplicationWorker:
             extension_seconds=self.heartbeat_extension_seconds,
         ):
             try:
+                # Hydrate serialized dict facts if present in job metadata
+                applicant_val = job_ref.metadata.get("applicant")
+                if isinstance(applicant_val, dict):
+                    try:
+                        applicant_val = ApplicantFact.model_validate(applicant_val)
+                    except Exception:
+                        pass
+
+                payslip_val = job_ref.metadata.get("payslip")
+                if isinstance(payslip_val, dict):
+                    try:
+                        payslip_val = PayslipFacts.model_validate(payslip_val)
+                    except Exception:
+                        pass
+
+                bank_val = job_ref.metadata.get("bank_statement")
+                if isinstance(bank_val, dict):
+                    try:
+                        bank_val = BankStatementFacts.model_validate(bank_val)
+                    except Exception:
+                        pass
+
+                tax_val = job_ref.metadata.get("tax_return")
+                if isinstance(tax_val, dict):
+                    try:
+                        tax_val = TaxReturnFacts.model_validate(tax_val)
+                    except Exception:
+                        pass
+
                 initial_state: LoanApplicationState = {
                     "application_id": job_ref.application_id,
                     "status": "PROCESSING",
@@ -155,10 +185,10 @@ class ApplicationWorker:
                     "document_ids": job_ref.metadata.get("document_ids", []),
                     "document_manifest": job_ref.metadata.get("document_manifest", {}),
                     "classified_types": job_ref.metadata.get("classified_types", {}),
-                    "applicant": job_ref.metadata.get("applicant"),
-                    "payslip": job_ref.metadata.get("payslip"),
-                    "bank_statement": job_ref.metadata.get("bank_statement"),
-                    "tax_return": job_ref.metadata.get("tax_return"),
+                    "applicant": applicant_val,
+                    "payslip": payslip_val,
+                    "bank_statement": bank_val,
+                    "tax_return": tax_val,
                     "findings": job_ref.metadata.get("findings", []),
                     "missing_documents": job_ref.metadata.get("missing_documents", []),
                     "retrieved_chunk_ids": job_ref.metadata.get("retrieved_chunk_ids", []),

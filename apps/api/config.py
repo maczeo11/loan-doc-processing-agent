@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     ENVIRONMENT: Literal["local", "cloud"] = "local"
     API_PORT: int = 8000
     DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/finscan"
+    DATABASE_ECHO: bool = False
     REDIS_URL: str = "redis://localhost:6379/0"
 
     # Adapter selections

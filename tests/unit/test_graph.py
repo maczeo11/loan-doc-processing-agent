@@ -175,3 +175,57 @@ def test_graph_with_checkpointer_and_interrupt():
     last_transition = history[-1]
     assert last_transition["to_status"] == "REVIEWED"
     assert "Underwriter sign-off submitted: APPROVED" in last_transition["reason"]
+
+
+def test_sqlite_saver_persists_across_instances(tmp_path):
+    from core.graph.checkpoint import SqliteSaver
+    from core.graph.workflow import resume_application_review
+
+    db_file = str(tmp_path / "checkpoints.sqlite3")
+    saver1 = SqliteSaver(db_path=db_file)
+    graph1 = build_application_graph(checkpointer=saver1, enable_interrupt=True)
+    state = create_initial_state("APP-SQLITE-001")
+    config = {"configurable": {"thread_id": "thread-sqlite-001"}}
+
+    # Process 1 executes up to interrupt
+    result1 = graph1.invoke(state, config=config)
+    assert result1["status"] == "READY_FOR_REVIEW"
+
+    # Process 2 loads separate checkpointer from same db
+    saver2 = SqliteSaver(db_path=db_file)
+    graph2 = build_application_graph(checkpointer=saver2, enable_interrupt=True)
+    snapshot = graph2.get_state(config)
+    assert snapshot.next == ("human_review",)
+    assert snapshot.values.get("status") == "READY_FOR_REVIEW"
+
+    # Resume via helper function
+    final_state = resume_application_review(
+        thread_id="thread-sqlite-001",
+        decision="APPROVED",
+        notes="Audit passed on durable database",
+        checkpointer=saver2,
+    )
+    assert final_state["status"] == "REVIEWED"
+    assert final_state["review_paused"] is False
+
+
+def test_resume_application_review_needs_info(tmp_path):
+    from core.graph.checkpoint import SqliteSaver
+    from core.graph.workflow import resume_application_review
+
+    db_file = str(tmp_path / "checkpoints_needs_info.sqlite3")
+    saver = SqliteSaver(db_path=db_file)
+    graph = build_application_graph(checkpointer=saver, enable_interrupt=True)
+    state = create_initial_state("APP-NEEDS-INFO-001")
+    config = {"configurable": {"thread_id": "thread-needs-info-001"}}
+
+    graph.invoke(state, config=config)
+
+    final_state = resume_application_review(
+        thread_id="thread-needs-info-001",
+        decision="NEEDS_INFO",
+        notes="Bank statement missing page 3.",
+        checkpointer=saver,
+    )
+    assert final_state["status"] == "NEEDS_INFORMATION"
+    assert final_state["review_paused"] is False

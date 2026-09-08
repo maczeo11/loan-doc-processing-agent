@@ -8,7 +8,7 @@ Orchestrates the sequential loan document processing pipeline with:
 - Human-in-the-loop interrupt() checkpoint before human underwriter review
 """
 
-from typing import Literal
+from typing import Literal, Optional
 from langgraph.graph import StateGraph, END
 from core.contracts.state import LoanApplicationState
 from core.graph.nodes import (
@@ -84,3 +84,52 @@ def build_application_graph(checkpointer=None, enable_interrupt: bool = True):
 
 # Backward compatibility alias
 build_loan_processing_graph = build_application_graph
+
+
+def get_default_checkpointer(db_path: str = "data/storage/checkpoints.sqlite3"):
+    """
+    Returns the production-grade durable SQLite checkpointer.
+    """
+    from core.graph.checkpoint import SqliteSaver
+    return SqliteSaver(db_path=db_path)
+
+
+def resume_application_review(
+    thread_id: str,
+    decision: Literal["APPROVED", "REJECTED", "NEEDS_INFO"],
+    notes: Optional[str] = None,
+    corrections: Optional[list] = None,
+    checkpointer=None,
+) -> LoanApplicationState:
+    """
+    Resumes a paused StateGraph execution from the READY_FOR_REVIEW interrupt checkpoint.
+    Applies human underwriter sign-off and executes the human_review node,
+    transitioning the application to REVIEWED or NEEDS_INFORMATION.
+
+    Args:
+        thread_id: The application ID / thread identifier.
+        decision: Underwriter decision ('APPROVED', 'REJECTED', or 'NEEDS_INFO').
+        notes: Optional underwriter audit rationale.
+        corrections: Optional fact corrections applied by underwriter.
+        checkpointer: Optional checkpointer instance. If None, uses default durable checkpointer.
+
+    Returns:
+        The updated LoanApplicationState after completion.
+    """
+    if checkpointer is None:
+        checkpointer = get_default_checkpointer()
+
+    graph = build_application_graph(checkpointer=checkpointer, enable_interrupt=True)
+    config = {"configurable": {"thread_id": thread_id}}
+
+    # 1. Update graph state with human underwriter decision
+    update_payload = {
+        "reviewer_decision": decision,
+        "reviewer_notes": notes,
+        "corrections_applied": corrections or [],
+    }
+    graph.update_state(config, update_payload)
+
+    # 2. Continue execution through human_review_node to END
+    final_state = graph.invoke(None, config=config)
+    return final_state

@@ -84,3 +84,17 @@ def test_finding_verdict_values():
 
     with pytest.raises(ValidationError):
         Finding(rule_id="RULE-04", rule_name="Rule 4", verdict="invalid_status", reason="Bad", supporting_evidence=[])  # type: ignore
+
+
+def test_storage_key_convention():
+    from adapters.storage.base import build_storage_key, sanitize_filename
+
+    # Basic sanitized key
+    key = build_storage_key("APP-101", "DOC-01", "July_Payslip.pdf")
+    assert key == "dossiers/APP-101/DOC-01_July_Payslip.pdf"
+
+    # Sanitizes path traversal and weird characters
+    assert sanitize_filename("../../malicious name#1.pdf") == "malicious_name_1.pdf"
+    key2 = build_storage_key("APP-202", "DOC-02", "../../../etc/passwd;foo.pdf")
+    assert key2 == "dossiers/APP-202/DOC-02_passwd_foo.pdf"
+

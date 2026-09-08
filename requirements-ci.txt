@@ -14,6 +14,7 @@ langgraph>=0.0.30
 langchain-core>=0.1.38
 boto3>=1.34.0
 psycopg[binary]>=3.1.18
+pymupdf>=1.24.0
 
 # Testing & Quality Gates
 pytest>=8.1.0

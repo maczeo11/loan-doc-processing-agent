@@ -2,19 +2,23 @@
 Async worker consumer loop.
 Owned by Member 2 (Bhanu Teja).
 
-Rules from AGENTS.md:
+Rules from AGENTS.md & HLD:
 - Delivery is at-least-once.
 - Handlers must be completely idempotent.
 - Acknowledge-Last: Results commit BEFORE ack is called.
 - Atomic worker lease with heartbeat/extend_lease.
 - Three-delivery ceiling before routing poisonous messages to DLQ.
+- Worker retrieves raw document bytes via StoragePort.get(key) before handing off to extractors.
 """
 
 import time
 import threading
 import logging
 from typing import Optional, Dict, Any
+
 from adapters.queue.base import QueuePort, Delivery
+from adapters.storage.base import StoragePort
+from adapters.storage.local_fs import LocalFileSystemStorage
 from core.contracts.jobs import JobRef
 from core.contracts.state import LoanApplicationState
 from core.contracts.facts import PayslipFacts, BankStatementFacts, TaxReturnFacts, ApplicantFact
@@ -71,12 +75,14 @@ class LeaseHeartbeat:
 
 class ApplicationWorker:
     """
-    Worker process that polls for jobs, runs the LangGraph pipeline, and enforces lease semantics.
+    Worker process that polls for jobs, loads raw document bytes via StoragePort,
+    runs the LangGraph pipeline, and enforces lease and acknowledge-last semantics.
     """
 
     def __init__(
         self,
         queue_adapter: QueuePort,
+        storage_adapter: Optional[StoragePort] = None,
         checkpointer=None,
         max_delivery_attempts: int = 3,
         heartbeat_interval_seconds: float = 10.0,
@@ -84,6 +90,7 @@ class ApplicationWorker:
         graph=None,
     ):
         self.queue = queue_adapter
+        self.storage: StoragePort = storage_adapter or LocalFileSystemStorage()
         self.checkpointer = checkpointer
         self.max_delivery_attempts = max_delivery_attempts
         self.heartbeat_interval_seconds = heartbeat_interval_seconds
@@ -115,7 +122,6 @@ class ApplicationWorker:
             except Exception as e:
                 logger.error(f"Error in consumer loop: {e}", exc_info=True)
                 time.sleep(poll_interval_seconds)
-
     def process_delivery(self, delivery: Delivery) -> Optional[Dict[str, Any]]:
         """
         Process a single job delivery idempotently.
@@ -149,6 +155,19 @@ class ApplicationWorker:
             extension_seconds=self.heartbeat_extension_seconds,
         ):
             try:
+                # Worker Storage Retrieval: Fetch raw document bytes via StoragePort.get(key)
+                manifest: Dict[str, str] = job_ref.metadata.get("document_manifest", {})
+                doc_ids = job_ref.metadata.get("document_ids") or list(manifest.keys())
+                doc_bytes_map: Dict[str, bytes] = {}
+
+                for doc_id, storage_key in manifest.items():
+                    try:
+                        raw_bytes = self.storage.get(storage_key)
+                        doc_bytes_map[doc_id] = raw_bytes
+                        logger.info(f"Retrieved {len(raw_bytes)} bytes from storage for {doc_id} (key: {storage_key})")
+                    except Exception as err:
+                        logger.warning(f"Could not retrieve bytes for {doc_id} from key '{storage_key}': {err}")
+
                 # Hydrate serialized dict facts if present in job metadata
                 applicant_val = job_ref.metadata.get("applicant")
                 if isinstance(applicant_val, dict):
@@ -182,8 +201,9 @@ class ApplicationWorker:
                     "application_id": job_ref.application_id,
                     "status": "PROCESSING",
                     "status_history": [],
-                    "document_ids": job_ref.metadata.get("document_ids", []),
-                    "document_manifest": job_ref.metadata.get("document_manifest", {}),
+                    "document_ids": doc_ids,
+                    "document_manifest": manifest,
+                    "document_bytes": doc_bytes_map,
                     "classified_types": job_ref.metadata.get("classified_types", {}),
                     "applicant": applicant_val,
                     "payslip": payslip_val,

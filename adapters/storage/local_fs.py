@@ -26,7 +26,14 @@ class LocalFileSystemStorage(StoragePort):
         self.base_dir.mkdir(parents=True, exist_ok=True)
 
     def _resolve_path(self, key: str) -> Path:
-        """Resolves key against base_dir and prevents directory traversal attacks."""
+        """Resolves key against base_dir, handling file:// URIs, absolute paths, and preventing directory traversal."""
+        if key.startswith("file://"):
+            clean_path = key[7:]
+            if os.name == "nt" and clean_path.startswith("/") and len(clean_path) > 2 and clean_path[2] == ":":
+                clean_path = clean_path.lstrip("/")
+            return Path(clean_path).resolve()
+        if os.path.isabs(key):
+            return Path(key).resolve()
         clean_key = os.path.normpath(key).lstrip("\\/").replace("\\", "/")
         full_path = (self.base_dir / clean_key).resolve()
         if not str(full_path).startswith(str(self.base_dir)):

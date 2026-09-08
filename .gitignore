@@ -67,4 +67,5 @@ htmlcov/
 .ruff_cache/
 mlruns/
 docs/hld/
+.agents/
 

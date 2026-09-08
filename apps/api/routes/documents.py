@@ -5,9 +5,9 @@ Endpoints:
 - POST /applications/{id}/documents
 """
 
-from fastapi import APIRouter, HTTPException, UploadFile, File, Form, status
+from fastapi import APIRouter, UploadFile, File, Form, status
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Optional
 
 router = APIRouter(prefix="/applications", tags=["Documents"])
 

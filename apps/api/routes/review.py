@@ -8,7 +8,7 @@ Endpoints:
 - POST /applications/{id}/review
 """
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any, Literal
 

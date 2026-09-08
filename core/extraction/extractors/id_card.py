@@ -10,14 +10,13 @@ Extracts:
 """
 
 import re
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 from core.extraction.extractors.base import (
     BaseExtractor,
     make_unknown_evidence,
     find_text_match_with_evidence,
 )
 from core.contracts.facts import ApplicantFact
-from core.contracts.evidence import EvidenceRef
 
 
 class IdCardExtractor(BaseExtractor):

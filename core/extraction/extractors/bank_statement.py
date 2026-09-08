@@ -13,7 +13,7 @@ Extracts:
 """
 
 import re
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 from core.extraction.extractors.base import (
     BaseExtractor,
     parse_monetary_amount,

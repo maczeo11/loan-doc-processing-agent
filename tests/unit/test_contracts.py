@@ -7,6 +7,27 @@ from pydantic import ValidationError
 from core.contracts.evidence import EvidenceRef, BoundingBox
 from core.contracts.facts import MoneyFact
 from core.contracts.findings import Finding
+from core.contracts.jobs import JobRef
+from adapters.queue.base import Delivery
+
+
+def test_job_ref_and_delivery():
+    job = JobRef(
+        job_id="JOB-123",
+        application_id="APP-456",
+        attempt_count=1,
+        created_at="2026-09-08T12:00:00Z",
+        priority=0,
+        metadata={"user_id": "reviewer-1"}
+    )
+    assert job.job_id == "JOB-123"
+    assert job.attempt_count == 1
+
+    delivery = Delivery(lease_handle="lease-xyz", job_ref=job)
+    assert delivery.lease_handle == "lease-xyz"
+    assert delivery.handle == "lease-xyz"
+    assert delivery.job_ref.application_id == "APP-456"
+
 
 
 def test_evidence_ref_valid():

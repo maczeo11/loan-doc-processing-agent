@@ -12,6 +12,7 @@ from core.contracts.facts import (
 )
 from core.contracts.findings import Finding, RuleVerdict
 from core.contracts.state import LoanApplicationState, ApplicationStatus
+from core.contracts.jobs import JobRef
 
 __all__ = [
     "EvidenceRef",
@@ -25,4 +26,5 @@ __all__ = [
     "RuleVerdict",
     "LoanApplicationState",
     "ApplicationStatus",
+    "JobRef",
 ]

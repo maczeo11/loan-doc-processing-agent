@@ -4,14 +4,15 @@ PostgreSQL SKIP LOCKED queue adapter for local development.
 
 from typing import List
 from adapters.queue.base import QueuePort, Delivery
+from core.contracts.jobs import JobRef
 
 
 class PostgresQueue(QueuePort):
     def __init__(self, dsn: str = "postgresql://finscan:finscan@localhost:5432/finscan"):
         self.dsn = dsn
 
-    def publish(self, job_ref: dict) -> None:
-        # TODO: Member 6 implement transactional outbox / job enqueue
+    def publish(self, job_ref: JobRef) -> None:
+        # Member 6 implement transactional outbox / job enqueue
         pass
 
     def receive(self, max_n: int = 1) -> List[Delivery]:

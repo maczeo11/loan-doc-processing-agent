@@ -4,6 +4,7 @@ AWS SQS + DLQ queue adapter for cloud demo deployment.
 
 from typing import List
 from adapters.queue.base import QueuePort, Delivery
+from core.contracts.jobs import JobRef
 
 
 class SQSQueue(QueuePort):
@@ -12,8 +13,8 @@ class SQSQueue(QueuePort):
         self.dlq_url = dlq_url
         self.region = region
 
-    def publish(self, job_ref: dict) -> None:
-        # TODO: Member 2 & 6 implement SQS send_message
+    def publish(self, job_ref: JobRef) -> None:
+        # Member 2 & 6 implement SQS send_message
         pass
 
     def receive(self, max_n: int = 1) -> List[Delivery]:

@@ -4,10 +4,11 @@ Generates realistic multi-page PDF dossiers from the Kaggle Loan Approval datase
 injecting controlled anomalies (salary inflation, name mismatch, missing docs) for testing and live hackathon demos.
 """
 
-import os
 import json
-import random
-from typing import Dict, Any
+import os
+from typing import Any, Dict
+
+import pymupdf
 
 SAMPLE_APPLICANTS = [
     {

@@ -1,0 +1,68 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+.env
+.env.local
+.env.*.local
+
+# Databases & local state
+*.sqlite3
+*.db
+local_queue/
+checkpoints/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# UI / Node
+ui/node_modules/
+ui/dist/
+ui/.next/
+
+# Large ML weights & binary datasets (>10MB)
+*.bin
+*.safetensors
+*.gguf
+*.pt
+*.pth
+data/synthetic_dossiers/**/*.pdf
+!data/manifests/
+
+# Logs & monitoring
+*.log
+.coverage
+htmlcov/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+mlruns/

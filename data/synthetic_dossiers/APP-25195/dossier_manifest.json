@@ -1,0 +1,47 @@
+{
+  "application_id": "APP-25195",
+  "applicant_name": "Aarav Sharma",
+  "injected_anomaly": null,
+  "payslip": {
+    "employee_name": "Aarav Sharma",
+    "employer_name": "Tata Consultancy Services Ltd",
+    "gross_salary": 100000.0,
+    "net_salary": 88000.0,
+    "epf_deduction": 8000.0,
+    "tds_deduction": 4000.0
+  },
+  "bank_statement": {
+    "account_holder": "Aarav Sharma",
+    "bank_name": "HDFC Bank Ltd",
+    "account_number": "501003522339",
+    "monthly_salary_credits": [
+      100000.0,
+      100000.0,
+      100000.0
+    ],
+    "average_balance": 45000.0,
+    "bounced_transactions": 0
+  },
+  "tax_return": {
+    "assessee_name": "Aarav Sharma",
+    "pan_number": "ABCDE1231F",
+    "gross_total_income": 1200000.0,
+    "total_tax_paid": 144000.0
+  },
+  "kyc": {
+    "full_name": "Aarav Sharma",
+    "pan_number": "ABCDE1231F",
+    "dob": "1994-06-15",
+    "aadhaar_masked": "XXXX-XXXX-6239"
+  },
+  "tabular_features": {
+    "no_of_dependents": 2,
+    "education": "Graduate",
+    "self_employed": "No",
+    "income_annum": 1200000.0,
+    "loan_amount": 3500000.0,
+    "loan_term": 15,
+    "cibil_score": 780,
+    "assets_total": 4500000.0
+  }
+}

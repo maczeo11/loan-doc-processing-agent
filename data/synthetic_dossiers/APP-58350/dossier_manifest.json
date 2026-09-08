@@ -1,0 +1,35 @@
+{
+  "application_id": "APP-58350",
+  "applicant_name": "Rajesh Nair",
+  "injected_anomaly": "MISSING_BANK_STATEMENT",
+  "payslip": {
+    "employee_name": "Rajesh Nair",
+    "employer_name": "Freelance IT Consultant",
+    "gross_salary": 116666.67,
+    "net_salary": 102666.67,
+    "epf_deduction": 9333.33,
+    "tds_deduction": 4666.67
+  },
+  "tax_return": {
+    "assessee_name": "Rajesh Nair",
+    "pan_number": "ABCDE1308F",
+    "gross_total_income": 1400000.0,
+    "total_tax_paid": 168000.0
+  },
+  "kyc": {
+    "full_name": "Rajesh Nair",
+    "pan_number": "ABCDE1308F",
+    "dob": "1994-06-15",
+    "aadhaar_masked": "XXXX-XXXX-1981"
+  },
+  "tabular_features": {
+    "no_of_dependents": 2,
+    "education": "Graduate",
+    "self_employed": "Yes",
+    "income_annum": 1400000.0,
+    "loan_amount": 4000000.0,
+    "loan_term": 12,
+    "cibil_score": 620,
+    "assets_total": 2800000.0
+  }
+}

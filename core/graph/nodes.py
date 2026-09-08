@@ -245,6 +245,7 @@ def synthesize_summary_node(state: LoanApplicationState) -> Dict[str, Any]:
 def validate_grounding_node(state: LoanApplicationState) -> Dict[str, Any]:
     """
     Node 7: Deterministic citation validation gate. Drops ungrounded claims.
+    Transitions: PROCESSING -> READY_FOR_REVIEW
     """
     summary = state.get("summary_markdown", "")
     retrieved_chunks = state.get("retrieved_chunk_ids", [])
@@ -253,7 +254,21 @@ def validate_grounding_node(state: LoanApplicationState) -> Dict[str, Any]:
     claims = [{"text": summary, "citations": retrieved_chunks}]
     is_grounded = validate_citations(claims, retrieved_chunks)
 
-    return {"summary_grounded": is_grounded}
+    history: List[StatusTransition] = list(state.get("status_history", []))
+    transition: StatusTransition = {
+        "from_status": state.get("status", "PROCESSING"),
+        "to_status": "READY_FOR_REVIEW",
+        "timestamp": _get_utc_timestamp(),
+        "reason": "Pipeline execution and grounding check complete. Ready for human underwriter review.",
+    }
+    history.append(transition)
+
+    return {
+        "status": "READY_FOR_REVIEW",
+        "status_history": history,
+        "summary_grounded": is_grounded,
+        "review_paused": True,
+    }
 
 
 def human_review_node(state: LoanApplicationState) -> Dict[str, Any]:
@@ -265,18 +280,10 @@ def human_review_node(state: LoanApplicationState) -> Dict[str, Any]:
     history: List[StatusTransition] = list(state.get("status_history", []))
     decision = state.get("reviewer_decision")
 
-    # If entering human review node before underwriter action, pause
+    # If entering human review node without underwriter decision, remain paused
     if decision is None:
-        transition: StatusTransition = {
-            "from_status": state.get("status", "PROCESSING"),
-            "to_status": "READY_FOR_REVIEW",
-            "timestamp": _get_utc_timestamp(),
-            "reason": "Pipeline execution completed. Paused at checkpoint for human underwriter review.",
-        }
-        history.append(transition)
         return {
             "status": "READY_FOR_REVIEW",
-            "status_history": history,
             "review_paused": True,
         }
 

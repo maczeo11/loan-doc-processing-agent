@@ -152,6 +152,8 @@ def test_graph_with_checkpointer_and_interrupt():
 
     # Phase 1: Run until interrupt before human_review
     interrupted_result = graph.invoke(state, config=config)
+    assert interrupted_result["status"] == "READY_FOR_REVIEW"
+    assert interrupted_result["review_paused"] is True
     snapshot = graph.get_state(config)
     assert snapshot.next == ("human_review",)
 

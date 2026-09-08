@@ -2,10 +2,9 @@
 Tax return (ITR acknowledgement) fact extractor.
 
 Extracts:
+- Assessee name, PAN
 - Assessment year
-- Taxpayer PAN / Name
-- Gross total income
-- Total tax paid
+- Gross total income, Total tax paid
 All facts MUST carry EvidenceRef.
 """
 
@@ -28,10 +27,9 @@ class TaxReturnExtractor(BaseExtractor):
             confidence=0.0,
         )
         return TaxReturnFacts(
-            document_id=doc_id,
+            assessee_name="UNKNOWN",
+            pan_number="UNKNOWN",
             assessment_year="UNKNOWN",
-            taxpayer_name=None,
-            pan_number=None,
             gross_total_income=MoneyFact(amount=0.0, currency="INR", source=fallback_evidence),
             total_tax_paid=MoneyFact(amount=0.0, currency="INR", source=fallback_evidence),
         )

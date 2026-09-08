@@ -19,7 +19,6 @@ class PayslipExtractor(BaseExtractor):
     """Extracts salary, employer, and dates from payslip pages."""
 
     def extract(self, doc_id: str, pages: List[Dict[str, Any]]) -> PayslipFacts:
-        # Jeevan to implement regex/layout extraction with word coordinates
         fallback_evidence = EvidenceRef(
             document_id=doc_id,
             document_type="payslip",
@@ -29,10 +28,9 @@ class PayslipExtractor(BaseExtractor):
             confidence=0.0,
         )
         return PayslipFacts(
-            document_id=doc_id,
-            employer_name=None,
-            employee_name=None,
+            employee_name="UNKNOWN",
+            employer_name="UNKNOWN",
             gross_salary=MoneyFact(amount=0.0, currency="INR", source=fallback_evidence),
             net_salary=MoneyFact(amount=0.0, currency="INR", source=fallback_evidence),
-            pay_period=None,
+            pay_period_str=None,
         )

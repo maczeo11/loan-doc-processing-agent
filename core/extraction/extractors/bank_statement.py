@@ -2,10 +2,8 @@
 Bank statement fact extractor.
 
 Extracts:
-- Bank name, Account number
-- Account holder name
-- Total deposits, Average monthly balance
-- Recurring salary credits
+- Account holder, Bank name, Masked account number
+- Recurring salary credits, Closing balance
 All facts MUST carry EvidenceRef.
 """
 
@@ -28,13 +26,11 @@ class BankStatementExtractor(BaseExtractor):
             confidence=0.0,
         )
         return BankStatementFacts(
-            document_id=doc_id,
-            bank_name=None,
-            account_holder_name=None,
-            statement_start_date=None,
-            statement_end_date=None,
-            total_credits=MoneyFact(amount=0.0, currency="INR", source=fallback_evidence),
-            total_debits=MoneyFact(amount=0.0, currency="INR", source=fallback_evidence),
+            account_holder="UNKNOWN",
+            bank_name="UNKNOWN",
+            account_number_masked="XXXXXX0000",
+            salary_credits=[],
+            average_salary_credit=None,
             closing_balance=MoneyFact(amount=0.0, currency="INR", source=fallback_evidence),
-            detected_salary_credits=[],
+            bounced_transactions=0,
         )

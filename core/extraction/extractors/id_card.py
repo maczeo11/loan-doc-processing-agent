@@ -28,7 +28,11 @@ class IdCardExtractor(BaseExtractor):
         )
         return ApplicantFact(
             full_name="UNKNOWN",
-            pan=None,
+            source_name=fallback_evidence,
+            pan_number=None,
+            source_pan=None,
             dob=None,
-            source=fallback_evidence,
+            source_dob=None,
+            aadhaar_masked=None,
+            source_aadhaar=None,
         )

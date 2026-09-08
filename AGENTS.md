@@ -77,14 +77,24 @@ All external dependencies sit behind strictly typed abstract ports. The core dom
 ### Queue Port Specification (`adapters/queue/base.py`)
 ```python
 publish(job_ref: JobRef) -> None
-receive(max_n: int) -> list[Delivery]          # Returns opaque lease handle
+receive(max_n: int) -> list[Delivery]          # Returns opaque lease handle and typed JobRef
 extend_lease(handle: str, seconds: int) -> None
 ack(handle: str) -> None
 fail(handle: str, retryable: bool) -> None
 ```
-**Queue Invariants:**
-- At-least-once delivery; consumer handlers must be completely idempotent.
-- **Acknowledge-Last:** Application state and audit logs must commit to PostgreSQL *before* calling `ack(handle)`.
+
+### Worker Consumer & Lease Heartbeat Protocol
+1. **At-Least-Once Delivery & Idempotency:**
+   - Queue deliveries must be idempotent. Re-delivering an already processed job ID must not create duplicate findings or corrupt state.
+2. **Lease Extension via `LeaseHeartbeat`:**
+   - While processing long-running jobs (OCR parsing, hybrid RAG, model inference), the worker runs a background `LeaseHeartbeat` thread.
+   - Heartbeat periodically invokes `extend_lease(handle, seconds=30)` (default interval: 10s) to prevent visibility timeout expiration and duplicate pickup.
+3. **Bounded Retries & Poison Message DLQ Ceiling:**
+   - Maximum 3 delivery attempts (`attempt_count <= 3`).
+   - If `attempt_count > 3`, the worker **must abort pipeline execution immediately** and invoke `fail(handle, retryable=False)` to route the message to DLQ.
+4. **Acknowledge-Last Guarantee:**
+   - Application state, audit logs, and graph checkpoint **must commit to PostgreSQL before** `ack(handle)` is called.
+   - On unhandled exception during processing, the worker catches the error, logs it, and calls `fail(handle, retryable=True)`. `ack()` is **never** called on failure.
 
 ---
 
@@ -93,14 +103,57 @@ fail(handle: str, retryable: bool) -> None
 `core/contracts/` defines the boundary across all pods. Never redefine a model locally, never loosen a type, and never rename fields to make a test pass.
 
 - **`EvidenceRef`** (`core/contracts/evidence.py`):
-  Every single fact carries document provenance: `document_id`, `document_type`, `page_number` (1-indexed), `quoted_span`, and `bounding_box` (`x0, y0, x1, y1` in PDF coordinates).
+  Every single fact carries document provenance: `document_id`, `document_type`, `page_number` (1-indexed), `quoted_span`, and `bounding_box` (`x0, y0, x1, y1` in normalized PDF coordinates).
 - **`MoneyFact`** (`core/contracts/facts.py`):
-  Represents financial amounts: `amount`, `currency`, `period`, `gross_or_net`, and mandatory `source: EvidenceRef`.
+  Represents financial amounts: `amount: float`, `currency: str`, `period: Optional[str]`, `gross_or_net: Optional[str]`, and mandatory `source: EvidenceRef`.
+- **`JobRef`** (`core/contracts/jobs.py`):
+  Authoritative job reference payload passed through transactional outbox and queue adapters:
+  - `job_id: str` (e.g. `JOB-550e8400-e29b-41d4-a716-446655440000`)
+  - `application_id: str` (e.g. `APP-25195`)
+  - `attempt_count: int` (starts at 1; ceiling = 3 before routing to DLQ)
+  - `created_at: str` (ISO 8601 UTC timestamp)
+  - `priority: int` (0 = normal, 9 = urgent)
+  - `metadata: Dict[str, Any]` (holds `document_ids`, `document_manifest`, trace context)
+- **Domain Fact Models** (`core/contracts/facts.py`):
+  - `PayslipFacts`: `employee_name: Optional[str]`, `employer_name: Optional[str]`, `gross_salary: Optional[MoneyFact]`, `net_salary: Optional[MoneyFact]`
+  - `BankStatementFacts`: `account_holder: Optional[str]`, `bank_name: Optional[str]`, `account_number_masked: Optional[str]`, `salary_credits: List[MoneyFact]`, `average_salary_credit: Optional[MoneyFact]`, `closing_balance: Optional[MoneyFact]`, `bounced_transactions: int`
+  - `TaxReturnFacts`: `assessee_name: Optional[str]`, `pan_number: Optional[str]`, `assessment_year: Optional[str]`, `gross_total_income: Optional[MoneyFact]`, `total_tax_paid: Optional[MoneyFact]`
+  - `ApplicantFact`: `full_name: Optional[str]`, `source_name: Optional[EvidenceRef]`, `pan_number: Optional[str]`, `source_pan: Optional[EvidenceRef]`
 - **`Finding`** (`core/contracts/findings.py`):
   Output of deterministic rules: `rule_id`, `rule_name`, `verdict` (`pass` / `flag` / `unknown`), `reason`, `supporting_evidence: list[EvidenceRef]`, and `policy_version`.
 - **`LoanApplicationState`** (`core/contracts/state.py`):
   The authoritative TypedDict passed through LangGraph nodes. Only these 8 lifecycle states exist:
   `UPLOADED` $\rightarrow$ `QUEUED` $\rightarrow$ `PROCESSING` $\rightarrow$ `READY_FOR_REVIEW` $\rightarrow$ `NEEDS_INFORMATION` $\rightarrow$ `REVIEWED` $\rightarrow$ `FAILED` $\rightarrow$ `CANCELLED`.
+
+### LangGraph StateGraph Execution Pipeline
+The pipeline runs the following deterministic node sequence:
+```
+[Entry: triage_node] ────── (empty dossier) ──────► FAILED ──► [END]
+         │ (valid manifest)
+         ▼
+[ocr_and_classify_node]
+         │
+         ▼
+[extract_facts_node]       (extracts Payslip, Bank, Tax, ID with EvidenceRefs)
+         │
+         ▼
+[evaluate_rules_node]      (deterministic rules: completeness, salary, tax, identity)
+         │
+         ▼
+[retrieve_policy_node]     (hybrid RAG: BM25 + BGE dense retrieval on policy corpus)
+         │
+         ▼
+[synthesize_summary_node]  (assembles Credit Appraisal Memo markdown narrative)
+         │
+         ▼
+[validate_grounding_node]  (citation gate: transitions state to READY_FOR_REVIEW)
+         │
+         ▼
+[interrupt_before: human_review_node] <─── HALTS for Human Underwriter Review
+         │ (resumed via API with reviewer_decision: APPROVED | REJECTED | NEEDS_INFO)
+         ▼
+[human_review_node] ──────► transitions to REVIEWED or NEEDS_INFORMATION ──► [END]
+```
 
 ---
 
@@ -187,6 +240,11 @@ Every member of our 8-person team has a clearly separated module boundary. Read 
 * **Inviolable Rules:**
   - **OCR routing happens before classification** (a scanned image has no text for a classifier to read).
   - **No fact without an `EvidenceRef`.** If an extractor cannot locate the exact span text and bounding box, it must assign `UNKNOWN`.
+  - **Exact Fact Contract Alignment (`core/contracts/facts.py`):**
+    - `BankStatementFacts`: MUST use `account_holder: Optional[str]` and `salary_credits: List[MoneyFact]`.
+    - `ApplicantFact`: MUST use `source_name: Optional[EvidenceRef]` and `source_pan: Optional[EvidenceRef]`.
+    - `PayslipFacts`: `gross_salary: Optional[MoneyFact]`, `net_salary: Optional[MoneyFact]`.
+    - Coordinates in `BoundingBox` must satisfy normalized bounds ($0 \le x_0 < x_1 \le 1$ or page points).
   - Never train custom OCR models; use pre-trained engines only.
 * **Safety & Security Role:** Validate page bounding-box bounds (`0 <= x0 < x1 <= page_width`) to prevent corrupted coordinate exploits.
 
@@ -198,15 +256,16 @@ Every member of our 8-person team has a clearly separated module boundary. Read 
 * **What You Build:**
   - Synthetic dossier generation script (`scripts/generate_dossiers.py`) generating coherent applicant dossiers with deliberate discrepancies from Kaggle tabular seeds.
   - **Deterministic Rules Engine (`core/rules/`) — HUMAN-ONLY ZONE:**
-    - `completeness.py`: Verify presence of application form, 3 payslips, bank statement, ITR, and KYC ID.
-    - `salary_audit.py`: Reconcile payslip net salary against verified bank credits within $5\%$ tolerance.
-    - `tax_audit.py`: Compare ITR gross total income against annualized payslip gross income.
-    - `identity.py`: Fuzzy string matching on applicant name and PAN across all dossier documents.
+    - `RULE-COMP-01` (`completeness.py`): Verify presence of application form, 3 payslips, bank statement, ITR, and KYC ID.
+    - `RULE-INC-01` (`salary_audit.py`): Reconcile payslip net salary against verified bank credits within $5\%$ tolerance (`tolerance=0.05`).
+    - `RULE-TAX-01` (`tax_audit.py`): Compare ITR gross total income against annualized payslip gross income ($12 \times \text{monthly gross}$).
+    - `RULE-ID-01` (`identity.py`): Fuzzy string matching on applicant name and PAN across all dossier documents.
   - Credit Appraisal Memo (CAM) builder and narrative assembly in `core/reporting/memo_builder.py`.
 * **Inviolable Rules:**
   - **No agent authorship in financial arithmetic without manual review.**
   - If a required value is missing or `UNKNOWN`, the rule verdict MUST be `unknown`, never a guessed `pass`.
   - Floating point arithmetic must use explicit tolerances ($\le 0.05$).
+  - Outputs must strictly construct typed [`Finding`](file:///c:/Users/bhanu/mycodes/cognizant-hackathon/core/contracts/findings.py) models.
 * **Safety & Security Role:** Guarantee that every financial comparison is mathematically sound and immune to LLM hallucination.
 
 ---
@@ -232,10 +291,29 @@ Every member of our 8-person team has a clearly separated module boundary. Read 
 * **Branch Prefix:** `feat/api-*`, `feat/db-*`, `feat/infra-*`
 * **What You Build:**
   - FastAPI application endpoints (`apps/api/routes/applications.py`, `documents.py`, `review.py`).
-  - PostgreSQL schema tables (`apps/api/db/models.py`) and async connection pool (`apps/api/db/session.py`).
+  - PostgreSQL schema tables (`apps/api/db/models.py`) with SQLAlchemy 2.0 + asyncpg and Alembic migrations.
   - Transactional outbox implementation: committing application status updates and queue jobs in a single database transaction.
   - Redis token buckets for rate limiting (5 uploads/min, 30 polls/min).
   - Cloud hosting infrastructure: single ARM `t4g.medium` EC2 instance, Caddy reverse proxy with Let's Encrypt HTTPS, Docker Compose, SQS/S3 provisioning, and teardown scripts.
+* **Authoritative Database & Outbox Architecture:**
+  1. **Stack:** SQLAlchemy 2.0 (`DeclarativeBase`, `Mapped`, `mapped_column`) with `asyncpg` async driver. Alembic migrations located in `apps/api/alembic/`.
+  2. **`outbox_jobs` Table Schema:**
+     - `id`: `UUID` (Primary Key, server default `gen_random_uuid()`)
+     - `job_id`: `VARCHAR(64)` UNIQUE NOT NULL (e.g. `JOB-UUID`)
+     - `application_id`: `VARCHAR(64)` NOT NULL INDEXED
+     - `payload`: `JSONB` NOT NULL conforming strictly to [`JobRef`](file:///c:/Users/bhanu/mycodes/cognizant-hackathon/core/contracts/jobs.py)
+     - `status`: `VARCHAR(20)` NOT NULL DEFAULT `'PENDING'` (`PENDING`, `DISPATCHED`, `FAILED`) INDEXED
+     - `retry_count`: `INT` NOT NULL DEFAULT 0
+     - `created_at`: `TIMESTAMPTZ` NOT NULL DEFAULT `clock_timestamp()`
+     - `dispatched_at`: `TIMESTAMPTZ` NULL
+  3. **Transactional Dispatcher Invariant:**
+     - `POST /applications/{id}/process`: In a single atomic DB transaction, persist uploaded documents, update application status to `QUEUED`, and insert a row into `outbox_jobs`. Return `202 Accepted` immediately with `{"job_id": job_id, "status": "QUEUED"}`.
+     - Outbox Poller queries: `SELECT * FROM outbox_jobs WHERE status = 'PENDING' ORDER BY created_at LIMIT 10 FOR UPDATE SKIP LOCKED`.
+     - Dispatcher calls `queue.publish(job_ref)` and updates `status = 'DISPATCHED'`.
+  4. **Human Review Resume Endpoint (`POST /applications/{id}/review`):**
+     - Accepts underwriter action: `{ "decision": "APPROVED" | "REJECTED" | "NEEDS_INFO", "notes": "..." }`.
+     - Resumes LangGraph checkpoint for `application_id` via `graph.update_state()` and `graph.invoke(None, config=config)`.
+     - Commits resulting transition to `REVIEWED` or `NEEDS_INFORMATION` in PostgreSQL.
 * **Inviolable Rules:**
   - `POST /applications/{id}/process` must return `202 Accepted` immediately with a `job_id`. Never block an HTTP request on pipeline execution.
   - The frontend must never call S3 directly or connect directly to PostgreSQL. Document downloads must use short-lived presigned URLs issued by the API.
@@ -254,10 +332,14 @@ Every member of our 8-person team has a clearly separated module boundary. Read 
     2. Center: `pdf.js` canvas rendering the original PDF with visual bounding-box highlights based on `EvidenceRef` coordinates.
     3. Right: Audit findings card, pass/flag/unknown badges, policy explanations, and sign-off action buttons.
   - Interactive Q&A chat panel connected to `POST /applications/{id}/questions`.
-  - Human review actions: **Sign Off (Approve)**, **Flag Discrepancy (Reject)**, and **Request Information**.
+  - Human review actions connecting to `POST /applications/{id}/review`:
+    - **Sign Off (Approve)**: Sends `{ "decision": "APPROVED", "notes": "..." }`.
+    - **Flag Discrepancy (Reject)**: Sends `{ "decision": "REJECTED", "notes": "..." }`.
+    - **Request Information**: Sends `{ "decision": "NEEDS_INFO", "notes": "..." }`.
   - Finalized audit report download (JSON / PDF export).
 * **Inviolable Rules:**
   - The UI must never compute financial math or make business decisions in client-side code.
+  - Polling rate limit: Poll `GET /applications/{id}` at intervals $\ge 2$ seconds (maximum 30 polls/min).
   - Use the generated API client from Manjunath; never write ad-hoc fetch calls.
   - Build outputs to `apps/ui/dist`, served same-origin by FastAPI.
 * **Safety & Security Role:** Ensure clear visual distinction between verified facts and `flag` discrepancies so underwriters never miss an alert.
@@ -275,7 +357,7 @@ Every member of our 8-person team has a clearly separated module boundary. Read 
   - Frozen 30-question evaluation benchmark (`eval/questions.json`: 18 dev / 12 held-out) measuring Recall@5 ($\ge 0.90$) and grounding precision.
 * **Inviolable Rules:**
   - **Hard Index Isolation:** Application chunks and policy chunks must never collide. An application index is strictly scoped to `application_id`.
-  - Any LLM claim that lacks grounding citations must be stripped, and the summary must explicitly abstain if evidence is missing.
+  - **Citation Grounding Gate:** Integrated directly into LangGraph Node 7 (`validate_grounding_node`). Any claim lacking grounding citations must be stripped, and the summary must explicitly abstain if evidence is missing.
   - Document text must be sanitized against prompt injection attempts.
 * **Safety & Security Role:** Grounding verification — acting as the firewall between LLM hallucinations and the human underwriter.
 
@@ -290,3 +372,4 @@ A feature branch is eligible for merge into `main` only when:
 4. **Zero Secrets Committed:** No API keys, AWS credentials, or passwords in git history.
 5. **Human-Only Review:** Any financial logic in `core/rules/` or queue/outbox SQL has been reviewed by Bhanu.
 6. **Owner Explanation:** The code author can explain every line in the PR during viva prep.
+

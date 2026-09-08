@@ -3,7 +3,7 @@ EvidenceRef: The atomic unit of evidence in FinScan AI.
 Every extracted fact or claim must carry an EvidenceRef back to a document page and span.
 """
 
-from typing import Optional, List
+from typing import Optional
 from pydantic import BaseModel, Field
 
 

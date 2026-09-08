@@ -11,7 +11,6 @@ Rules from AGENTS.md:
 
 import time
 import logging
-from typing import Optional
 from adapters.queue.base import QueuePort, Delivery
 from core.graph.workflow import build_application_graph
 

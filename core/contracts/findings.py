@@ -3,7 +3,7 @@ Findings: The output of deterministic verification rules in core/rules/.
 No verdict originates from an LLM. Rules compute them; LLMs only narrate them.
 """
 
-from typing import List, Literal, Optional
+from typing import List, Literal
 from pydantic import BaseModel, Field
 from core.contracts.evidence import EvidenceRef
 

@@ -3,7 +3,7 @@ Native PDF parser using PyMuPDF (fitz) for text and exact word bounding boxes.
 """
 
 from typing import List
-from core.contracts.evidence import EvidenceRef, BoundingBox
+from core.contracts.evidence import EvidenceRef
 
 
 def extract_native_text_with_coordinates(pdf_path: str, page_number: int) -> List[EvidenceRef]:

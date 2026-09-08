@@ -9,7 +9,7 @@ Extracts:
 All facts MUST carry EvidenceRef.
 """
 
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 from core.extraction.extractors.base import BaseExtractor
 from core.contracts.facts import TaxReturnFacts, MoneyFact
 from core.contracts.evidence import EvidenceRef, BoundingBox

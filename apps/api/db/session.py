@@ -6,8 +6,6 @@ Rules from AGENTS.md:
 - We depend on SELECT ... FOR UPDATE SKIP LOCKED, row locks, and transactional outbox commits.
 """
 
-from typing import AsyncGenerator
-from apps.api.config import settings
 
 
 async def get_db_connection():

@@ -134,6 +134,18 @@ FinScan AI is organized as a **modular monolith with ports and adapters**, ensur
 
 ---
 
+### 🔒 Object Storage & S3 Security Architecture
+
+All document assets (uploaded PDFs, parsed manifests, generated CAM artifacts) are managed through the abstract [`StoragePort`](file:///c:/Users/bhanu/mycodes/cognizant-hackathon/adapters/storage/base.py) with enterprise banking security defaults:
+
+1. **Server-Side Encryption at Rest (SSE-S3 / SSE-KMS):** Every object written to S3 is encrypted with mandatory `ServerSideEncryption="AES256"` (or AWS KMS). Unencrypted object writes are blocked at both client adapter and S3 bucket policy levels.
+2. **Tenant & Dossier Partitioning:** Storage keys strictly follow the canonical hierarchy `dossiers/{application_id}/{document_id}_{sanitized_filename}` via `build_storage_key()`. The storage adapter strictly validates that operations cannot escape or manipulate path prefixes.
+3. **Path Traversal & Filename Sanitization:** Input filenames are stripped of directory traversal sequences (`../`, `..\\`) and sanitized into safe alphanumeric ASCII strings before key creation.
+4. **Short-Lived Cryptographic Presigned URLs:** Neither the browser frontend nor external consumers ever get direct public access to S3 buckets. Document rendering in `pdf.js` uses time-bounded presigned GET URLs (TTL 15–60 min).
+5. **Zero Public Access:** AWS S3 Block Public Access is enabled across all 4 controls (bucket and account levels).
+
+---
+
 ## 👥 Team Work Breakdown & Ownership (8 Members)
 
 | Member | Owns |

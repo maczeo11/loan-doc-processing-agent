@@ -91,14 +91,15 @@ def test_s3_storage_put_bytes():
     storage = S3Storage(bucket_name="finscan-dossiers", region="us-east-1", s3_client=mock_s3)
     content = b"S3 raw binary upload"
 
-    uri = storage.put("apps/app01/id.pdf", content)
+    uri = storage.put("dossiers/apps/app01/id.pdf", content)
 
-    assert uri == "s3://finscan-dossiers/apps/app01/id.pdf"
+    assert uri == "s3://finscan-dossiers/dossiers/apps/app01/id.pdf"
     mock_s3.put_object.assert_called_once_with(
         Bucket="finscan-dossiers",
-        Key="apps/app01/id.pdf",
+        Key="dossiers/apps/app01/id.pdf",
         Body=content,
         ContentType="application/pdf",
+        ServerSideEncryption="AES256",
     )
 
 
@@ -107,14 +108,14 @@ def test_s3_storage_put_stream():
     storage = S3Storage(bucket_name="finscan-dossiers", s3_client=mock_s3)
     stream = io.BytesIO(b"Stream data for S3")
 
-    uri = storage.put("apps/app01/payslip.pdf", stream)
+    uri = storage.put("dossiers/apps/app01/payslip.pdf", stream)
 
-    assert uri == "s3://finscan-dossiers/apps/app01/payslip.pdf"
+    assert uri == "s3://finscan-dossiers/dossiers/apps/app01/payslip.pdf"
     mock_s3.upload_fileobj.assert_called_once_with(
         stream,
         "finscan-dossiers",
-        "apps/app01/payslip.pdf",
-        ExtraArgs={"ContentType": "application/pdf"},
+        "dossiers/apps/app01/payslip.pdf",
+        ExtraArgs={"ContentType": "application/pdf", "ServerSideEncryption": "AES256"},
     )
 
 

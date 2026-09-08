@@ -8,9 +8,14 @@ Endpoints:
 - POST /applications/{id}/review
 """
 
-from fastapi import APIRouter
-from pydantic import BaseModel
 from typing import Optional, List, Dict, Any, Literal
+from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from apps.api.db.models import JobModel
+from apps.api.db.session import get_db
 
 router = APIRouter(tags=["Review & Jobs"])
 
@@ -40,13 +45,30 @@ class QuestionResponse(BaseModel):
 
 
 @router.get("/jobs/{id}", response_model=JobStatusResponse)
-async def get_job_status(id: str):
-    """Poll processing job status."""
+async def get_job_status(
+    id: str,
+    session: AsyncSession = Depends(get_db),
+):
+    """
+    Poll authoritative processing job status from PostgreSQL JobModel.
+    Returns 404 for unknown jobs.
+    """
+    result = await session.execute(
+        select(JobModel).where(JobModel.id == id)
+    )
+    job_record = result.scalar_one_or_none()
+    if not job_record:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Job '{id}' not found",
+        )
+
     return JobStatusResponse(
-        job_id=id,
-        application_id="APP-PENDING",
-        status="PROCESSING",
-        attempt_count=1
+        job_id=job_record.id,
+        application_id=job_record.application_id,
+        status=job_record.status,
+        attempt_count=job_record.attempt_count,
+        error_message=job_record.error_message,
     )
 
 

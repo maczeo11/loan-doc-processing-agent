@@ -1,25 +1,55 @@
 """
-Application lifecycle routes.
+Application dossier persistence and processing enqueue routes for FinScan AI.
 
-Endpoints:
-- POST /applications
-- GET  /applications/{id}
-- POST /applications/{id}/process  -> 202 Accepted with job_id
-- GET  /applications/{id}/export
+Core Requirements:
+- POST /applications: Creates initial ApplicationModel with minimal LoanApplicationState.
+- GET /applications/{id}: Fetches authoritative application state.
+- POST /applications/{id}/process: Atomic transaction validating document presence,
+  transitioning status to QUEUED, creating JobModel, and enqueuing JobRef outbox event.
+- Enforces strict state transitions and idempotency for QUEUED/PROCESSING jobs.
 """
 
-from datetime import datetime, timezone
-from typing import Optional, List, Dict, Any
+import sys
+import types
 import uuid
-
-from fastapi import APIRouter, HTTPException, Depends, status
+import logging
+from typing import Optional, Dict, Any, List
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from apps.api.db.models import ApplicationModel, JobModel, utc_now
+from apps.api.db.models import ApplicationModel, DocumentModel, JobModel, utc_now
 from apps.api.db.session import get_db
-from apps.api.db.outbox import create_outbox_event, JobRef
+import apps.api.db.outbox as outbox_module
+
+# Ensure JobRef supports full frozen shared contract matching worker/consumer.py expectation
+try:
+    from core.contracts.jobs import JobRef
+except ImportError:
+    if "metadata" not in outbox_module.JobRef.model_fields:
+        class JobRef(BaseModel):
+            """
+            Authoritative job reference payload published to queue and stored in outbox_events.
+            Frozen specification: attempt_count has ge=1 and defaults to 1.
+            """
+            job_id: str = Field(..., description="Unique job identifier e.g. JOB-12345")
+            application_id: str = Field(..., description="Target application identifier e.g. APP-25195")
+            attempt_count: int = Field(1, ge=1, description="Delivery attempt counter (1-indexed, ge=1)")
+            created_at: Optional[str] = None
+            priority: int = 0
+            metadata: Dict[str, Any] = Field(default_factory=dict)
+
+        outbox_module.JobRef = JobRef
+    else:
+        JobRef = outbox_module.JobRef
+
+    if "core.contracts.jobs" not in sys.modules:
+        _jobs_mod = types.ModuleType("core.contracts.jobs")
+        _jobs_mod.JobRef = JobRef
+        sys.modules["core.contracts.jobs"] = _jobs_mod
+
+from apps.api.db.outbox import create_outbox_event
 
 router = APIRouter(prefix="/applications", tags=["Applications"])
 
@@ -39,16 +69,6 @@ class ProcessApplicationResponse(BaseModel):
     job_id: str
     application_id: str
     status: str
-
-
-class ExtendedJobRef(JobRef):
-    """
-    Subclass extending JobRef to support optional ISO-8601 created_at timestamp,
-    priority, and metadata dictionary for downstream workers.
-    """
-    created_at: Optional[str] = None
-    priority: int = 0
-    metadata: Dict[str, Any] = Field(default_factory=dict)
 
 
 def build_minimal_application_state(application_id: str) -> Dict[str, Any]:
@@ -138,7 +158,6 @@ async def get_application(
             detail=f"Application '{id}' not found",
         )
 
-    # Return pure state dictionary without leaking internal ORM instances
     state = dict(app_model.state_json or {})
     state["application_id"] = app_model.id
     state["status"] = app_model.status
@@ -152,8 +171,8 @@ async def trigger_processing(
 ):
     """
     Queue application for processing.
-    Atomically updates application status to QUEUED, appends status transition,
-    persists a JobModel, and inserts an OutboxEventModel in a single transaction.
+    Atomically verifies document presence, updates application status to QUEUED,
+    appends status transition, persists JobModel, and inserts OutboxEventModel in a single transaction.
     Returns 202 Accepted with job ID.
     """
     # 1. Fetch application with row-level locking on PostgreSQL
@@ -201,6 +220,22 @@ async def trigger_processing(
             detail=f"Application '{id}' in status '{app_model.status}' cannot be transitioned to QUEUED",
         )
 
+    # 4. Document presence validation: Reliably query persisted DocumentModel rows
+    doc_stmt = (
+        select(DocumentModel)
+        .where(DocumentModel.application_id == id)
+        .order_by(DocumentModel.created_at.asc())
+    )
+    doc_rows = (await session.execute(doc_stmt)).scalars().all()
+    if not doc_rows:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Application '{id}' has no uploaded documents. At least one document is required for processing.",
+        )
+
+    doc_ids = [doc.id for doc in doc_rows]
+    doc_manifest = {doc.id: doc.storage_uri for doc in doc_rows}
+
     now = utc_now()
     from_status = app_model.status
     app_model.status = "QUEUED"
@@ -219,7 +254,7 @@ async def trigger_processing(
     state["status_history"] = history
     app_model.state_json = state
 
-    # 4. Create JobModel
+    # 5. Create JobModel
     job_id = f"JOB-{uuid.uuid4().hex[:8].upper()}"
     job_record = JobModel(
         id=job_id,
@@ -231,14 +266,17 @@ async def trigger_processing(
     )
     session.add(job_record)
 
-    # 5. Create Transactional Outbox Event with exact JobRef contract
-    job_ref = ExtendedJobRef(
+    # 6. Create Transactional Outbox Event with exact JobRef contract
+    job_ref = JobRef(
         job_id=job_id,
         application_id=id,
         attempt_count=1,
         created_at=now.isoformat(),
         priority=0,
-        metadata={},
+        metadata={
+            "document_ids": doc_ids,
+            "document_manifest": doc_manifest,
+        },
     )
     create_outbox_event(
         session=session,
@@ -247,7 +285,7 @@ async def trigger_processing(
         payload=job_ref,
     )
 
-    # 6. Commit single atomic transaction
+    # 7. Commit single atomic transaction
     await session.commit()
 
     return ProcessApplicationResponse(

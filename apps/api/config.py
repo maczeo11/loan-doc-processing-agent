@@ -2,8 +2,8 @@
 API configuration and settings.
 """
 
+from typing import List, Literal
 from pydantic_settings import BaseSettings
-from typing import Literal
 
 
 class Settings(BaseSettings):
@@ -15,6 +15,7 @@ class Settings(BaseSettings):
 
     # Adapter selections
     STORAGE_BACKEND: Literal["local", "s3"] = "local"
+    STORAGE_BASE_DIR: str = "data/storage"
     QUEUE_BACKEND: Literal["postgres", "sqs"] = "postgres"
     LLM_BACKEND: Literal["opencode", "qwen_offline"] = "opencode"
 
@@ -32,6 +33,15 @@ class Settings(BaseSettings):
     MAX_STATUS_POLLS_PER_MIN: int = 30
     MAX_FILE_SIZE_MB: int = 10
     MAX_PAGES_PER_APP: int = 30
+
+    # Document upload validation
+    ALLOWED_CONTENT_TYPES: List[str] = [
+        "application/pdf",
+        "image/jpeg",
+        "image/png",
+        "image/tiff",
+    ]
+    ALLOWED_EXTENSIONS: List[str] = [".pdf", ".jpg", ".jpeg", ".png", ".tiff"]
 
     class Config:
         env_file = ".env"

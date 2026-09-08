@@ -160,3 +160,45 @@ def test_s3_storage_exists_and_delete():
     # Delete
     assert storage.delete("doc.pdf") is True
     mock_s3.delete_object.assert_called_once_with(Bucket="finscan-dossiers", Key="doc.pdf")
+
+
+# =====================================================================
+# Canonical Storage Key & Sanitization Tests
+# =====================================================================
+
+def test_sanitize_filename():
+    from adapters.storage.base import sanitize_filename
+
+    assert sanitize_filename("simple_salary.pdf") == "simple_salary.pdf"
+    assert sanitize_filename("../../etc/passwd.pdf") == "passwd.pdf"
+    assert sanitize_filename("my payslip (March 2024) #1!.pdf") == "my_payslip__March_2024___1_.pdf"
+    assert sanitize_filename("") == "document.pdf"
+
+
+def test_build_storage_key_canonical_format():
+    from adapters.storage.base import build_storage_key
+
+    app_id = "APP-25195"
+    doc_id = "DOC-99182"
+    filename = "march payslip (verified).pdf"
+
+    key = build_storage_key(app_id, doc_id, filename)
+
+    assert key == "dossiers/APP-25195/DOC-99182_march_payslip__verified_.pdf"
+    assert key.startswith("dossiers/APP-25195/")
+    assert f"{doc_id}_" in key
+
+
+def test_storage_package_exports():
+    from adapters.storage import (
+        StoragePort,
+        LocalFileSystemStorage,
+        S3Storage,
+        build_storage_key,
+        sanitize_filename,
+    )
+    assert callable(build_storage_key)
+    assert callable(sanitize_filename)
+    assert StoragePort is not None
+    assert LocalFileSystemStorage is not None
+    assert S3Storage is not None

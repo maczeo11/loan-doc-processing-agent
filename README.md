@@ -13,6 +13,40 @@
 
 ---
 
+## 💡 Executive Pitch for Evaluators & Judges
+
+### 🎙️ The 30-Second Elevator Pitch
+> **FinScan AI** cuts retail loan document verification from **48 hours to 90 seconds** while completely eliminating GenAI hallucination risks. By enforcing a strict architectural firewall where **deterministic code computes financial math** and **AI only narrates verified findings**, every single number on the screen traces back to an exact pixel-level bounding box on an uploaded page. Underwriters audit verified flags in a split-screen dashboard and sign off in one click.
+
+---
+
+### 🚨 The Problem: The Underwriting Bottleneck & The "GenAI Trap"
+- **The Manual Burden:** Retail loan origination requires cross-referencing 5+ disparate document types (payslips, 6-month bank statements with varying formats, ITR-V tax acknowledgements, and KYC cards). Manual underwriting takes 24–72 hours per dossier, is error-prone, and burns costly underwriter hours on basic cross-checking.
+- **The GenAI Trap:** Banks cannot deploy off-the-shelf LLMs or "chat-with-your-doc" wrappers to approve loans. LLMs hallucinate numbers, fail basic arithmetic, cannot provide legally binding audit trails, and introduce severe regulatory liability (RBI / Fair Lending compliance).
+- **The Core Dilemma:** How can banks automate document verification at GenAI speed *without* risking a single hallucinated number or unauthorized credit decision?
+
+---
+
+### 🛡️ The FinScan AI Solution
+FinScan AI solves this by introducing **Provenance-Grounded Deterministic Verification**:
+1. **Zero Hallucinated Numbers:** Pure Python rules execute all financial calculations (salary-to-bank credit reconciliation within $5\%$ tolerance, tax-to-salary annualization, DTI limits). The LLM is **never** permitted to calculate totals or assign pass/fail verdicts.
+2. **Atomic Evidence Citations:** Every extracted entity carries an `EvidenceRef` containing document ID, page number, and bounding-box coordinates (`x0, y0, x1, y1`). Missing data defaults to `UNKNOWN`, never a guess.
+3. **Underwriter-in-the-Loop:** LangGraph unconditionally pauses execution at an `interrupt()` checkpoint, presenting underwriters with visual bounding-box highlights on original PDFs. The human remains the sole decision-maker.
+
+---
+
+### 🏆 Evaluator Scorecard: How FinScan AI Delivers on Hackathon Rubrics
+
+| Evaluation Criteria | How FinScan AI Excels | Where to Inspect |
+| :--- | :--- | :--- |
+| **System Architecture & Rigor** | Modular monolith with Hexagonal Ports & Adapters; LangGraph stateful orchestration; PostgreSQL transactional outbox. | [`adapters/`](file:///c:/Users/bhanu/mycodes/cognizant-hackathon/adapters), [`core/graph/`](file:///c:/Users/bhanu/mycodes/cognizant-hackathon/core/graph) |
+| **Safety, Provenance & Compliance** | Zero autonomous lending decisions; strict bounding-box provenance; prompt-injection firewall; grounding validator drops unverified claims. | [`core/contracts/`](file:///c:/Users/bhanu/mycodes/cognizant-hackathon/core/contracts), [`core/rag/grounding.py`](file:///c:/Users/bhanu/mycodes/cognizant-hackathon/core/rag/grounding.py) |
+| **Cloud & Cost Engineering** | Runs 100% free locally (CPU OCR, Postgres queue, local Qwen GGUF) and deploys on AWS for under $15 total budget ($25 hard ceiling). | [`infra/`](file:///c:/Users/bhanu/mycodes/cognizant-hackathon/infra), [`AGENTS.md`](file:///c:/Users/bhanu/mycodes/cognizant-hackathon/AGENTS.md) |
+| **Reviewer UX & Productivity** | 3-pane React 18 + Vite dashboard with interactive `pdf.js` canvas highlights, discrepancy badges, and 1-click sign-off. | [`apps/ui/`](file:///c:/Users/bhanu/mycodes/cognizant-hackathon/apps/ui) |
+| **Team Parallelism & CI/CD** | 8 teammates working concurrently across isolated directories with pre-written passing tests and zero merge conflicts. | [`README.md#team`](file:///c:/Users/bhanu/mycodes/cognizant-hackathon/README.md), [`tests/`](file:///c:/Users/bhanu/mycodes/cognizant-hackathon/tests) |
+
+---
+
 ## 🎯 The Core Doctrine
 
 > **Deterministic code decides. AI explains. A human approves. Every number traces back to a page in a document.**

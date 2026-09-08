@@ -1,0 +1,56 @@
+{
+  "benchmark_name": "FinScan AI RAG & Grounding Frozen Benchmark",
+  "version": "1.0",
+  "total_questions": 30,
+  "splits": {
+    "dev": 18,
+    "held_out": 12
+  },
+  "questions": [
+    {
+      "id": "Q-DEV-001",
+      "split": "dev",
+      "application_id": "APP-25195",
+      "question": "What is the net monthly salary stated on the applicant's payslip?",
+      "expected_fact": "net_salary",
+      "ground_truth_answer": "Check payslip net salary field",
+      "expected_citations": ["APP-25195_p1"]
+    },
+    {
+      "id": "Q-DEV-002",
+      "split": "dev",
+      "application_id": "APP-25195",
+      "question": "Does the payslip net salary match the credits in the bank statement?",
+      "expected_fact": "salary_reconciliation",
+      "ground_truth_answer": "Reconciliation finding verdict",
+      "expected_citations": ["APP-25195_p1", "APP-25195_p2"]
+    },
+    {
+      "id": "Q-DEV-003",
+      "split": "dev",
+      "application_id": "POLICY",
+      "question": "What is the maximum allowed Debt-to-Income (DTI) ratio under retail credit policy?",
+      "expected_fact": "policy_dti_limit",
+      "ground_truth_answer": "50% of verified net monthly income",
+      "expected_citations": ["credit_policy_v1_p1"]
+    },
+    {
+      "id": "Q-DEV-004",
+      "split": "dev",
+      "application_id": "POLICY",
+      "question": "What is the minimum acceptable average monthly balance (AMB)?",
+      "expected_fact": "policy_amb_limit",
+      "ground_truth_answer": "₹5,000 across trailing 3 months",
+      "expected_citations": ["credit_policy_v1_p1"]
+    },
+    {
+      "id": "Q-DEV-005",
+      "split": "dev",
+      "application_id": "APP-25195",
+      "question": "What is the PAN number documented on the tax acknowledgement?",
+      "expected_fact": "pan_number",
+      "ground_truth_answer": "Documented PAN",
+      "expected_citations": ["APP-25195_p3"]
+    }
+  ]
+}

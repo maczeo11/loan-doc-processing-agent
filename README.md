@@ -1,147 +1,254 @@
-# 🏦 FinScan AI: GenAI-Enabled Loan Document Processing & Underwriting Agent
+# 🏦 FinScan AI: GenAI-Enabled Loan Document Processing Agent
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.110+-009688.svg)](https://fastapi.tiangolo.com/)
 [![LangGraph](https://img.shields.io/badge/LangGraph-Agentic_Core-orange.svg)](https://langchain-ai.github.io/langgraph/)
-[![LightGBM](https://img.shields.io/badge/LightGBM-Tabular_ML-brightgreen.svg)](https://lightgbm.readthedocs.io/)
-[![Langfuse](https://img.shields.io/badge/Langfuse-LLMOps_Tracing-purple.svg)](https://langfuse.com/)
-[![Notion Documentation](https://img.shields.io/badge/Notion-Live_Project_Doc-black.svg)](https://app.notion.com/p/Loan-Document-Processing-Agent-Master-Architecture-1-Week-Project-Plan-3d490e25dc1b818ab96dea600d6d8e87)
+[![React](https://img.shields.io/badge/React-18_Vite_TS-61DAFB.svg)](https://react.dev/)
+[![TailwindCSS](https://img.shields.io/badge/Tailwind-3.4+-38B2AC.svg)](https://tailwindcss.com/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-336791.svg)](https://www.postgresql.org/)
 
-> **Cognizant Hackathon / Buildathon Project**  
-> **Team:** 8 Members | **Lead:** Technical Team Lead (Bhanu) | **Timeline:** 1 Week (7 Days)  
-> **Live Notion Workspace:** [FinScan AI Master Architecture & Sprint Board](https://app.notion.com/p/Loan-Document-Processing-Agent-Master-Architecture-1-Week-Project-Plan-3d490e25dc1b818ab96dea600d6d8e87)
+> **Cognizant GenAI + Cloud-Tools Buildathon**  
+> **Team:** 8 Members | **Lead / Integrator:** Bhanu Teja | **Timeline:** 1 Week (7 Days)  
+> **GitHub Repo:** [maczeo11/loan-doc-processing-agent](https://github.com/maczeo11/loan-doc-processing-agent)
 
 ---
 
-## 📖 Overview
+## 🎯 The Core Doctrine
 
-Banks receive vast volumes of unstructured loan documents (payslips, multi-page bank statements, ITR returns, and KYC proofs). Manual underwriting is error-prone, takes 24–72 hours, and is vulnerable to fraud.
+> **Deterministic code decides. AI explains. A human approves. Every number traces back to a page in a document.**
 
-**FinScan AI** is an autonomous multi-agent document processing and credit underwriting system that:
-1. **Parses & Extracts** key financial entities via hybrid Azure Document Intelligence + local PaddleOCR.
-2. **Identifies Missing Documents** in applicant dossiers automatically.
-3. **Cross-Reconciles & Detects Inconsistencies** (e.g., stated salary vs. bank payroll credits vs. ITR income).
-4. **Combines Tabular ML with GenAI**: Evaluates creditworthiness using a **LightGBM model** trained on the Kaggle *Loan Approval Prediction Dataset*, explained via **SHAP values**, alongside an LLM-synthesized **Credit Appraisal Memo (CAM)**.
-5. **Provides a Human-in-the-Loop (HITL) Dashboard** with visual bounding-box citations, discrepancy alerts, and one-click approvals.
+- **No hallucinated decisions:** No total, disposition, pass/flag verdict or monetary value originates from an LLM. Pure deterministic functions compute them; the LLM only narrates and explains them.
+- **Evidence provenance:** Every extracted fact requires an `EvidenceRef` with document ID, page number, and bounding box coordinates. Missing facts return `UNKNOWN`, never a guess.
+- **Human sign-off:** The system never autonomously approves or denies a loan. It prepares an auditable case dossier for human underwriters to inspect and approve.
 
 ---
 
 ## 🏛️ System Architecture
 
+FinScan AI is organized as a **modular monolith with ports and adapters**, ensuring seamless offline/local development without paid cloud dependencies while supporting 1-click cloud deployment.
+
 ```
-[ Applicant / Loan Officer ]
-             │ (Upload Dossier: Payslip, Bank Stmt, ITR, KYC)
-             ▼
+[ Underwriter / Loan Officer ]
+              │ (Upload Dossier: Application, Payslips, Bank Statements, ITR, ID)
+              ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ 1. INGESTION & DOCUMENT TRIAGE LAYER                        │
+│ 1. INGESTION & DOCUMENT TRIAGE (apps/api)                   │
 │    • FastAPI Async Endpoint • SHA-256 Deduplication         │
-│    • File Type Routing (PDF, PNG, JPG) • S3 Storage         │
+│    • Local FileSystem / AWS S3 via StoragePort Adapter      │
+│    • Transactional Outbox (PostgreSQL)                      │
 └────────────────────────────┬────────────────────────────────┘
                              │
                              ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ 2. PERCEPTION & HYBRID EXTRACTION ENGINE                    │
-│    • Azure Document Intelligence (Prebuilt Layout & IDs)    │
-│    • Local PaddleOCR / PyMuPDF (Fast Table & Text Fallback) │
-│    • Multimodal VLM (GPT-4o-mini / Bedrock Claude 3 Haiku)  │
-│    • Pydantic Strict JSON Schema Validation                 │
+│ 2. ASYNC WORKER & QUEUE LEASE (worker/ + adapters/queue)   │
+│    • Local dev: PostgreSQL SKIP LOCKED Queue Adapter        │
+│    • Cloud demo: AWS SQS + DLQ Queue Adapter                │
+│    • Idempotent handling • Atomic leases • Acknowledge-last │
 └────────────────────────────┬────────────────────────────────┘
                              │
                              ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ 3. AGENTIC ORCHESTRATION CORE (LangGraph StateGraph)        │
-│    ├─ Triage & Completeness Checker Node                    │
-│    ├─ Parallel Specialized Extractor Nodes (Payslip, Bank)  │
-│    ├─ Cross-Document Reconciliation & Math Audit Node       │
-│    ├─ Fraud & Tampering Heuristic Node                      │
-│    ├─ Tabular ML Scoring Node (LightGBM + SHAP Attribution) │
-│    └─ Credit Appraisal Memo Synthesis Node                  │
+│ 3. PERCEPTION & HYBRID OCR (core/extraction)                │
+│    • Route 1: Native PDF text layer (PyMuPDF) + Word boxes  │
+│    • Route 2: Scanned pages -> PaddleOCR on CPU             │
+│    • Route 3: AWS Textract (capped fallback, off by default)│
 └────────────────────────────┬────────────────────────────────┘
                              │
                              ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ 4. HUMAN-IN-THE-LOOP (HITL) DECISION & AUDIT LAYER          │
-│    • LangGraph Checkpointer & Breakpoints (interrupt_before)│
-│    • Underwriter Streamlit Dashboard                        │
-│    • Visual Bounding-Box Citations & Discrepancy Flags      │
-│    • One-Click Approval / Override / PDF Export             │
+│ 4. DOCUMENT CLASSIFICATION (ml/classifier)                  │
+│    • Baseline: TF-IDF + Logistic Regression (fast, CPU)     │
+│    • Challenger: DistilBERT-class encoder (seq 256)         │
+│    • Auto-selection: Baseline ships if quality is comparable│
 └────────────────────────────┬────────────────────────────────┘
                              │
                              ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ 5. OBSERVABILITY & LLMOps INFRASTRUCTURE                    │
-│    • Langfuse Tracing (Latency, Cost, Prompt Versions)      │
-│    • MLflow Model Registry & Artifact Store                 │
-│    • Ragas / DeepEval Benchmark Test Harness                │
+│ 5. STRUCTURED FACT EXTRACTION (core/extraction/extractors)  │
+│    • PayslipFacts, BankStatementFacts, TaxReturnFacts       │
+│    • Strict Pydantic models with mandatory EvidenceRef      │
+└────────────────────────────┬────────────────────────────────┘
+                             │
+                             ▼
+┌─────────────────────────────────────────────────────────────┐
+│ 6. DETERMINISTIC RECONCILIATION & RULES (core/rules)        │
+│    • Completeness: Flag missing mandatory documents         │
+│    • Salary Audit: Payslip net salary vs bank salary credits│
+│    • Tax Audit: ITR income vs payslip annualized gross      │
+│    • KYC Check: PAN & identity fuzzy matching               │
+│    • Output: Structured Findings (pass / flag / unknown)    │
+└────────────────────────────┬────────────────────────────────┘
+                             │
+                             ▼
+┌─────────────────────────────────────────────────────────────┐
+│ 7. ISOLATED RAG & CITATION CHECK (core/rag)                 │
+│    • Application Corpus + Authoritative Policy Corpus       │
+│    • Hybrid Retrieval: BM25 Lexical + BGE-small Dense (RRF) │
+│    • Exact FAISS Indexing with hard tenant isolation        │
+│    • Grounding Validation: Drops ungrounded claims          │
+└────────────────────────────┬────────────────────────────────┘
+                             │
+                             ▼
+┌─────────────────────────────────────────────────────────────┐
+│ 8. HUMAN-IN-THE-LOOP (HITL) WORKSPACE (apps/ui)             │
+│    • LangGraph interrupt() checkpoint                       │
+│    • React 18 + Vite + Tailwind underwriter SPA             │
+│    • pdf.js visual bounding-box citation overlays           │
+│    • Sign-off: One-click Approve, Flag Discrepancy, Export  │
 └─────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 💻 Compute & Infrastructure Strategy
+## 👥 Team Roles & Branch Ownership (8 Members)
 
-| Infrastructure | Allocated Workload | Cost / Free Tier Allocation |
-| :--- | :--- | :--- |
-| **Local Workstation**<br>*(RTX 3050 6GB, 16GB RAM, Ryzen 7)* | • Rapid development & LightGBM tabular model training (3 sec).<br>• Local PaddleOCR processing.<br>• **Ollama Edge Fallback** (`qwen2.5:7b-instruct` / `llama3.2:3b` in ~4GB VRAM) for offline banking demo. | **$0.00** |
-| **Azure for Students**<br>*($100 Credit + Free Tier)* | • **Azure Document Intelligence** (500 free pages/month).<br>• **Azure App Service / Container Apps** for hosting the public Streamlit UI. | **$0.00** |
-| **AWS Cloud**<br>*($100 Credits + Free Tier)* | • **AWS S3**: Document vault for encrypted PDFs and JSON schemas.<br>• **AWS Bedrock**: Claude 3 Haiku (extraction) & Claude 3.5 Sonnet (CAM synthesis).<br>• **EC2 t3.medium**: FastAPI backend & Langfuse Docker. | **~$15.00**<br>(Leaves $85 buffer) |
+All development follows trunk-based workflow with short-lived feature branches targeting `main`:
 
----
-
-## 👥 Team Work Breakdown Structure (8 Members)
-
-| Pod | Role | Owner | Core Deliverables |
-| :--- | :--- | :--- | :--- |
-| **Leadership** | Lead Architect & Integration | **Member 1 (You)** | Architecture design, Pydantic contracts, code reviews, pitch deck & demo. |
-| **Agent Core** | LangGraph Agent Engineer | **Member 2** | StateGraph, extraction nodes, conditional routing, HITL breakpoints. |
-| **Vision/OCR** | Document Parsing & OCR | **Member 3** | Azure Document Intelligence client, PaddleOCR fallback, table parsing. |
-| **Logic & Rules** | Reconciliation & Fraud Engine | **Member 4** | Cross-doc fuzzy matching, salary vs bank audit, anomaly detection. |
-| **Tabular ML** | Credit Scoring & SHAP | **Member 5** | Kaggle dataset preprocessing, LightGBM training, SHAP attribution. |
-| **Backend/DB** | FastAPI Backend & Storage | **Member 6** | REST endpoints (`/upload`, `/process`, `/review`), AWS S3, SQLite/Postgres. |
-| **Frontend UI** | Streamlit UI/UX Engineer | **Member 7** | Multi-tab dashboard, PDF viewer, discrepancy cards, SHAP plots. |
-| **LLMOps/CI** | MLOps & Evaluation | **Member 8** | Langfuse tracing, Ragas test harness, Docker compose, cloud deployment. |
+| Member | Role | Branch Prefix | Primary Directories |
+|---|---|---|---|
+| **Bhanu Teja** | Tech Lead & Integrator, Async Cloud | `feat/worker-*`, `feat/cloud-*` | `worker/`, `adapters/`, `infra/`, root |
+| **Manjunath** | API, Contracts & LangGraph | `feat/api-*`, `feat/contracts-*` | `apps/api/`, `core/contracts/`, `core/graph/` |
+| **Jeevan** | Parsing, OCR Routing & Extractors | `feat/ocr-*`, `feat/extract-*` | `core/extraction/` |
+| **Sravanthi** | Synthetic Data, Rules & Reporting | `feat/rules-*`, `feat/data-*` | `core/rules/`, `core/reporting/`, `data/` |
+| **Karthik** | Document Classifier ML & Evaluation | `feat/ml-*`, `feat/classifier-*` | `ml/` |
+| **Balaji** | API Database, Outbox & Deployment | `feat/db-*`, `feat/api-*` | `apps/api/db/`, `infra/` |
+| **Akshaya** | React Reviewer SPA (pdf.js) | `feat/ui-*` | `apps/ui/` |
+| **Sai Mokshith** | Hybrid RAG & Grounding Validation | `feat/rag-*`, `feat/eval-*` | `core/rag/`, `policies/`, `eval/` |
 
 ---
 
-## 📅 1-Week Sprint Schedule
+## 📂 Repository Layout
 
-- **Day 1:** System contracts, GitHub repo setup, generate 25 synthetic applicant dossiers with injected fraud cases.
-- **Day 2:** Baseline OCR extraction working; LightGBM model trained on Kaggle dataset (>95% ROC-AUC).
-- **Day 3:** LangGraph StateGraph operational; cross-document salary vs bank reconciliation implemented.
-- **Day 4:** End-to-end localhost pipeline: Upload ➡️ Parse ➡️ Cross-Reconcile ➡️ ML Approval Score + SHAP.
-- **Day 5:** Human-in-the-Loop breakpoint (`interrupt_before`), Credit Memo PDF export, and Ragas accuracy benchmark.
-- **Day 6:** Cloud deployment (AWS S3 + Azure App Service) + RTX 3050 edge mode verification.
-- **Day 7:** Code freeze, pitch deck finalization, 5-minute live demo rehearsal.
+```txt
+loan-doc-processing-agent/
+├── AGENTS.md               # System constitution, non-negotiables & boundaries
+├── Makefile                # Standard developer targets (install, test, lint, demo)
+├── pyproject.toml          # Editable package definitions (core, adapters, worker, apps, ml)
+├── requirements.txt        # Frozen Python dependencies
+├── .env.example            # Environment template
+│
+├── adapters/               # Hexagonal Ports & Adapters (interchangeable)
+│   ├── llm/                # OpenCode Zen (cloud) & local Qwen GGUF (offline)
+│   ├── queue/              # Postgres SKIP LOCKED (local) & SQS (cloud)
+│   └── storage/            # Local Filesystem (local) & S3 (cloud)
+│
+├── apps/
+│   ├── api/                # FastAPI REST backend & outbox models
+│   │   ├── db/             # PostgreSQL session and tables
+│   │   ├── routes/         # applications, documents, review, jobs
+│   │   ├── config.py       # Pydantic Settings
+│   │   └── main.py         # Entrypoint (serves API & mounts built UI)
+│   └── ui/                 # React 18 + Vite + TypeScript Reviewer SPA
+│       ├── src/            # Underwriter dashboard & pdf.js overlays
+│       └── package.json
+│
+├── core/                   # Pure business logic (NO vendor SDK imports allowed!)
+│   ├── contracts/          # Pydantic schemas: EvidenceRef, MoneyFact, Finding, State
+│   ├── extraction/         # OCR routing & typed extractors (Payslip, Bank, Tax, ID)
+│   ├── graph/              # LangGraph nodes & workflow (StateGraph + interrupt)
+│   ├── rag/                # Passage chunking, FAISS exact index, hybrid RRF, grounding
+│   ├── reporting/          # Credit Appraisal Memo synthesis & JSON/PDF export
+│   └── rules/              # Deterministic financial arithmetic (HUMAN-ONLY ZONE)
+│
+├── worker/                 # Consumer loop driving LangGraph with atomic leases & DLQ
+│   ├── consumer.py         # Delivery handling & result commit before ack
+│   └── main.py             # Worker startup
+│
+├── ml/                     # Document classification models
+│   ├── artifacts/          # Serialized models (.joblib)
+│   └── classifier/         # Baseline TF-IDF vs Challenger DistilBERT
+│
+├── policies/               # Authoritative underwriting guidelines for RAG
+│   ├── credit_policy_v1.md
+│   └── kyc_guidelines_v1.md
+│
+├── data/
+│   ├── manifests/          # Frozen dataset split definitions
+│   └── synthetic_dossiers/ # Generated synthetic applicant dossiers with injected fraud
+│
+├── eval/                   # Frozen 30-question benchmark set & test harness
+│   └── questions.json
+│
+├── infra/                  # Local and Cloud deployment infrastructure
+│   ├── Caddyfile           # Reverse proxy config
+│   ├── Dockerfile.api      # API container
+│   ├── Dockerfile.worker   # Worker container
+│   └── docker-compose.yml  # Local Postgres, Redis, API, Worker stack
+│
+├── scripts/                # Synthetic dossier generators & maintenance
+│   └── generate_dossiers.py
+│
+└── tests/                  # Automated test suite
+    ├── smoke/              # Health check & golden-path smoke tests
+    └── unit/               # Contract and rule assertion tests
+```
 
 ---
 
 ## 🚀 Quick Start (Local Setup)
 
+### 1. Clone & Set Up Python Environment
+
 ```bash
-# 1. Clone repository
 git clone https://github.com/maczeo11/loan-doc-processing-agent.git
 cd loan-doc-processing-agent
 
-# 2. Setup virtual environment
+# Create & activate virtualenv
 python -m venv venv
-venv\Scripts\activate  # On Windows
+venv\Scripts\activate      # Windows (PowerShell)
+# source venv/bin/activate # macOS/Linux
 
-# 3. Install dependencies
+# Install dependencies and editable packages
 pip install -r requirements.txt
-
-# 4. Configure environment variables
-cp .env.example .env
-# Fill in Azure Document Intelligence, AWS Bedrock / OpenAI, and Langfuse keys
-
-# 5. Generate synthetic loan dossiers
-python scripts/generate_dossiers.py
-
-# 6. Train Kaggle Tabular Credit Model
-python ml/train_credit_model.py
-
-# 7. Start FastAPI Backend
-uvicorn app.main:app --reload --port 8000
-
-# 8. Start Streamlit UI
-streamlit run frontend/app.py
+pip install -e .
 ```
+
+### 2. Configure Environment
+
+```bash
+cp .env.example .env
+# Default settings work out-of-the-box for local filesystem & PostgreSQL
+```
+
+### 3. Run Automated Tests
+
+```bash
+pytest tests/unit
+```
+
+### 4. Start Local Services with Docker Compose
+
+```bash
+cd infra
+docker compose up -d db redis
+cd ..
+```
+
+### 5. Run API & Worker Locally
+
+In terminal 1 (API):
+```bash
+uvicorn apps.api.main:app --reload --port 8000
+```
+
+In terminal 2 (Worker):
+```bash
+python -m worker.main
+```
+
+In terminal 3 (UI):
+```bash
+cd apps/ui
+npm install
+npm run dev
+```
+
+---
+
+## 🛡️ Human-Only Zones & Contribution Rules
+
+To prevent hallucinations in critical paths, the following areas require strict human review before merging:
+1. **Financial arithmetic in `core/rules/`** (no agent may write both a rule and its test unreviewed).
+2. **Lease, outbox, and `SKIP LOCKED` SQL** in `adapters/queue/` and `apps/api/db/`.
+3. **Contracts in `core/contracts/`** are the shared single source of truth — changes require integrator sign-off.
+4. **`core/` must never import `boto3` or provider SDKs.** All cloud/hardware dependencies belong in `adapters/`.

@@ -24,6 +24,7 @@ from apps.api.config import settings
 from apps.api.db.models import ApplicationModel, DocumentModel, utc_now
 from apps.api.db.session import get_db
 from apps.api.storage import get_storage
+from apps.api.middleware.rate_limit import rate_limit_upload
 from adapters.storage.base import StoragePort, build_storage_key
 
 logger = logging.getLogger("finscan.documents")
@@ -100,7 +101,12 @@ def validate_file_signature(first_chunk: bytes) -> None:
         )
 
 
-@router.post("/{id}/documents", status_code=status.HTTP_201_CREATED, response_model=DocumentUploadResponse)
+@router.post(
+    "/{id}/documents",
+    status_code=status.HTTP_201_CREATED,
+    response_model=DocumentUploadResponse,
+    dependencies=[Depends(rate_limit_upload)],
+)
 async def upload_document(
     id: str,
     file: UploadFile = File(...),

@@ -5,7 +5,8 @@ Core Requirements:
 - POST /applications: Creates initial ApplicationModel with minimal LoanApplicationState.
 - GET /applications/{id}: Fetches authoritative application state.
 - POST /applications/{id}/process: Atomic transaction validating document presence,
-  transitioning status to QUEUED, creating JobModel, and enqueuing JobRef outbox event.
+  enforcing active-job spend guards, transitioning status to QUEUED, creating JobModel,
+  and enqueuing JobRef outbox event.
 - Enforces strict state transitions and idempotency for QUEUED/PROCESSING jobs.
 """
 
@@ -14,42 +15,21 @@ import types
 import uuid
 import logging
 from typing import Optional, Dict, Any, List
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
-from sqlalchemy import select, func
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+import redis.asyncio as aioredis
 
+from apps.api.config import settings
 from apps.api.db.models import ApplicationModel, DocumentModel, JobModel, utc_now
 from apps.api.db.session import get_db
-import apps.api.db.outbox as outbox_module
-
-# Ensure JobRef supports full frozen shared contract matching worker/consumer.py expectation
-try:
-    from core.contracts.jobs import JobRef
-except ImportError:
-    if "metadata" not in outbox_module.JobRef.model_fields:
-        class JobRef(BaseModel):
-            """
-            Authoritative job reference payload published to queue and stored in outbox_events.
-            Frozen specification: attempt_count has ge=1 and defaults to 1.
-            """
-            job_id: str = Field(..., description="Unique job identifier e.g. JOB-12345")
-            application_id: str = Field(..., description="Target application identifier e.g. APP-25195")
-            attempt_count: int = Field(1, ge=1, description="Delivery attempt counter (1-indexed, ge=1)")
-            created_at: Optional[str] = None
-            priority: int = 0
-            metadata: Dict[str, Any] = Field(default_factory=dict)
-
-        outbox_module.JobRef = JobRef
-    else:
-        JobRef = outbox_module.JobRef
-
-    if "core.contracts.jobs" not in sys.modules:
-        _jobs_mod = types.ModuleType("core.contracts.jobs")
-        _jobs_mod.JobRef = JobRef
-        sys.modules["core.contracts.jobs"] = _jobs_mod
-
+from apps.api.middleware.rate_limit import get_redis_client, resolve_user_identity
+from apps.api.middleware.spend_guard import reserve_active_job_slot, release_active_job_slot
+from core.contracts.jobs import JobRef
 from apps.api.db.outbox import create_outbox_event
+
+logger = logging.getLogger("finscan.applications")
 
 router = APIRouter(prefix="/applications", tags=["Applications"])
 
@@ -167,12 +147,15 @@ async def get_application(
 @router.post("/{id}/process", status_code=status.HTTP_202_ACCEPTED, response_model=ProcessApplicationResponse)
 async def trigger_processing(
     id: str,
+    request: Request,
     session: AsyncSession = Depends(get_db),
+    redis_client: aioredis.Redis = Depends(get_redis_client),
 ):
     """
     Queue application for processing.
-    Atomically verifies document presence, updates application status to QUEUED,
-    appends status transition, persists JobModel, and inserts OutboxEventModel in a single transaction.
+    Atomically verifies document presence, reserves active-job spend guard slot,
+    updates application status to QUEUED, appends status transition,
+    persists JobModel, and inserts OutboxEventModel in a single transaction.
     Returns 202 Accepted with job ID.
     """
     # 1. Fetch application with row-level locking on PostgreSQL
@@ -194,6 +177,7 @@ async def trigger_processing(
         )
 
     # 2. Idempotency handling: If already QUEUED or PROCESSING, return existing active job
+    # Crucial rule: Do NOT consume extra spend-guard reservation slots on idempotent queries
     if app_model.status in ("QUEUED", "PROCESSING"):
         job_stmt = (
             select(JobModel)
@@ -236,6 +220,23 @@ async def trigger_processing(
     doc_ids = [doc.id for doc in doc_rows]
     doc_manifest = {doc.id: doc.storage_uri for doc in doc_rows}
 
+    # 5. Spend guard: Reserve active-job slot before mutating state
+    user_id = resolve_user_identity(request)
+    job_id = f"JOB-{uuid.uuid4().hex[:8].upper()}"
+
+    slot_reserved = await reserve_active_job_slot(
+        redis_client=redis_client,
+        user_id=user_id,
+        job_id=job_id,
+        max_active=settings.MAX_ACTIVE_JOBS_PER_USER,
+        ttl_seconds=settings.SPEND_GUARD_RESERVATION_TTL_SECONDS,
+    )
+    if not slot_reserved:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Active job limit exceeded for user ({settings.MAX_ACTIVE_JOBS_PER_USER} active jobs allowed). Please wait for ongoing processing to complete.",
+        )
+
     now = utc_now()
     from_status = app_model.status
     app_model.status = "QUEUED"
@@ -254,8 +255,7 @@ async def trigger_processing(
     state["status_history"] = history
     app_model.state_json = state
 
-    # 5. Create JobModel
-    job_id = f"JOB-{uuid.uuid4().hex[:8].upper()}"
+    # 6. Create JobModel
     job_record = JobModel(
         id=job_id,
         application_id=id,
@@ -266,7 +266,7 @@ async def trigger_processing(
     )
     session.add(job_record)
 
-    # 6. Create Transactional Outbox Event with exact JobRef contract
+    # 7. Create Transactional Outbox Event with exact JobRef contract
     job_ref = JobRef(
         job_id=job_id,
         application_id=id,
@@ -285,8 +285,15 @@ async def trigger_processing(
         payload=job_ref,
     )
 
-    # 7. Commit single atomic transaction
-    await session.commit()
+    # 8. Commit single atomic transaction; release spend guard slot if DB fails
+    try:
+        await session.commit()
+    except Exception as db_err:
+        await session.rollback()
+        # Cleanly release spend-guard reservation on DB failure
+        await release_active_job_slot(redis_client=redis_client, user_id=user_id, job_id=job_id)
+        logger.error(f"Failed to commit processing job transaction for application '{id}': {db_err}", exc_info=True)
+        raise
 
     return ProcessApplicationResponse(
         job_id=job_id,

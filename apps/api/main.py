@@ -4,19 +4,29 @@ FinScan AI: FastAPI Application Entrypoint.
 Serves REST API and mounts React SPA from apps/ui/dist.
 """
 
+import os
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-import os
 
 from apps.api.routes.applications import router as applications_router
 from apps.api.routes.documents import router as documents_router
 from apps.api.routes.review import router as review_router
+from apps.api.middleware.rate_limit import close_redis_client
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    yield
+    await close_redis_client()
+
 
 app = FastAPI(
     title="FinScan AI API",
     version="1.0.0",
-    description="Deterministic code decides. AI explains. A human approves."
+    description="Deterministic code decides. AI explains. A human approves.",
+    lifespan=lifespan,
 )
 
 app.add_middleware(
@@ -35,10 +45,14 @@ app.include_router(review_router)
 
 @app.get("/health", tags=["Health"])
 async def health_check():
+    from apps.api.config import settings
     return {
         "status": "ok",
         "service": "finscan-api",
-        "version": "1.0.0",
+        "version": settings.RELEASE_VERSION,
+        "git_sha": settings.GIT_SHA,
+        "build_timestamp": settings.BUILD_TIMESTAMP,
+        "environment": settings.ENVIRONMENT,
     }
 
 

@@ -47,12 +47,12 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "20"
-          cache: npm
-          cache-dependency-path: apps/ui/package-lock.json
 
       - name: Install UI Dependencies
         working-directory: apps/ui
-        run: npm ci
+        # NOTE: npm install (not ci) — apps/ui has no committed lockfile yet.
+        # Manjunath: committing apps/ui/package-lock.json lets us switch to npm ci + cache.
+        run: npm install --no-audit --no-fund
 
       - name: Build Reviewer SPA
         working-directory: apps/ui

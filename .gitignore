@@ -45,9 +45,11 @@ checkpoints/
 Thumbs.db
 
 # UI / Node
-ui/node_modules/
+**/node_modules/
+apps/ui/dist/
 ui/dist/
 ui/.next/
+apps/ui/.next/
 
 # Large ML weights & binary datasets (>10MB)
 *.bin

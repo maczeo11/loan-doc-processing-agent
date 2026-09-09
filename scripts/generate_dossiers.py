@@ -228,6 +228,7 @@ def generate_dossier(
         "RULE-INC-01": "pass",
         "RULE-TAX-01": "pass",
         "RULE-ID-01": "pass",
+        "RULE-BANK-01": "pass",
     }
 
     # Inject Controlled Scenarios
@@ -467,6 +468,16 @@ def generate_dossier(
             "payslip_name": payslip_employee_name,
             "kyc_pass_threshold": 0.85,
             "kyc_flag_threshold": 0.70,
+        },
+        "RULE-BANK-01": {
+            "rule_id": "RULE-BANK-01",
+            "rule_name": "Bank Statement Arithmetic Validation",
+            "verdict": expected_rules["RULE-BANK-01"],
+            "opening_balance": opening_balance,
+            "total_credits": salary_credits_total,
+            "total_debits": total_debits,
+            "closing_balance": closing_balance,
+            "configured_tolerance": 0.05,
         },
     }
 

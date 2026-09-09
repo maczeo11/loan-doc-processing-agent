@@ -13,6 +13,7 @@ from core.rules.bank_arithmetic import (
     audit_bank_statement_arithmetic,
     audit_bank_arithmetic,
 )
+from core.rules.engine import evaluate_dossier_rules, findings_to_dict
 
 __all__ = [
     "evaluate_completeness",
@@ -25,4 +26,6 @@ __all__ = [
     "validate_bank_statement_arithmetic",
     "audit_bank_statement_arithmetic",
     "audit_bank_arithmetic",
+    "evaluate_dossier_rules",
+    "findings_to_dict",
 ]

@@ -33,6 +33,7 @@ wheels/
 *.db
 local_queue/
 checkpoints/
+data/storage/
 
 # IDEs
 .vscode/

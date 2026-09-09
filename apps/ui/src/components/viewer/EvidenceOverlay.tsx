@@ -47,6 +47,7 @@ export const EvidenceOverlay: React.FC<EvidenceOverlayProps> = ({
   return (
     <div className="absolute inset-0 pointer-events-none z-10">
       {pageEvidenceItems.map(({ evidence, finding, key }) => {
+        if (!evidence.bounding_box) return null;
         const percent = computeBoundingBoxPercent(evidence.bounding_box);
         const isActive = activeEvidenceKey === key;
         const isHovered = hoveredKey === key;

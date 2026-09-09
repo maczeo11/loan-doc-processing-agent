@@ -1,4 +1,4 @@
-import { ApiService } from './api';
+
 
 interface CachedUrl {
   url: string;
@@ -22,7 +22,10 @@ export class DocumentStorageService {
     }
 
     try {
-      const freshUrl = await ApiService.getDocumentSignedUrl(appId, docId);
+      const res = await fetch(`/applications/${encodeURIComponent(appId)}/documents/${encodeURIComponent(docId)}/url`);
+      if (!res.ok) throw new Error('Failed to get signed URL');
+      const data = await res.json();
+      const freshUrl = data.url as string;
       // Default 15 minute TTL
       this.cache.set(key, {
         url: freshUrl,

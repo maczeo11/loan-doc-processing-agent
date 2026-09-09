@@ -56,5 +56,6 @@ export function computeBoundingBoxPercent(bbox: BoundingBox): BoundingBoxPercent
  */
 export function getEvidenceKey(evidence: EvidenceRef): string {
   const b = evidence.bounding_box;
+  if (!b) return `${evidence.document_id}-P${evidence.page_number}-no-bbox`;
   return `${evidence.document_id}-P${evidence.page_number}-${b.x0.toFixed(2)}_${b.y0.toFixed(2)}`;
 }

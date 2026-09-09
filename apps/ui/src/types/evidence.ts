@@ -3,8 +3,8 @@ export interface BoundingBox {
   y0: number;
   x1: number;
   y1: number;
-  page_width?: number;
-  page_height?: number;
+  page_width?: number | null;
+  page_height?: number | null;
 }
 
 export interface EvidenceRef {
@@ -12,7 +12,9 @@ export interface EvidenceRef {
   document_type: string;
   page_number: number; // 1-indexed
   quoted_span: string;
-  bounding_box: BoundingBox;
+  bounding_box?: BoundingBox | null;
+  extraction_method?: string;
+  confidence?: number;
 }
 
 export type RuleVerdict = 'pass' | 'flag' | 'unknown';

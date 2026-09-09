@@ -74,7 +74,7 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({
     activeEvidence.page_number === currentPage;
 
   return (
-    <main className="w-full h-full flex flex-col bg-slate-100 overflow-hidden">
+    <main className="w-full h-full flex flex-col bg-[#F5F2EB] overflow-hidden">
       {/* Top Toolbar */}
       <ViewerToolbar
         docTitle={docTitle}
@@ -118,36 +118,36 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({
       )}
 
       {/* Main Viewport */}
-      <div className="flex-1 overflow-auto p-6 flex justify-center items-start">
+      <div className="flex-1 overflow-auto p-6 flex justify-center items-start bg-[#F5F2EB]">
         {isLoading ? (
           <div className="flex flex-col items-center justify-center p-16 text-center">
-            <Loader2 className="w-8 h-8 text-indigo-600 animate-spin mb-3" />
-            <p className="text-xs font-semibold text-slate-700">Loading document with PDF.js...</p>
-            <p className="text-[11px] text-slate-400 mt-0.5">Parsing document structure</p>
+            <Loader2 className="w-8 h-8 text-stone-500 animate-spin mb-3" />
+            <p className="text-xs font-serif font-bold text-stone-800">Loading document with PDF.js...</p>
+            <p className="text-[11px] text-stone-500 mt-0.5 font-mono">Parsing document structure</p>
           </div>
         ) : error ? (
-          <div className="bg-white rounded-xl shadow-md border border-rose-200 p-8 text-center max-w-md my-auto">
-            <div className="w-12 h-12 rounded-full bg-rose-50 border border-rose-100 flex items-center justify-center text-rose-600 mx-auto mb-3">
+          <div className="bg-white rounded-sm shadow-md border border-[#FECACA] p-8 text-center max-w-md my-auto">
+            <div className="w-12 h-12 rounded-full bg-[#FEF2F2] border border-[#FECACA] flex items-center justify-center text-[#991B1B] mx-auto mb-3">
               <AlertTriangle className="w-6 h-6" />
             </div>
-            <h3 className="text-sm font-bold text-slate-800 mb-1">Failed to Render PDF</h3>
-            <p className="text-xs text-rose-600 bg-rose-50 p-2 rounded-lg border border-rose-100 font-mono mb-3 break-all">
+            <h3 className="text-sm font-serif font-bold text-stone-900 mb-1">Failed to Render PDF</h3>
+            <p className="text-xs text-[#991B1B] bg-[#FEF2F2] p-2 rounded-sm border border-[#FECACA] font-mono mb-3 break-all">
               {error}
             </p>
-            <p className="text-[11px] text-slate-500">
+            <p className="text-[11px] text-stone-500">
               The PDF could not be processed by the browser canvas renderer. Verify document integrity or source data.
             </p>
           </div>
         ) : sourceType === 'unavailable' ? (
-          <div className="bg-white rounded-xl shadow-md border border-slate-200 p-8 text-center max-w-md my-auto">
-            <div className="w-12 h-12 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400 mx-auto mb-3">
+          <div className="bg-white rounded-sm shadow-md border border-[#E3DDD3] p-8 text-center max-w-md my-auto">
+            <div className="w-12 h-12 rounded-full bg-[#F8F6F1] border border-[#E3DDD3] flex items-center justify-center text-stone-400 mx-auto mb-3">
               <FileX className="w-6 h-6" />
             </div>
-            <h3 className="text-sm font-bold text-slate-800 mb-1">Document Source Unavailable</h3>
-            <p className="text-xs text-slate-500 mb-3">
-              The live backend does not currently expose a GET document download endpoint. Toggle to <strong className="text-slate-700">Demo Dossier</strong> to view synthetic client-rendered documents.
+            <h3 className="text-sm font-serif font-bold text-stone-900 mb-1">Document Source Unavailable</h3>
+            <p className="text-xs text-stone-600 mb-3">
+              The live backend does not currently expose a GET document download endpoint. Toggle to <strong className="text-stone-900">Demo Dossier</strong> to view synthetic client-rendered documents.
             </p>
-            <div className="bg-slate-50 border border-slate-200 rounded p-2 text-[11px] text-slate-600 font-mono">
+            <div className="bg-[#F8F6F1] border border-[#E3DDD3] rounded-sm p-2 text-[11px] text-stone-700 font-mono">
               Document ID: {docId}
             </div>
           </div>
@@ -165,8 +165,8 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({
 
             {/* Rendering Indicator */}
             {isRendering && (
-              <div className="absolute top-10 right-4 z-30 bg-slate-900/80 text-white text-[10px] px-2.5 py-1 rounded-full flex items-center gap-1.5 shadow">
-                <Loader2 className="w-3 h-3 animate-spin text-indigo-300" />
+              <div className="absolute top-10 right-4 z-30 bg-stone-900/80 text-white text-[10px] font-mono px-2.5 py-1 rounded-full flex items-center gap-1.5 shadow">
+                <Loader2 className="w-3 h-3 animate-spin text-amber-200" />
                 <span>Rendering canvas...</span>
               </div>
             )}
@@ -177,7 +177,7 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({
                 width: `${canvasDimensions.width}px`,
                 height: `${canvasDimensions.height}px`,
               }}
-              className="bg-white rounded-b-lg shadow-lg border border-t-0 border-slate-200 relative overflow-hidden transition-all"
+              className="bg-white rounded-b-sm shadow-lg border border-t-0 border-[#D5CFC5] relative overflow-hidden transition-all"
             >
               {/* HTML5 Canvas rendered by PDF.js */}
               <canvas ref={canvasRef} className="block w-full h-full" />

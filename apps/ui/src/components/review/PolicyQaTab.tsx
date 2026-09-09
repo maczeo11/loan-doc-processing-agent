@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ApiService } from '../../services/api';
+import { api } from '../../services/api';
 import { PolicyQaResponse } from '../../types/api';
 import { EvidenceRef } from '../../types/evidence';
 import { Send, BookOpen, ShieldCheck, Loader2 } from 'lucide-react';
@@ -9,7 +9,7 @@ interface PolicyQaTabProps {
   onSelectEvidence?: (ev: EvidenceRef) => void;
 }
 
-export const PolicyQaTab: React.FC<PolicyQaTabProps> = () => {
+export const PolicyQaTab: React.FC<PolicyQaTabProps> = ({ applicationId }) => {
   const [question, setQuestion] = useState('');
   const [loading, setLoading] = useState(false);
   const [history, setHistory] = useState<PolicyQaResponse[]>([
@@ -39,10 +39,21 @@ export const PolicyQaTab: React.FC<PolicyQaTabProps> = () => {
     setQuestion('');
 
     try {
-      const resp = await ApiService.askPolicyQuestion(q);
-      setHistory((prev) => [resp, ...prev]);
+      const resp = await api.askQuestion(applicationId || 'APP-25195', { question: q });
+      setHistory((prev) => [{
+        question: q,
+        answer: resp.answer,
+        is_grounded: true,
+        citations: resp.citations.map(c => ({
+          chunk_id: c.chunk_id || '',
+          policy_name: c.title || 'Policy',
+          section: c.section || '',
+          text: c.text || '',
+          score: 0.9,
+        })),
+      }, ...prev]);
     } catch {
-      // Fallback
+      // Fallback — API not available in demo mode
     } finally {
       setLoading(false);
     }

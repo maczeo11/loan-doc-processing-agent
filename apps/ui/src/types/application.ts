@@ -15,6 +15,7 @@ export interface MoneyFact {
   currency: string;
   period?: string | null;
   gross_or_net?: string | null;
+  basis?: string | null;
   source: EvidenceRef;
 }
 
@@ -31,6 +32,8 @@ export interface PayslipFacts {
   gross_salary?: MoneyFact | null;
   net_salary?: MoneyFact | null;
   pay_period?: string | null;
+  pay_period_str?: string | null;
+  deductions_total?: MoneyFact | null;
 }
 
 export interface BankStatementFacts {

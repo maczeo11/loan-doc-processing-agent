@@ -55,14 +55,14 @@ export const ViewerToolbar: React.FC<ViewerToolbarProps> = ({
   };
 
   return (
-    <div className="h-12 bg-white border-b border-slate-200 px-4 flex items-center justify-between shadow-xs shrink-0">
+    <div className="h-12 bg-white border-b border-[#E3DDD3] px-4 flex items-center justify-between shadow-xs shrink-0">
       {/* Document Info & Source Badge */}
       <div className="flex items-center gap-2 truncate">
-        <FileSearch className="w-4 h-4 text-indigo-600 shrink-0" />
-        <span className="text-xs font-bold text-slate-800 truncate">
+        <FileSearch className="w-4 h-4 text-stone-700 shrink-0" />
+        <span className="text-xs font-serif font-bold text-stone-900 truncate">
           {docTitle}
         </span>
-        <span className="font-mono text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded shrink-0">
+        <span className="font-mono text-[10px] bg-[#F8F6F1] text-stone-600 px-1.5 py-0.5 rounded-sm border border-[#E3DDD3] shrink-0">
           {docId}
         </span>
         {getSourceBadge()}
@@ -71,24 +71,24 @@ export const ViewerToolbar: React.FC<ViewerToolbarProps> = ({
       {/* Page & Zoom Controls */}
       <div className="flex items-center gap-3">
         {/* Page Switcher */}
-        <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-lg p-0.5">
+        <div className="flex items-center gap-1 bg-[#FBF9F5] border border-[#E3DDD3] rounded-sm p-0.5">
           <button
             type="button"
             onClick={onPrevPage}
             disabled={currentPage <= 1}
-            className="p-1 hover:bg-slate-200 rounded text-slate-600 disabled:opacity-30 disabled:hover:bg-transparent"
+            className="p-1 hover:bg-stone-200 rounded-xs text-stone-700 disabled:opacity-30 disabled:hover:bg-transparent"
             title="Previous Page"
           >
             <ChevronLeft className="w-4 h-4" />
           </button>
-          <span className="text-xs font-semibold text-slate-700 px-2 min-w-[70px] text-center">
+          <span className="text-xs font-mono font-semibold text-stone-800 px-2 min-w-[70px] text-center tabular-nums">
             {numPages > 0 ? `${currentPage} / ${numPages}` : '-'}
           </span>
           <button
             type="button"
             onClick={onNextPage}
             disabled={currentPage >= numPages}
-            className="p-1 hover:bg-slate-200 rounded text-slate-600 disabled:opacity-30 disabled:hover:bg-transparent"
+            className="p-1 hover:bg-stone-200 rounded-xs text-stone-700 disabled:opacity-30 disabled:hover:bg-transparent"
             title="Next Page"
           >
             <ChevronRight className="w-4 h-4" />
@@ -96,12 +96,12 @@ export const ViewerToolbar: React.FC<ViewerToolbarProps> = ({
         </div>
 
         {/* Zoom Controls */}
-        <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-lg p-0.5">
+        <div className="flex items-center gap-1 bg-[#FBF9F5] border border-[#E3DDD3] rounded-sm p-0.5">
           <button
             type="button"
             onClick={onZoomOut}
             disabled={zoom <= 50}
-            className="p-1 hover:bg-slate-200 rounded text-slate-600 disabled:opacity-30"
+            className="p-1 hover:bg-stone-200 rounded-xs text-stone-700 disabled:opacity-30"
             title="Zoom Out"
           >
             <ZoomOut className="w-4 h-4" />
@@ -109,7 +109,7 @@ export const ViewerToolbar: React.FC<ViewerToolbarProps> = ({
           <button
             type="button"
             onClick={onResetZoom}
-            className="text-xs font-semibold text-slate-700 px-1.5 hover:bg-slate-200 rounded min-w-[45px] text-center"
+            className="text-xs font-mono font-semibold text-stone-800 px-1.5 hover:bg-stone-200 rounded-xs min-w-[45px] text-center tabular-nums"
             title="Reset to 100%"
           >
             {zoom}%
@@ -118,7 +118,7 @@ export const ViewerToolbar: React.FC<ViewerToolbarProps> = ({
             type="button"
             onClick={onZoomIn}
             disabled={zoom >= 200}
-            className="p-1 hover:bg-slate-200 rounded text-slate-600 disabled:opacity-30"
+            className="p-1 hover:bg-stone-200 rounded-xs text-stone-700 disabled:opacity-30"
             title="Zoom In"
           >
             <ZoomIn className="w-4 h-4" />
@@ -126,7 +126,7 @@ export const ViewerToolbar: React.FC<ViewerToolbarProps> = ({
           <button
             type="button"
             onClick={onFitWidth}
-            className="p-1 hover:bg-slate-200 rounded text-slate-600 border-l border-slate-200 pl-1"
+            className="p-1 hover:bg-stone-200 rounded-xs text-stone-600 border-l border-[#E3DDD3] pl-1"
             title="Fit Width"
           >
             <Maximize2 className="w-3.5 h-3.5" />

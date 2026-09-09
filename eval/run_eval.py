@@ -19,10 +19,12 @@ logger = logging.getLogger("finscan.eval")
 def load_synthetic_dossiers_into_manager(
     index_manager: IndexManager,
     data_dir: str = "data/synthetic_dossiers",
+    use_bge: Optional[bool] = None,
 ) -> int:
     """
     Ingests synthetic applicant dossier manifests from disk into isolated application indices.
     Returns the number of applications ingested.
+    `use_bge=False` forces TF-IDF; None auto-tries BGE unless FINSCAN_USE_BGE=0.
     """
     if not os.path.exists(data_dir):
         logger.warning(f"Synthetic dossier dir {data_dir} does not exist.")
@@ -144,7 +146,7 @@ def load_synthetic_dossiers_into_manager(
             aliases=[f"{app_id}_p5_c0"],
         )
 
-        app_index.add_chunks([chunk_p1, chunk_p2, chunk_p3, chunk_p4, chunk_p5])
+        app_index.add_chunks([chunk_p1, chunk_p2, chunk_p3, chunk_p4, chunk_p5], use_bge=use_bge)
         app_count += 1
 
     logger.info(f"Ingested {app_count} synthetic dossiers into isolated indices.")
@@ -157,10 +159,12 @@ def evaluate_benchmark(
     data_dir: str = "data/synthetic_dossiers",
     output_path: Optional[str] = "eval/eval_results.json",
     top_k: int = 5,
+    use_bge: Optional[bool] = None,
 ) -> Dict[str, Any]:
     """
     Executes the frozen 30-question evaluation benchmark using HybridRetriever.
     Computes Recall@5, MRR@5, and Citation Grounding Precision across splits.
+    `use_bge=False` forces TF-IDF (deterministic CI); None auto-tries BGE.
     """
     if not os.path.exists(questions_path):
         raise FileNotFoundError(f"Benchmark questions file not found: {questions_path}")
@@ -172,10 +176,10 @@ def evaluate_benchmark(
 
     # Initialize retriever & index manager
     manager = IndexManager()
-    manager.load_policy_corpus(policy_dir=policy_dir)
-    load_synthetic_dossiers_into_manager(manager, data_dir=data_dir)
+    manager.load_policy_corpus(policy_dir=policy_dir, use_bge=use_bge)
+    load_synthetic_dossiers_into_manager(manager, data_dir=data_dir, use_bge=use_bge)
 
-    retriever = HybridRetriever(index_manager=manager, policy_dir=policy_dir)
+    retriever = HybridRetriever(index_manager=manager, policy_dir=policy_dir, use_bge=use_bge)
 
     split_stats: Dict[str, Dict[str, Any]] = {
         "dev": {"total": 0, "hits_at_5": 0, "rr_sum": 0.0, "total_chunks": 0, "authorized_chunks": 0},
@@ -235,7 +239,7 @@ def evaluate_benchmark(
             "split": split,
             "target": target_app,
             "question": query_text,
-            "expected_citations": list(expected_citations),
+            "expected_citations": sorted(expected_citations),
             "retrieved_chunk_ids": retrieved_ids,
             "hit_at_5": hit,
             "rank": rank,

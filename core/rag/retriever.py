@@ -47,17 +47,50 @@ class HybridRetriever:
         self,
         index_manager: Optional[IndexManager] = None,
         policy_dir: str = "policies",
+        use_bge: Optional[bool] = None,
     ):
         if index_manager is None:
             self.index_manager = IndexManager()
-            self.index_manager.load_policy_corpus(policy_dir=policy_dir)
+            self.index_manager.load_policy_corpus(policy_dir=policy_dir, use_bge=use_bge)
         else:
             self.index_manager = index_manager
             # Ensure policy index is loaded if empty
             if len(self.index_manager.get_policy_index()) == 0:
-                self.index_manager.load_policy_corpus(policy_dir=policy_dir)
+                self.index_manager.load_policy_corpus(policy_dir=policy_dir, use_bge=use_bge)
 
         self.policy_dir = policy_dir
+        # None = auto (BGE when the target index uses it, TF-IDF otherwise).
+        # False = always TF-IDF/TF string path (deterministic CI / eval).
+        self.use_bge = use_bge
+
+    def _dense_search(
+        self, target_index: IsolatedIndex, query: str, top_k: int
+    ) -> List[str]:
+        """
+        Picks a dimension-compatible dense query encoding: BGE when the target
+        index was built with BGE (or BGE-dim external vectors), else the
+        TF-IDF string path. Never raises on dim mismatch — falls back to text.
+        """
+        if self.use_bge is not False:
+            try:
+                from core.rag.embeddings import (
+                    BGE_DIMENSION,
+                    embed_query,
+                    is_bge_enabled,
+                    is_bge_installed,
+                )
+
+                kind = getattr(target_index, "embedding_kind", "tfidf")
+                dim = getattr(target_index, "_dimension", None)
+                wants_bge = (kind == "bge") or (kind == "external" and dim == BGE_DIMENSION)
+                if wants_bge and is_bge_enabled() and is_bge_installed():
+                    vec = embed_query(query)
+                    if vec is not None and vec.shape[1] == dim:
+                        return target_index.search_dense(vec, top_k=top_k)
+                    logger.debug("BGE query encoding unavailable/mismatched; using TF-IDF path.")
+            except Exception as e:
+                logger.debug(f"BGE query path failed, using TF-IDF path: {e}")
+        return target_index.search_dense(query, top_k=top_k)
 
     def retrieve(
         self,
@@ -95,11 +128,11 @@ class HybridRetriever:
         # 2. Parallel BM25 lexical search
         lexical_ranked = target_index.search_lexical(query, top_k=candidate_k)
 
-        # 3. Parallel dense FAISS search
+        # 3. Parallel dense FAISS search (BGE when the index uses it, else TF-IDF)
         if query_embedding is not None:
             dense_ranked = target_index.search_dense(query_embedding, top_k=candidate_k)
         else:
-            dense_ranked = target_index.search_dense(query, top_k=candidate_k)
+            dense_ranked = self._dense_search(target_index, query, candidate_k)
 
         # 4. Reciprocal Rank Fusion (RRF)
         fused_candidates = reciprocal_rank_fusion(lexical_ranked, dense_ranked, k=60)

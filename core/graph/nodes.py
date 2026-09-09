@@ -12,6 +12,7 @@ Rules from AGENTS.md:
 import datetime
 import logging
 import os
+import re
 from typing import Dict, Any, List, Optional, Union
 
 from core.contracts.state import LoanApplicationState, StatusTransition, ApplicationStatus
@@ -26,7 +27,13 @@ from core.extraction.extractors.payslip import PayslipExtractor
 from core.extraction.extractors.bank_statement import BankStatementExtractor
 from core.extraction.extractors.tax_return import TaxReturnExtractor
 from core.extraction.extractors.id_card import IdCardExtractor
-from core.rag.grounding import validate_citations
+from core.rag.grounding import (
+    detect_prompt_injection,
+    filter_grounded_claims,
+    sanitize_document_text,
+    sanitize_summary_text,
+    validate_citations,
+)
 from adapters.storage.local_fs import LocalFileSystemStorage
 
 logger = logging.getLogger("finscan.graph.nodes")
@@ -156,12 +163,32 @@ def extract_facts_node(state: LoanApplicationState) -> Dict[str, Any]:
         if not pages:
             pages = [{"page_number": 1, "text": f"Document content for {doc_id} of type {doc_type}"}]
 
+        # Prompt-injection defense (Member 8): document text is untrusted external
+        # input. Defuse adversarial spans BEFORE classification and extraction so
+        # injected instructions can never reach LLM prompts or flip verdicts.
+        # Facts (amounts, names, dates) are unaffected — only override phrases
+        # and markdown breakouts are neutralized.
+        defused_pages: List[Dict[str, Any]] = []
+        for page in pages:
+            raw_text = page.get("text", "")
+            if raw_text:
+                flagged, _ = detect_prompt_injection(raw_text)
+                if flagged:
+                    logger.warning(
+                        f"Prompt-injection pattern defused in document {doc_id} page {page.get('page_number', '?')}"
+                    )
+                page = {**page, "text": sanitize_document_text(raw_text)}
+            defused_pages.append(page)
+        pages = defused_pages
+
         # Classify document type from text if unknown
         if not doc_type or doc_type == "unknown":
             combined_text = " ".join(p.get("text", "") for p in pages).lower()
             if any(k in combined_text for k in ["payslip", "gross salary", "net salary", "net take home"]):
                 doc_type = "payslip"
-            elif any(k in combined_text for k in ["bank", "account number", "closing balance", "salary credit", "neft"]):
+            elif any(
+                k in combined_text for k in ["bank", "account number", "closing balance", "salary credit", "neft"]
+            ):
                 doc_type = "bank_statement"
             elif any(k in combined_text for k in ["income tax", "itr-v", "assessee", "gross total income"]):
                 doc_type = "tax_acknowledgement"
@@ -283,18 +310,69 @@ def evaluate_rules_node(state: LoanApplicationState) -> Dict[str, Any]:
     }
 
 
+def _finding_field(finding: Any, name: str, default: Any = None) -> Any:
+    """Reads a Finding field whether the state carries a model or a plain dict (post-checkpoint serde)."""
+    if isinstance(finding, dict):
+        return finding.get(name, default)
+    return getattr(finding, name, default)
+
+
+def _resolve_policy_dir() -> str:
+    """Locates the policy corpus: env override, else repo-root policies/, else cwd policies/."""
+    env_dir = os.getenv("FINSCAN_POLICY_DIR")
+    if env_dir and os.path.isdir(env_dir):
+        return env_dir
+    repo_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    repo_policies = os.path.join(repo_root, "policies")
+    if os.path.isdir(repo_policies):
+        return repo_policies
+    return "policies"
+
+
 def retrieve_policy_node(state: LoanApplicationState) -> Dict[str, Any]:
     """
-    Node 5: Hybrid RAG retrieval for underwriting guidelines and credit policy.
-    Hard tenant isolation: Only retrieves policy corpus passages.
+    Node 5: Hybrid RAG retrieval (BM25 + BGE dense, RRF fused) over the policy corpus.
+    Hard tenant isolation: Only retrieves policy corpus passages, never applicant dossiers.
+
+    Finding-aware queries drive retrieval; the deterministic canonical backstop
+    below guarantees the mandatory clauses are always cited even if retrieval
+    returns nothing (e.g. missing policy dir in a minimal test env).
     """
     retrieved_chunk_ids: List[str] = list(state.get("retrieved_chunk_ids", []))
     findings = state.get("findings", [])
 
-    # Check for flagged rules to pull relevant policy clauses
-    has_salary_flag = any(f.rule_id == "RULE-INC-01" and f.verdict == "flag" for f in findings)
-    has_comp_flag = any(f.rule_id == "RULE-COMP-01" and f.verdict == "flag" for f in findings)
+    has_salary_flag = any(
+        _finding_field(f, "rule_id") == "RULE-INC-01" and _finding_field(f, "verdict") == "flag" for f in findings
+    )
+    has_comp_flag = any(
+        _finding_field(f, "rule_id") == "RULE-COMP-01" and _finding_field(f, "verdict") == "flag" for f in findings
+    )
 
+    # 1. Live hybrid retrieval over the isolated policy index (best effort)
+    queries = [
+        "retail credit underwriting policy debt-to-income DTI salary tolerance",
+        "mandatory documents checklist payslip bank statement ITR KYC",
+    ]
+    if has_salary_flag:
+        queries.append("payslip net salary bank statement salary credit reconciliation tolerance percent")
+    if has_comp_flag:
+        queries.append("mandatory documentation checklist application form consecutive payslips")
+    try:
+        from core.rag.indexer import IndexManager
+        from core.rag.retriever import HybridRetriever
+
+        manager = IndexManager()
+        manager.load_policy_corpus(policy_dir=_resolve_policy_dir())
+        retriever = HybridRetriever(index_manager=manager, policy_dir=_resolve_policy_dir())
+        for query in queries:
+            for hit in retriever.retrieve_policy(query, top_k=3):
+                chunk_id = hit["chunk_id"]
+                if chunk_id not in retrieved_chunk_ids:
+                    retrieved_chunk_ids.append(chunk_id)
+    except Exception as e:
+        logger.warning(f"Policy hybrid retrieval unavailable, using canonical backstop: {e}")
+
+    # 2. Deterministic canonical backstop — mandatory clauses always cited
     if has_salary_flag and "credit_policy_v1_p1" not in retrieved_chunk_ids:
         retrieved_chunk_ids.append("credit_policy_v1_p1")
     if has_comp_flag and "credit_policy_v1_p2" not in retrieved_chunk_ids:
@@ -329,7 +407,9 @@ def synthesize_summary_node(state: LoanApplicationState) -> Dict[str, Any]:
         "#### Deterministic Verification Summary",
     ]
     for finding in findings:
-        status_badge = "✅ PASS" if finding.verdict == "pass" else ("⚠️ FLAG" if finding.verdict == "flag" else "❓ UNKNOWN")
+        status_badge = (
+            "✅ PASS" if finding.verdict == "pass" else ("⚠️ FLAG" if finding.verdict == "flag" else "❓ UNKNOWN")
+        )
         summary_lines.append(f"- **{finding.rule_name}** ({finding.rule_id}) [{status_badge}]: {finding.reason}")
 
     if missing_docs:
@@ -338,36 +418,67 @@ def synthesize_summary_node(state: LoanApplicationState) -> Dict[str, Any]:
 
     summary_lines.append("")
     summary_lines.append("#### Authoritative Policy Citations")
-    summary_lines.append(f"Referenced guidelines: {', '.join(chunks) if chunks else 'None'}")
+    # Bracketed IDs are machine-parseable: validate_grounding_node extracts them
+    # and rejects any citation outside retrieved_chunk_ids.
+    summary_lines.append(f"Referenced guidelines: {', '.join(f'[{c}]' for c in chunks) if chunks else 'None'}")
 
     return {
         "summary_markdown": "\n".join(summary_lines),
     }
 
 
+# Bracket citations parsed from memo markdown. Status badges ([PASS]/[FLAG]/...)
+# and abstention markers are NOT citations and are excluded.
+_CITATION_RE = re.compile(r"\[([A-Za-z0-9_\-]+)\]")
+_NON_CITATION_PREFIXES = ("PASS", "FLAG", "UNKNOWN", "ABSTENTION")
+
+
+def _parse_memo_citations(summary_markdown: str) -> List[str]:
+    """Extracts machine-verifiable [chunk_id] citations from the memo."""
+    if not summary_markdown:
+        return []
+    return [c for c in _CITATION_RE.findall(summary_markdown) if not c.upper().startswith(_NON_CITATION_PREFIXES)]
+
+
 def validate_grounding_node(state: LoanApplicationState) -> Dict[str, Any]:
     """
     Node 7: Deterministic citation validation gate. Drops ungrounded claims.
+    Parses actual [chunk_id] citations from the memo (never trusts the
+    retrieved list as its own proof), strips unauthorized lines, and appends
+    an explicit abstention when evidence is missing or unverified.
     Transitions: PROCESSING -> READY_FOR_REVIEW
     """
-    summary = state.get("summary_markdown", "")
-    retrieved_chunks = state.get("retrieved_chunk_ids", [])
+    summary = state.get("summary_markdown", "") or ""
+    retrieved_chunks = list(state.get("retrieved_chunk_ids", []) or [])
 
-    claims = [{"text": summary, "citations": retrieved_chunks}]
+    parsed_citations = _parse_memo_citations(summary)
+    claims = [{"text": summary, "citations": parsed_citations}]
     is_grounded = validate_citations(claims, retrieved_chunks)
+
+    sanitized_summary = sanitize_summary_text(summary, retrieved_chunks)
+    _, dropped = filter_grounded_claims(claims, retrieved_chunks)
+    if dropped:
+        logger.warning(
+            f"Grounding gate dropped {len(dropped)} ungrounded claim block(s); "
+            f"parsed={parsed_citations} authorized={retrieved_chunks}"
+        )
 
     history: List[StatusTransition] = list(state.get("status_history", []))
     transition: StatusTransition = {
         "from_status": state.get("status", "PROCESSING"),
         "to_status": "READY_FOR_REVIEW",
         "timestamp": _get_utc_timestamp(),
-        "reason": "Pipeline execution and grounding check complete. Ready for human underwriter review.",
+        "reason": (
+            "Pipeline execution and grounding check complete. "
+            f"Citations grounded: {is_grounded}. Ready for human underwriter review."
+        ),
     }
     history.append(transition)
 
     return {
         "status": "READY_FOR_REVIEW",
         "status_history": history,
+        "summary_markdown": sanitized_summary,
         "summary_grounded": is_grounded,
         "review_paused": True,
     }

@@ -53,8 +53,8 @@
       "target": "APP-25195",
       "question": "Does the payslip net salary match the credits in the bank statement?",
       "expected_citations": [
-        "APP-25195_p2",
-        "APP-25195_p1"
+        "APP-25195_p1",
+        "APP-25195_p2"
       ],
       "retrieved_chunk_ids": [
         "APP-25195_p2",

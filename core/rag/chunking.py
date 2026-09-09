@@ -239,6 +239,12 @@ def chunk_policy_document(
 ) -> List[DocumentChunk]:
     """
     Chunks a policy markdown document preserving clause structure and canonical policy citations.
+
+    NOTE (Member 8): thresholds intentionally differ from the 250-400 document-page
+    target. The policy corpus files total ~250-350 tokens; 150/260 keeps the
+    mandatory-checklist clause as a separately citable chunk (credit_policy_v1_p2),
+    which the frozen 30Q benchmark and retrieve_policy_node cite directly.
+    Verified: 250/400 merges the corpus into a single chunk and orphans those citations.
     """
     chunks: List[DocumentChunk] = []
     # Split by major horizontal rules or H2 headings

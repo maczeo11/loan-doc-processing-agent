@@ -1,0 +1,35 @@
+# ==============================================================================
+# FinScan AI: Production Caddy Configuration with Automatic Let's Encrypt HTTPS
+# ==============================================================================
+
+{
+    email {$ACME_EMAIL:admin@example.com}
+    admin off
+}
+
+{$DOMAIN_NAME:localhost} {
+    encode gzip zstd
+
+    # Security headers
+    header {
+        Strict-Transport-Security "max-age=3153600; includeSubDomains; preload"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        -Server
+    }
+
+    # Reverse proxy to FastAPI application container
+    reverse_proxy api:8000 {
+        header_up Host {host}
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+    }
+
+    # Structured production logging
+    log {
+        output stdout
+        format json
+    }
+}

@@ -1,4 +1,4 @@
-# FinScan AI — Fast CI Dependency Manifest
+# FinScan AI - Fast CI Dependency Manifest
 # Used by GitHub Actions to avoid compiling heavy ML/GPU wheels in CI runners
 
 # Web & API Testing
@@ -9,14 +9,24 @@ httpx>=0.27.0
 pydantic>=2.6.0
 pydantic-settings>=2.2.0
 
+# Database & Persistence
+sqlalchemy>=2.0.0
+asyncpg>=0.29.0
+alembic>=1.13.0
+aiosqlite>=0.20.0
+psycopg[binary]>=3.1.18
+redis>=5.0.3
+
 # Orchestration & Adapters
 langgraph>=0.0.30
 langchain-core>=0.1.38
 boto3>=1.34.0
-psycopg[binary]>=3.1.18
 pymupdf>=1.24.0
+pyyaml>=6.0
 
 # Testing & Quality Gates
 pytest>=8.1.0
 pytest-cov>=4.1.0
+pytest-asyncio>=0.23.0
+fakeredis>=2.20.0
 ruff>=0.3.0

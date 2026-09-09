@@ -2,7 +2,7 @@
   "metadata": {
     "dataset_version": "2.0",
     "source_csv": "data/kaggle_loan_approval_dataset.csv",
-    "source_csv_sha256": "4b5cd093d178378f4cfa8c107adb6e599b88be9d8a3b51f3b99c0d5914154e54",
+    "source_csv_sha256": "7fd55001bd0b3ef6f5463506c4f13d2bdbe286c3f3cd4dd6fff5cded4055520f",
     "seed": 42,
     "n_applicants": 70,
     "classes": [

@@ -13,6 +13,7 @@ from fastapi.staticfiles import StaticFiles
 from apps.api.routes.applications import router as applications_router
 from apps.api.routes.documents import router as documents_router
 from apps.api.routes.review import router as review_router
+from apps.api.routes.uploads import router as uploads_router
 from apps.api.middleware.rate_limit import close_redis_client
 
 
@@ -41,6 +42,7 @@ app.add_middleware(
 app.include_router(applications_router)
 app.include_router(documents_router)
 app.include_router(review_router)
+app.include_router(uploads_router)
 
 
 @app.get("/health", tags=["Health"])

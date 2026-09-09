@@ -99,10 +99,12 @@ class PostgresQueue(QueuePort):
         """
         Atomically claims up to max_n available jobs using FOR UPDATE SKIP LOCKED.
         Updates status to PROCESSING and sets locked_until for lease management.
+        Derives JobRef.attempt_count from the row retry_count so poison messages
+        escalate (attempt = retries + 1) and the consumer DLQ ceiling trips.
         """
         query = f"""
         WITH claimed AS (
-            SELECT id, job_id, payload
+            SELECT id, job_id, payload, retry_count
             FROM {self.table_name}
             WHERE status IN ('PENDING', 'DISPATCHED')
               AND (locked_until IS NULL OR locked_until < clock_timestamp())
@@ -116,7 +118,7 @@ class PostgresQueue(QueuePort):
             dispatched_at = COALESCE(t.dispatched_at, clock_timestamp())
         FROM claimed
         WHERE t.id = claimed.id
-        RETURNING t.job_id, t.payload;
+        RETURNING t.job_id, t.payload, t.retry_count;
         """
         conn = self._get_connection()
         deliveries: List[Delivery] = []
@@ -129,8 +131,18 @@ class PostgresQueue(QueuePort):
             for row in rows:
                 job_id = row[0]
                 payload_raw = row[1]
+                delivered_retries = 0
+                if len(row) > 2 and row[2] is not None:
+                    try:
+                        delivered_retries = int(row[2])
+                    except (TypeError, ValueError):
+                        delivered_retries = 0
                 payload_dict = json.loads(payload_raw) if isinstance(payload_raw, str) else payload_raw
                 job_ref = JobRef.model_validate(payload_dict)
+                # Escalate: publish() stores retry_count = attempt_count - 1, so the
+                # live attempt is always retries + 1 (min 1). Without this, redelivered
+                # poison messages would replay attempt 1 forever and never reach DLQ.
+                job_ref.attempt_count = max(1, delivered_retries + 1)
                 deliveries.append(Delivery(lease_handle=job_id, job_ref=job_ref))
 
             return deliveries

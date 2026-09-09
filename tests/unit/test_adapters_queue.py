@@ -83,7 +83,7 @@ def test_postgres_queue_publish():
 
 def test_postgres_queue_receive_skip_locked():
     job = sample_job_ref()
-    cur = MockCursor(fetchall_data=[(job.job_id, job.model_dump_json())])
+    cur = MockCursor(fetchall_data=[(job.job_id, job.model_dump_json(), 0)])
     conn = MockConnection(cur)
     queue = PostgresQueue(table_name="outbox_jobs", conn=conn)
 
@@ -94,10 +94,24 @@ def test_postgres_queue_receive_skip_locked():
     assert delivery.lease_handle == job.job_id
     assert delivery.job_ref.job_id == job.job_id
     assert delivery.job_ref.application_id == job.application_id
+    assert delivery.job_ref.attempt_count == 1
 
     query, params = cur.executed_queries[0]
     assert "FOR UPDATE SKIP LOCKED" in query
     assert conn.committed is True
+
+
+def test_postgres_queue_receive_escalates_attempt_from_retry_count():
+    """Poison messages must surface attempt = retries + 1 so the consumer DLQ ceiling trips."""
+    job = sample_job_ref()
+    cur = MockCursor(fetchall_data=[(job.job_id, job.model_dump_json(), 3)])
+    conn = MockConnection(cur)
+    queue = PostgresQueue(table_name="outbox_jobs", conn=conn)
+
+    deliveries = queue.receive(max_n=1)
+
+    assert len(deliveries) == 1
+    assert deliveries[0].job_ref.attempt_count == 4
 
 
 def test_postgres_queue_extend_lease():

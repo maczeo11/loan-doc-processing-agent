@@ -373,3 +373,55 @@ A feature branch is eligible for merge into `main` only when:
 5. **Human-Only Review:** Any financial logic in `core/rules/` or queue/outbox SQL has been reviewed by Bhanu.
 6. **Owner Explanation:** The code author can explain every line in the PR during viva prep.
 
+---
+
+## 8. FinScan Classifier — Remediation, Training & Release Requirements
+
+### 8.1 Scope & Canonical Schema
+- **Task:** Predict document page category from extracted page text (native-PDF or OCR layer).
+- **Canonical Labels (5):**
+  - `application_form`
+  - `bank_statement`
+  - `id_card`
+  - `payslip`
+  - `tax_acknowledgement`
+- **Abstention Policy:** `UNKNOWN` is strictly an abstention outcome (triggered by confidence thresholding, empty text, or out-of-domain rejection), NOT a trained 6th document class.
+- **Explicit Non-Goals:**
+  - No loan approval or credit risk prediction from tabular CSV rows.
+  - No field extraction, mathematical reconciliation, or fraud detection in this module.
+  - No LLM fine-tuning; metrics reflect solely document page routing performance.
+
+### 8.2 Dataset Provenance & Synthesis Rules
+- **Data Source:** Actual tabular loan records from Kaggle (`data/kaggle_loan_approval_dataset.csv`).
+- **Data Pipeline:**
+  $$\text{Kaggle CSV rows} \longrightarrow \text{Synthetic Applicant Profiles} \longrightarrow \text{Multi-Family Synthetic Dossiers} \longrightarrow \text{Extracted Page Text} \longrightarrow \text{Classifier}$$
+- **Financial & Demographic Realism:**
+  - Annual income divided by 12 is derived monthly gross, not take-home pay. Explicit assumptions for EPF, TDS, and net pay.
+  - All names, employers, banks, PAN/Aadhaar IDs, and ledger entries are fictional.
+  - Mandatory visible watermark on all rendered documents: **`SYNTHETIC DEMO — NOT VALID`**.
+  - Provenance sidecars record: source CSV row ID, applicant ID, dataset version, seed, split, template family, and expected label (held strictly outside feature inputs).
+
+### 8.3 Dataset Diversity & Disjoint Split Rules
+- **Volume Target:** 500–1,000 QA-checked document pages across the 5 canonical classes.
+- **Template Families:** Minimum 3–4 genuinely distinct structural template families per class (varying section order, terminology, tabular structure, headers).
+- **Strict Disjoint Partitioning:**
+  - Partitions: Train (~70%), Dev (~15%), Held-Out Test (~15%).
+  - **Double-Disjoint Invariant:** Both applicant IDs AND entire template families must be disjoint across splits. Test set must evaluate generalization to unseen template families, eliminating template memorization.
+- **Negative / Out-of-Domain Benchmark:**
+  - Development and held-out test sets include explicit negative samples: empty strings, whitespace, random gibberish, and unsupported out-of-domain documents (e.g. utility bills, medical prescriptions).
+  - Target output for negatives: `UNKNOWN`.
+
+### 8.4 Model Identity, Training & Resource Invariants
+- **Production Architecture:** Word `(1, 2)` + Character `(3, 5)` TF-IDF with balanced `LogisticRegression` on CPU.
+- **Honest Model Identity:** No fallback linear classifier may be labeled as "DistilBERT" or a transformer encoder. Neural architectures require verified PyTorch/Transformers execution.
+- **Metrics & Benchmarking:**
+  - Real process memory (RSS) and micro-benchmarked latency (p50/p95).
+  - Confidence threshold $T$ selected on the Dev set to balance precision, recall, and rejection.
+  - Final generalization evaluation reported on the reserved held-out template families.
+- **Deployment Compatibility:**
+  - 100% CPU execution.
+  - Linux ARM64 (`t4g.medium` EC2) compatible.
+  - Zero network download dependencies during inference.
+- **Detailed Handoff:** Long-form progress, logs, and reproduction audits are maintained in `docs/classifier_handoff.md`.
+
+

@@ -1,0 +1,100 @@
+{
+  "commit": "85ff8fd",
+  "model_path": "ml/artifacts/baseline_tfidf.joblib",
+  "model_sha256": "71c72f69e952aa98d689cc42f21205b3f2db1ba04bf9c65ff9d5e888a586d6e3",
+  "splits_path": "ml/data/splits.json",
+  "splits_sha256": "e83889f6efbf63e83b5836924313c4b275fec71189b0d81693a38a455536a569",
+  "classes_order": [
+    "application_form",
+    "bank_statement",
+    "id_card",
+    "payslip",
+    "tax_acknowledgement"
+  ],
+  "test_sample_count": 99,
+  "accuracy": 1.0,
+  "macro_f1": 1.0,
+  "weighted_f1": 1.0,
+  "confusion_matrix": [
+    [
+      18,
+      0,
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      27,
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      18,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      0,
+      27,
+      0
+    ],
+    [
+      0,
+      0,
+      0,
+      0,
+      9
+    ]
+  ],
+  "classification_report": {
+    "application_form": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 18.0
+    },
+    "bank_statement": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 27.0
+    },
+    "id_card": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 18.0
+    },
+    "payslip": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 27.0
+    },
+    "tax_acknowledgement": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 9.0
+    },
+    "accuracy": 1.0,
+    "macro avg": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 99.0
+    },
+    "weighted avg": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 99.0
+    }
+  }
+}

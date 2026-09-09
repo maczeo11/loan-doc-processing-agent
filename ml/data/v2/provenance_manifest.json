@@ -32,7 +32,6 @@
       "APP_FORM_DIGITAL_APP",
       "BANK_STMT_WEALTH_OVERVIEW",
       "ID_VOTER_EPIC",
-      "NEGATIVE_EMPTY_STRING",
       "NEGATIVE_GIBBERISH_TOKENS",
       "NEGATIVE_LEASE_AGREEMENT",
       "NEGATIVE_MEDICAL_PRESCRIPTION",
@@ -60,9 +59,9 @@
     ],
     "counts": {
       "train_samples": 480,
-      "dev_samples": 63,
+      "dev_samples": 62,
       "test_samples": 63,
-      "total_samples": 606
+      "total_samples": 605
     }
   },
   "records": [
@@ -4897,14 +4896,14 @@
       "text": "SYNTHETIC DEMO \u2014 NOT VALID\n    NEXUS FINTECH LENDING PLATFORM \u2014 DIGITAL APPLICATION SUMMARY\n    Session Token: DIGI-APP-APP-KAG-0055 | Trace: KAG-CSV-55\n    Timestamp: 2025-09-12T09:14:22Z | Digital Channel: Web-Portal\n\n    USER VERIFICATION & KYC DATA:\n    Applicant Legal Name : Amit Bose\n    Parentage Name       : Nikhil Bose\n    DOB & Sex            : 1999-04-02 [Male]\n    PAN Verification     : BLCEI9131A [NSDL VALIDATED]\n    Aadhaar Token        : XXXX-XXXX-4312 [UIDAI OTP AUTHENTICATED]\n    Education & Family   : Graduate, 2 dependent(s)\n\n    DIGITAL SANCTION SUMMARY:\n    - Facility Applied   : Retail Personal Term Loan\n    - Loan Ticket Size   : Rs. 19,700,000.00\n    - Requested Duration : 240 Months\n    - Monthly Instalment : Rs. 170,961.18 / month\n    - Primary Work       : Reliance Industries Ltd (Operations Manager)\n    - Annualized Gross   : Rs. 5,100,000.00\n    - In-hand Monthly    : Rs. 330,133.33\n    - Risk Bureau Score  : 590\n\n    E-SIGN CONSENT:\n    Applicant digitally agreed to T&C and information sharing via Aadhaar e-Sign.\n    SYNTHETIC DEMO \u2014 NOT VALID"
     },
     {
-      "page_id": "APP-KAG-0059-PAYSLIP_PUBLIC_SECTOR",
+      "page_id": "APP-KAG-0059-APP_FORM_DIGITAL_APP",
       "application_id": "APP-KAG-0059",
       "source_csv_row": 59,
       "split": "dev",
-      "label": "payslip",
-      "template_family": "PAYSLIP_PUBLIC_SECTOR",
+      "label": "application_form",
+      "template_family": "APP_FORM_DIGITAL_APP",
       "is_negative": false,
-      "text": "SYNTHETIC DEMO \u2014 NOT VALID\n    GOVERNMENT & STATUTORY CORPORATION PAY ADVICE\n    Office of Accounts & Disbursals, Ahmedabad Circle\n    Statement of Salary & Allowances for Month of August 2025\n\n    Employee Identification Details:\n    Name of Officer / Employee : Swati Pandey\n    Cadre / Designation        : Assistant Vice President\n    Organization / Agency      : Tata Consultancy Services Ltd\n    PAN Number                 : ZEIZL7176T\n    Credit Destination         : Bank of Baroda (A/c: 501003110737)\n\n    CREDITS SCHEDULE (INR):\n    - Substantive Pay (Basic)  : 308,333.34\n    - Dearness Allowance       : 107,916.67\n    - House Rent Compensation  : 77,083.34\n    - Special Conveyance Pool  : 123,333.33\n    GROSS SALARY ACCRUAL       : INR 616,666.67\n\n    DEBITS SCHEDULE (INR):\n    - General Provident Fund   : 37,000.00\n    - Professional Tax         : 200.00\n    - Income Tax Withheld      : 107,500.00\n    TOTAL DEBITS               : INR 144,700.00\n\n    NET PAYMENT SANCTIONED     : INR 471,966.67\n    Passed for Treasury Payment: Verified against cadre payroll rolls.\n    SYNTHETIC DEMO \u2014 NOT VALID"
+      "text": "SYNTHETIC DEMO \u2014 NOT VALID\n    NEXUS FINTECH LENDING PLATFORM \u2014 DIGITAL APPLICATION SUMMARY\n    Session Token: DIGI-APP-APP-KAG-0059 | Trace: KAG-CSV-59\n    Timestamp: 2025-09-12T09:14:22Z | Digital Channel: Web-Portal\n\n    USER VERIFICATION & KYC DATA:\n    Applicant Legal Name : Swati Pandey\n    Parentage Name       : Deepika Pandey\n    DOB & Sex            : 1992-01-25 [Female]\n    PAN Verification     : ZEIZL7176T [NSDL VALIDATED]\n    Aadhaar Token        : XXXX-XXXX-8883 [UIDAI OTP AUTHENTICATED]\n    Education & Family   : Graduate, 1 dependent(s)\n\n    DIGITAL SANCTION SUMMARY:\n    - Facility Applied   : Retail Personal Term Loan\n    - Loan Ticket Size   : Rs. 18,400,000.00\n    - Requested Duration : 240 Months\n    - Monthly Instalment : Rs. 159,679.47 / month\n    - Primary Work       : Tata Consultancy Services Ltd (Assistant Vice President)\n    - Annualized Gross   : Rs. 7,400,000.00\n    - In-hand Monthly    : Rs. 471,966.67\n    - Risk Bureau Score  : 421\n\n    E-SIGN CONSENT:\n    Applicant digitally agreed to T&C and information sharing via Aadhaar e-Sign.\n    SYNTHETIC DEMO \u2014 NOT VALID"
     },
     {
       "page_id": "APP-KAG-0051-ID_VOTER_EPIC",
@@ -4927,14 +4926,14 @@
       "text": "SYNTHETIC DEMO \u2014 NOT VALID\n    GOVERNMENT OF INDIA - INCOME TAX DEPARTMENT\n    INTIMATION UNDER SECTION 143(1) OF THE INCOME TAX ACT, 1961\n    CPC, Post Box No. 1, Electronic City Office, Bengaluru\n    DIN: CPC/2526/1431/00000052 | PAN: LIJOS3982Y\n    To: ROHAN BHAT, Kolkata\n\n    COMPARATIVE COMPUTATION TABLE\n    Particulars                         As Provided in Return   As Computed u/s 143(1)\n    Gross Income from Salary / Source   INR 8,700,000.00        INR 8,700,000.00\n    Total Deductions Under Chapter VIA  INR 150,000.00          INR 150,000.00\n    Aggregate Taxable Income            INR 8,500,000.00      INR 8,500,000.00\n    Net Tax Payable                     INR 1,020,000.00     INR 1,020,000.00\n    Prepaid Taxes / TDS Relief          INR 1,020,000.00     INR 1,020,000.00\n    Net Amount Refundable / Demand      NIL                     NIL\n\n    This is an automated computerized intimation requiring no signature.\n    SYNTHETIC DEMO \u2014 NOT VALID"
     },
     {
-      "page_id": "APP-KAG-0059-ID_VOTER_EPIC",
+      "page_id": "APP-KAG-0059-BANK_STMT_WEALTH_OVERVIEW",
       "application_id": "APP-KAG-0059",
       "source_csv_row": 59,
       "split": "dev",
-      "label": "id_card",
-      "template_family": "ID_VOTER_EPIC",
+      "label": "bank_statement",
+      "template_family": "BANK_STMT_WEALTH_OVERVIEW",
       "is_negative": false,
-      "text": "SYNTHETIC DEMO \u2014 NOT VALID\n    ELECTION COMMISSION OF INDIA - IDENTITY CARD\n    ELECTOR PHOTO IDENTITY CARD (EPIC)\n    EPIC Number: XYZ0000059\n    \n    Elector Name   : Swati Pandey\n    Relation Name  : Deepika Pandey\n    Gender / Sex   : Female\n    Date of Birth  : 1992-01-25\n    Constituency   : Ahmedabad Central Assembly Segment\n    Electoral Registration Officer Seal: Issued by ECI Authority.\n    SYNTHETIC DEMO \u2014 NOT VALID"
+      "text": "SYNTHETIC DEMO \u2014 NOT VALID\n    PRIVATE WEALTH MANAGEMENT CLIENT CONSOLIDATED STATEMENT\n    Financial Institution: Bank of Baroda Wealth Services\n    Portfolio Client: Swati Pandey | Account: 501003110737\n    Currency: Indian Rupee (INR) | Statement Date: 31-Aug-2025\n\n    MONTHLY LIQUIDITY SUMMARY:\n    - Average Quarterly Balance (AQB) : INR 1,297,908.34\n    - Total Payroll Credits Inflow     : INR 1,415,900.01\n    - Closing Liquid Funds             : INR 1,179,916.68\n\n    TRANSACTION LOG (REPRESENTATIVE CREDITS & OUTFLOWS):\n    1. 01-Jun-2025 : Corporate Payroll Inflow (Tata Consultancy Services Ltd) -> CR INR 471,966.67\n    2. 12-Jun-2025 : Investment Outflow / Mutual Fund SIP       -> DR INR 15,000.00\n    3. 01-Jul-2025 : Corporate Payroll Inflow (Tata Consultancy Services Ltd) -> CR INR 471,966.67\n    4. 20-Jul-2025 : Point-of-Sale International Debit           -> DR INR 8,400.00\n    5. 01-Aug-2025 : Corporate Payroll Inflow (Tata Consultancy Services Ltd) -> CR INR 471,966.67\n\n    Account in Good Standing: No negative liens or dishonour events noted.\n    SYNTHETIC DEMO \u2014 NOT VALID"
     },
     {
       "page_id": "APP-KAG-0050-ID_VOTER_EPIC",
@@ -4957,14 +4956,14 @@
       "text": "SYNTHETIC DEMO \u2014 NOT VALID\n    NEXUS FINTECH LENDING PLATFORM \u2014 DIGITAL APPLICATION SUMMARY\n    Session Token: DIGI-APP-APP-KAG-0050 | Trace: KAG-CSV-50\n    Timestamp: 2025-09-12T09:14:22Z | Digital Channel: Web-Portal\n\n    USER VERIFICATION & KYC DATA:\n    Applicant Legal Name : Neha Rao\n    Parentage Name       : Rajesh Rao\n    DOB & Sex            : 1993-05-16 [Female]\n    PAN Verification     : MDMYJ4690K [NSDL VALIDATED]\n    Aadhaar Token        : XXXX-XXXX-9773 [UIDAI OTP AUTHENTICATED]\n    Education & Family   : Not Graduate, 1 dependent(s)\n\n    DIGITAL SANCTION SUMMARY:\n    - Facility Applied   : Retail Personal Term Loan\n    - Loan Ticket Size   : Rs. 19,100,000.00\n    - Requested Duration : 192 Months\n    - Monthly Instalment : Rs. 182,307.78 / month\n    - Primary Work       : Cognizant Technology Solutions (Operations Manager)\n    - Annualized Gross   : Rs. 9,500,000.00\n    - In-hand Monthly    : Rs. 601,466.67\n    - Risk Bureau Score  : 662\n\n    E-SIGN CONSENT:\n    Applicant digitally agreed to T&C and information sharing via Aadhaar e-Sign.\n    SYNTHETIC DEMO \u2014 NOT VALID"
     },
     {
-      "page_id": "NEG-DEV-003-utility_bill",
-      "application_id": "NONE_NEGATIVE",
-      "source_csv_row": -1,
+      "page_id": "APP-KAG-0057-APP_FORM_DIGITAL_APP",
+      "application_id": "APP-KAG-0057",
+      "source_csv_row": 57,
       "split": "dev",
-      "label": "UNKNOWN",
-      "template_family": "NEGATIVE_UTILITY_BILL",
-      "is_negative": true,
-      "text": "SYNTHETIC DEMO \u2014 NOT VALID\n        CITY ELECTRICITY SUPPLY CORPORATION - MONTHLY UTILITY INVOICE\n        Consumer Account No: 98127391 | Meter No: ELEC-9812\n        Consumer Name: Ramesh Gupta | Billing Month: August 2025\n        Units Consumed: 342 kWh | Tariff Rate: Rs. 6.50 / unit\n        Energy Charges: Rs. 2,223.00 | Fuel Surcharge: Rs. 140.00\n        Total Bill Payable by Due Date: Rs. 2,363.00\n        SYNTHETIC DEMO \u2014 NOT VALID"
+      "label": "application_form",
+      "template_family": "APP_FORM_DIGITAL_APP",
+      "is_negative": false,
+      "text": "SYNTHETIC DEMO \u2014 NOT VALID\n    NEXUS FINTECH LENDING PLATFORM \u2014 DIGITAL APPLICATION SUMMARY\n    Session Token: DIGI-APP-APP-KAG-0057 | Trace: KAG-CSV-57\n    Timestamp: 2025-09-12T09:14:22Z | Digital Channel: Web-Portal\n\n    USER VERIFICATION & KYC DATA:\n    Applicant Legal Name : Varun Agarwal\n    Parentage Name       : Gaurav Agarwal\n    DOB & Sex            : 2000-09-22 [Female]\n    PAN Verification     : IDMQY6852T [NSDL VALIDATED]\n    Aadhaar Token        : XXXX-XXXX-4014 [UIDAI OTP AUTHENTICATED]\n    Education & Family   : Not Graduate, 2 dependent(s)\n\n    DIGITAL SANCTION SUMMARY:\n    - Facility Applied   : Retail Personal Term Loan\n    - Loan Ticket Size   : Rs. 10,600,000.00\n    - Requested Duration : 216 Months\n    - Monthly Instalment : Rs. 95,978.49 / month\n    - Primary Work       : Infosys Technologies Ltd (Assistant Vice President)\n    - Annualized Gross   : Rs. 4,300,000.00\n    - In-hand Monthly    : Rs. 280,800.00\n    - Risk Bureau Score  : 431\n\n    E-SIGN CONSENT:\n    Applicant digitally agreed to T&C and information sharing via Aadhaar e-Sign.\n    SYNTHETIC DEMO \u2014 NOT VALID"
     },
     {
       "page_id": "APP-KAG-0054-ID_VOTER_EPIC",
@@ -5007,14 +5006,14 @@
       "text": "SYNTHETIC DEMO \u2014 NOT VALID\n    ELECTION COMMISSION OF INDIA - IDENTITY CARD\n    ELECTOR PHOTO IDENTITY CARD (EPIC)\n    EPIC Number: XYZ0000049\n    \n    Elector Name   : Meera Saxena\n    Relation Name  : Manoj Saxena\n    Gender / Sex   : Female\n    Date of Birth  : 1982-03-10\n    Constituency   : Bengaluru Central Assembly Segment\n    Electoral Registration Officer Seal: Issued by ECI Authority.\n    SYNTHETIC DEMO \u2014 NOT VALID"
     },
     {
-      "page_id": "APP-KAG-0057-APP_FORM_DIGITAL_APP",
-      "application_id": "APP-KAG-0057",
-      "source_csv_row": 57,
+      "page_id": "APP-KAG-0056-ID_VOTER_EPIC",
+      "application_id": "APP-KAG-0056",
+      "source_csv_row": 56,
       "split": "dev",
-      "label": "application_form",
-      "template_family": "APP_FORM_DIGITAL_APP",
+      "label": "id_card",
+      "template_family": "ID_VOTER_EPIC",
       "is_negative": false,
-      "text": "SYNTHETIC DEMO \u2014 NOT VALID\n    NEXUS FINTECH LENDING PLATFORM \u2014 DIGITAL APPLICATION SUMMARY\n    Session Token: DIGI-APP-APP-KAG-0057 | Trace: KAG-CSV-57\n    Timestamp: 2025-09-12T09:14:22Z | Digital Channel: Web-Portal\n\n    USER VERIFICATION & KYC DATA:\n    Applicant Legal Name : Varun Agarwal\n    Parentage Name       : Gaurav Agarwal\n    DOB & Sex            : 2000-09-22 [Female]\n    PAN Verification     : IDMQY6852T [NSDL VALIDATED]\n    Aadhaar Token        : XXXX-XXXX-4014 [UIDAI OTP AUTHENTICATED]\n    Education & Family   : Not Graduate, 2 dependent(s)\n\n    DIGITAL SANCTION SUMMARY:\n    - Facility Applied   : Retail Personal Term Loan\n    - Loan Ticket Size   : Rs. 10,600,000.00\n    - Requested Duration : 216 Months\n    - Monthly Instalment : Rs. 95,978.49 / month\n    - Primary Work       : Infosys Technologies Ltd (Assistant Vice President)\n    - Annualized Gross   : Rs. 4,300,000.00\n    - In-hand Monthly    : Rs. 280,800.00\n    - Risk Bureau Score  : 431\n\n    E-SIGN CONSENT:\n    Applicant digitally agreed to T&C and information sharing via Aadhaar e-Sign.\n    SYNTHETIC DEMO \u2014 NOT VALID"
+      "text": "SYNTHETIC DEMO \u2014 NOT VALID\n    ELECTION COMMISSION OF INDIA - IDENTITY CARD\n    ELECTOR PHOTO IDENTITY CARD (EPIC)\n    EPIC Number: XYZ0000056\n    \n    Elector Name   : Neha Patel\n    Relation Name  : Aditya Patel\n    Gender / Sex   : Female\n    Date of Birth  : 1986-04-02\n    Constituency   : Pune Central Assembly Segment\n    Electoral Registration Officer Seal: Issued by ECI Authority.\n    SYNTHETIC DEMO \u2014 NOT VALID"
     },
     {
       "page_id": "APP-KAG-0049-TAX_ACK_INTIMATION_143_1",
@@ -5047,14 +5046,14 @@
       "text": "SYNTHETIC DEMO \u2014 NOT VALID\n    NEXUS FINTECH LENDING PLATFORM \u2014 DIGITAL APPLICATION SUMMARY\n    Session Token: DIGI-APP-APP-KAG-0051 | Trace: KAG-CSV-51\n    Timestamp: 2025-09-12T09:14:22Z | Digital Channel: Web-Portal\n\n    USER VERIFICATION & KYC DATA:\n    Applicant Legal Name : Ritu Nambiar\n    Parentage Name       : Simran Nambiar\n    DOB & Sex            : 1998-10-22 [Male]\n    PAN Verification     : JRJHL7641A [NSDL VALIDATED]\n    Aadhaar Token        : XXXX-XXXX-8379 [UIDAI OTP AUTHENTICATED]\n    Education & Family   : Graduate, 4 dependent(s)\n\n    DIGITAL SANCTION SUMMARY:\n    - Facility Applied   : Retail Personal Term Loan\n    - Loan Ticket Size   : Rs. 25,400,000.00\n    - Requested Duration : 192 Months\n    - Monthly Instalment : Rs. 242,440.71 / month\n    - Primary Work       : Hindustan Unilever Ltd (Lead Consultant)\n    - Annualized Gross   : Rs. 7,300,000.00\n    - In-hand Monthly    : Rs. 465,800.00\n    - Risk Bureau Score  : 502\n\n    E-SIGN CONSENT:\n    Applicant digitally agreed to T&C and information sharing via Aadhaar e-Sign.\n    SYNTHETIC DEMO \u2014 NOT VALID"
     },
     {
-      "page_id": "APP-KAG-0058-BANK_STMT_WEALTH_OVERVIEW",
+      "page_id": "APP-KAG-0058-PAYSLIP_PUBLIC_SECTOR",
       "application_id": "APP-KAG-0058",
       "source_csv_row": 58,
       "split": "dev",
-      "label": "bank_statement",
-      "template_family": "BANK_STMT_WEALTH_OVERVIEW",
+      "label": "payslip",
+      "template_family": "PAYSLIP_PUBLIC_SECTOR",
       "is_negative": false,
-      "text": "SYNTHETIC DEMO \u2014 NOT VALID\n    PRIVATE WEALTH MANAGEMENT CLIENT CONSOLIDATED STATEMENT\n    Financial Institution: Punjab National Bank Wealth Services\n    Portfolio Client: Manoj Reddy | Account: 501007433110\n    Currency: Indian Rupee (INR) | Statement Date: 31-Aug-2025\n\n    MONTHLY LIQUIDITY SUMMARY:\n    - Average Quarterly Balance (AQB) : INR 1,620,116.66\n    - Total Payroll Credits Inflow     : INR 1,767,399.99\n    - Closing Liquid Funds             : INR 1,472,833.32\n\n    TRANSACTION LOG (REPRESENTATIVE CREDITS & OUTFLOWS):\n    1. 01-Jun-2025 : Corporate Payroll Inflow (Cognizant Technology Solutions) -> CR INR 589,133.33\n    2. 12-Jun-2025 : Investment Outflow / Mutual Fund SIP       -> DR INR 15,000.00\n    3. 01-Jul-2025 : Corporate Payroll Inflow (Cognizant Technology Solutions) -> CR INR 589,133.33\n    4. 20-Jul-2025 : Point-of-Sale International Debit           -> DR INR 8,400.00\n    5. 01-Aug-2025 : Corporate Payroll Inflow (Cognizant Technology Solutions) -> CR INR 589,133.33\n\n    Account in Good Standing: No negative liens or dishonour events noted.\n    SYNTHETIC DEMO \u2014 NOT VALID"
+      "text": "SYNTHETIC DEMO \u2014 NOT VALID\n    GOVERNMENT & STATUTORY CORPORATION PAY ADVICE\n    Office of Accounts & Disbursals, Chennai Circle\n    Statement of Salary & Allowances for Month of August 2025\n\n    Employee Identification Details:\n    Name of Officer / Employee : Manoj Reddy\n    Cadre / Designation        : Lead Consultant\n    Organization / Agency      : Cognizant Technology Solutions\n    PAN Number                 : ITJLD5862N\n    Credit Destination         : Punjab National Bank (A/c: 501007433110)\n\n    CREDITS SCHEDULE (INR):\n    - Substantive Pay (Basic)  : 387,500.00\n    - Dearness Allowance       : 135,625.00\n    - House Rent Compensation  : 96,875.00\n    - Special Conveyance Pool  : 155,000.00\n    GROSS SALARY ACCRUAL       : INR 775,000.00\n\n    DEBITS SCHEDULE (INR):\n    - General Provident Fund   : 46,500.00\n    - Professional Tax         : 200.00\n    - Income Tax Withheld      : 139,166.67\n    TOTAL DEBITS               : INR 185,866.67\n\n    NET PAYMENT SANCTIONED     : INR 589,133.33\n    Passed for Treasury Payment: Verified against cadre payroll rolls.\n    SYNTHETIC DEMO \u2014 NOT VALID"
     },
     {
       "page_id": "APP-KAG-0051-TAX_ACK_INTIMATION_143_1",
@@ -5067,24 +5066,24 @@
       "text": "SYNTHETIC DEMO \u2014 NOT VALID\n    GOVERNMENT OF INDIA - INCOME TAX DEPARTMENT\n    INTIMATION UNDER SECTION 143(1) OF THE INCOME TAX ACT, 1961\n    CPC, Post Box No. 1, Electronic City Office, Bengaluru\n    DIN: CPC/2526/1431/00000051 | PAN: JRJHL7641A\n    To: RITU NAMBIAR, Delhi NCR\n\n    COMPARATIVE COMPUTATION TABLE\n    Particulars                         As Provided in Return   As Computed u/s 143(1)\n    Gross Income from Salary / Source   INR 7,300,000.00        INR 7,300,000.00\n    Total Deductions Under Chapter VIA  INR 150,000.00          INR 150,000.00\n    Aggregate Taxable Income            INR 7,100,000.00      INR 7,100,000.00\n    Net Tax Payable                     INR 852,000.00     INR 852,000.00\n    Prepaid Taxes / TDS Relief          INR 852,000.00     INR 852,000.00\n    Net Amount Refundable / Demand      NIL                     NIL\n\n    This is an automated computerized intimation requiring no signature.\n    SYNTHETIC DEMO \u2014 NOT VALID"
     },
     {
-      "page_id": "APP-KAG-0058-TAX_ACK_INTIMATION_143_1",
+      "page_id": "APP-KAG-0058-BANK_STMT_WEALTH_OVERVIEW",
       "application_id": "APP-KAG-0058",
       "source_csv_row": 58,
       "split": "dev",
-      "label": "tax_acknowledgement",
-      "template_family": "TAX_ACK_INTIMATION_143_1",
+      "label": "bank_statement",
+      "template_family": "BANK_STMT_WEALTH_OVERVIEW",
       "is_negative": false,
-      "text": "SYNTHETIC DEMO \u2014 NOT VALID\n    GOVERNMENT OF INDIA - INCOME TAX DEPARTMENT\n    INTIMATION UNDER SECTION 143(1) OF THE INCOME TAX ACT, 1961\n    CPC, Post Box No. 1, Electronic City Office, Bengaluru\n    DIN: CPC/2526/1431/00000058 | PAN: ITJLD5862N\n    To: MANOJ REDDY, Chennai\n\n    COMPARATIVE COMPUTATION TABLE\n    Particulars                         As Provided in Return   As Computed u/s 143(1)\n    Gross Income from Salary / Source   INR 9,300,000.00        INR 9,300,000.00\n    Total Deductions Under Chapter VIA  INR 150,000.00          INR 150,000.00\n    Aggregate Taxable Income            INR 9,100,000.00      INR 9,100,000.00\n    Net Tax Payable                     INR 1,092,000.00     INR 1,092,000.00\n    Prepaid Taxes / TDS Relief          INR 1,092,000.00     INR 1,092,000.00\n    Net Amount Refundable / Demand      NIL                     NIL\n\n    This is an automated computerized intimation requiring no signature.\n    SYNTHETIC DEMO \u2014 NOT VALID"
+      "text": "SYNTHETIC DEMO \u2014 NOT VALID\n    PRIVATE WEALTH MANAGEMENT CLIENT CONSOLIDATED STATEMENT\n    Financial Institution: Punjab National Bank Wealth Services\n    Portfolio Client: Manoj Reddy | Account: 501007433110\n    Currency: Indian Rupee (INR) | Statement Date: 31-Aug-2025\n\n    MONTHLY LIQUIDITY SUMMARY:\n    - Average Quarterly Balance (AQB) : INR 1,620,116.66\n    - Total Payroll Credits Inflow     : INR 1,767,399.99\n    - Closing Liquid Funds             : INR 1,472,833.32\n\n    TRANSACTION LOG (REPRESENTATIVE CREDITS & OUTFLOWS):\n    1. 01-Jun-2025 : Corporate Payroll Inflow (Cognizant Technology Solutions) -> CR INR 589,133.33\n    2. 12-Jun-2025 : Investment Outflow / Mutual Fund SIP       -> DR INR 15,000.00\n    3. 01-Jul-2025 : Corporate Payroll Inflow (Cognizant Technology Solutions) -> CR INR 589,133.33\n    4. 20-Jul-2025 : Point-of-Sale International Debit           -> DR INR 8,400.00\n    5. 01-Aug-2025 : Corporate Payroll Inflow (Cognizant Technology Solutions) -> CR INR 589,133.33\n\n    Account in Good Standing: No negative liens or dishonour events noted.\n    SYNTHETIC DEMO \u2014 NOT VALID"
     },
     {
-      "page_id": "APP-KAG-0057-ID_VOTER_EPIC",
-      "application_id": "APP-KAG-0057",
-      "source_csv_row": 57,
+      "page_id": "APP-KAG-0059-ID_VOTER_EPIC",
+      "application_id": "APP-KAG-0059",
+      "source_csv_row": 59,
       "split": "dev",
       "label": "id_card",
       "template_family": "ID_VOTER_EPIC",
       "is_negative": false,
-      "text": "SYNTHETIC DEMO \u2014 NOT VALID\n    ELECTION COMMISSION OF INDIA - IDENTITY CARD\n    ELECTOR PHOTO IDENTITY CARD (EPIC)\n    EPIC Number: XYZ0000057\n    \n    Elector Name   : Varun Agarwal\n    Relation Name  : Gaurav Agarwal\n    Gender / Sex   : Female\n    Date of Birth  : 2000-09-22\n    Constituency   : Pune Central Assembly Segment\n    Electoral Registration Officer Seal: Issued by ECI Authority.\n    SYNTHETIC DEMO \u2014 NOT VALID"
+      "text": "SYNTHETIC DEMO \u2014 NOT VALID\n    ELECTION COMMISSION OF INDIA - IDENTITY CARD\n    ELECTOR PHOTO IDENTITY CARD (EPIC)\n    EPIC Number: XYZ0000059\n    \n    Elector Name   : Swati Pandey\n    Relation Name  : Deepika Pandey\n    Gender / Sex   : Female\n    Date of Birth  : 1992-01-25\n    Constituency   : Ahmedabad Central Assembly Segment\n    Electoral Registration Officer Seal: Issued by ECI Authority.\n    SYNTHETIC DEMO \u2014 NOT VALID"
     },
     {
       "page_id": "APP-KAG-0054-PAYSLIP_PUBLIC_SECTOR",
@@ -5127,18 +5126,18 @@
       "text": "SYNTHETIC DEMO \u2014 NOT VALID\n    GOVERNMENT OF INDIA - INCOME TAX DEPARTMENT\n    INTIMATION UNDER SECTION 143(1) OF THE INCOME TAX ACT, 1961\n    CPC, Post Box No. 1, Electronic City Office, Bengaluru\n    DIN: CPC/2526/1431/00000053 | PAN: XSDOJ8269W\n    To: KAVITA IYER, Ahmedabad\n\n    COMPARATIVE COMPUTATION TABLE\n    Particulars                         As Provided in Return   As Computed u/s 143(1)\n    Gross Income from Salary / Source   INR 3,800,000.00        INR 3,800,000.00\n    Total Deductions Under Chapter VIA  INR 150,000.00          INR 150,000.00\n    Aggregate Taxable Income            INR 3,600,000.00      INR 3,600,000.00\n    Net Tax Payable                     INR 432,000.00     INR 432,000.00\n    Prepaid Taxes / TDS Relief          INR 432,000.00     INR 432,000.00\n    Net Amount Refundable / Demand      NIL                     NIL\n\n    This is an automated computerized intimation requiring no signature.\n    SYNTHETIC DEMO \u2014 NOT VALID"
     },
     {
-      "page_id": "APP-KAG-0059-BANK_STMT_WEALTH_OVERVIEW",
+      "page_id": "APP-KAG-0059-PAYSLIP_PUBLIC_SECTOR",
       "application_id": "APP-KAG-0059",
       "source_csv_row": 59,
       "split": "dev",
-      "label": "bank_statement",
-      "template_family": "BANK_STMT_WEALTH_OVERVIEW",
+      "label": "payslip",
+      "template_family": "PAYSLIP_PUBLIC_SECTOR",
       "is_negative": false,
-      "text": "SYNTHETIC DEMO \u2014 NOT VALID\n    PRIVATE WEALTH MANAGEMENT CLIENT CONSOLIDATED STATEMENT\n    Financial Institution: Bank of Baroda Wealth Services\n    Portfolio Client: Swati Pandey | Account: 501003110737\n    Currency: Indian Rupee (INR) | Statement Date: 31-Aug-2025\n\n    MONTHLY LIQUIDITY SUMMARY:\n    - Average Quarterly Balance (AQB) : INR 1,297,908.34\n    - Total Payroll Credits Inflow     : INR 1,415,900.01\n    - Closing Liquid Funds             : INR 1,179,916.68\n\n    TRANSACTION LOG (REPRESENTATIVE CREDITS & OUTFLOWS):\n    1. 01-Jun-2025 : Corporate Payroll Inflow (Tata Consultancy Services Ltd) -> CR INR 471,966.67\n    2. 12-Jun-2025 : Investment Outflow / Mutual Fund SIP       -> DR INR 15,000.00\n    3. 01-Jul-2025 : Corporate Payroll Inflow (Tata Consultancy Services Ltd) -> CR INR 471,966.67\n    4. 20-Jul-2025 : Point-of-Sale International Debit           -> DR INR 8,400.00\n    5. 01-Aug-2025 : Corporate Payroll Inflow (Tata Consultancy Services Ltd) -> CR INR 471,966.67\n\n    Account in Good Standing: No negative liens or dishonour events noted.\n    SYNTHETIC DEMO \u2014 NOT VALID"
+      "text": "SYNTHETIC DEMO \u2014 NOT VALID\n    GOVERNMENT & STATUTORY CORPORATION PAY ADVICE\n    Office of Accounts & Disbursals, Ahmedabad Circle\n    Statement of Salary & Allowances for Month of August 2025\n\n    Employee Identification Details:\n    Name of Officer / Employee : Swati Pandey\n    Cadre / Designation        : Assistant Vice President\n    Organization / Agency      : Tata Consultancy Services Ltd\n    PAN Number                 : ZEIZL7176T\n    Credit Destination         : Bank of Baroda (A/c: 501003110737)\n\n    CREDITS SCHEDULE (INR):\n    - Substantive Pay (Basic)  : 308,333.34\n    - Dearness Allowance       : 107,916.67\n    - House Rent Compensation  : 77,083.34\n    - Special Conveyance Pool  : 123,333.33\n    GROSS SALARY ACCRUAL       : INR 616,666.67\n\n    DEBITS SCHEDULE (INR):\n    - General Provident Fund   : 37,000.00\n    - Professional Tax         : 200.00\n    - Income Tax Withheld      : 107,500.00\n    TOTAL DEBITS               : INR 144,700.00\n\n    NET PAYMENT SANCTIONED     : INR 471,966.67\n    Passed for Treasury Payment: Verified against cadre payroll rolls.\n    SYNTHETIC DEMO \u2014 NOT VALID"
     },
     {
-      "page_id": "NEG-DEV-005-lease_agreement",
-      "application_id": "NONE_NEGATIVE",
+      "page_id": "NEG-DEV-004-lease_agreement",
+      "application_id": "NONE_NEGATIVE_DEV_004",
       "source_csv_row": -1,
       "split": "dev",
       "label": "UNKNOWN",
@@ -5147,14 +5146,14 @@
       "text": "SYNTHETIC DEMO \u2014 NOT VALID\n        RESIDENTIAL LEASE AGREEMENT & TENANCY INDENTURE\n        This Tenancy Agreement is executed at Pune on this 1st day of July 2025.\n        Lessor / Landlord: Mr. Arun K. Joshi\n        Lessee / Tenant: Ms. Swati Rao\n        Premises: Flat No 402, Green Acre Apartments, Baner, Pune.\n        Monthly Lease Rent: INR 26,000/- per English calendar month.\n        Refundable Security Deposit: INR 1,00,000/- paid via bank transfer.\n        Period of Tenancy: 11 Months commencing from 01-Jul-2025.\n        SYNTHETIC DEMO \u2014 NOT VALID"
     },
     {
-      "page_id": "NEG-DEV-001-whitespace_only",
-      "application_id": "NONE_NEGATIVE",
+      "page_id": "NEG-DEV-000-whitespace_only",
+      "application_id": "NONE_NEGATIVE_DEV_000",
       "source_csv_row": -1,
       "split": "dev",
       "label": "UNKNOWN",
       "template_family": "NEGATIVE_WHITESPACE_ONLY",
       "is_negative": true,
-      "text": "\\n\\t"
+      "text": "   \n\t   "
     },
     {
       "page_id": "APP-KAG-0055-TAX_ACK_INTIMATION_143_1",
@@ -5177,14 +5176,24 @@
       "text": "SYNTHETIC DEMO \u2014 NOT VALID\n    NEXUS FINTECH LENDING PLATFORM \u2014 DIGITAL APPLICATION SUMMARY\n    Session Token: DIGI-APP-APP-KAG-0049 | Trace: KAG-CSV-49\n    Timestamp: 2025-09-12T09:14:22Z | Digital Channel: Web-Portal\n\n    USER VERIFICATION & KYC DATA:\n    Applicant Legal Name : Meera Saxena\n    Parentage Name       : Manoj Saxena\n    DOB & Sex            : 1982-03-10 [Female]\n    PAN Verification     : XJNLJ1341E [NSDL VALIDATED]\n    Aadhaar Token        : XXXX-XXXX-7738 [UIDAI OTP AUTHENTICATED]\n    Education & Family   : Not Graduate, 3 dependent(s)\n\n    DIGITAL SANCTION SUMMARY:\n    - Facility Applied   : Retail Personal Term Loan\n    - Loan Ticket Size   : Rs. 20,500,000.00\n    - Requested Duration : 144 Months\n    - Monthly Instalment : Rs. 227,561.39 / month\n    - Primary Work       : Hindustan Unilever Ltd (Operations Manager)\n    - Annualized Gross   : Rs. 5,500,000.00\n    - In-hand Monthly    : Rs. 354,800.00\n    - Risk Bureau Score  : 634\n\n    E-SIGN CONSENT:\n    Applicant digitally agreed to T&C and information sharing via Aadhaar e-Sign.\n    SYNTHETIC DEMO \u2014 NOT VALID"
     },
     {
-      "page_id": "APP-KAG-0056-ID_VOTER_EPIC",
-      "application_id": "APP-KAG-0056",
-      "source_csv_row": 56,
+      "page_id": "APP-KAG-0057-BANK_STMT_WEALTH_OVERVIEW",
+      "application_id": "APP-KAG-0057",
+      "source_csv_row": 57,
+      "split": "dev",
+      "label": "bank_statement",
+      "template_family": "BANK_STMT_WEALTH_OVERVIEW",
+      "is_negative": false,
+      "text": "SYNTHETIC DEMO \u2014 NOT VALID\n    PRIVATE WEALTH MANAGEMENT CLIENT CONSOLIDATED STATEMENT\n    Financial Institution: ICICI Bank Ltd Wealth Services\n    Portfolio Client: Varun Agarwal | Account: 501007511913\n    Currency: Indian Rupee (INR) | Statement Date: 31-Aug-2025\n\n    MONTHLY LIQUIDITY SUMMARY:\n    - Average Quarterly Balance (AQB) : INR 772,200.00\n    - Total Payroll Credits Inflow     : INR 842,400.00\n    - Closing Liquid Funds             : INR 702,000.00\n\n    TRANSACTION LOG (REPRESENTATIVE CREDITS & OUTFLOWS):\n    1. 01-Jun-2025 : Corporate Payroll Inflow (Infosys Technologies Ltd) -> CR INR 280,800.00\n    2. 12-Jun-2025 : Investment Outflow / Mutual Fund SIP       -> DR INR 15,000.00\n    3. 01-Jul-2025 : Corporate Payroll Inflow (Infosys Technologies Ltd) -> CR INR 280,800.00\n    4. 20-Jul-2025 : Point-of-Sale International Debit           -> DR INR 8,400.00\n    5. 01-Aug-2025 : Corporate Payroll Inflow (Infosys Technologies Ltd) -> CR INR 280,800.00\n\n    Account in Good Standing: No negative liens or dishonour events noted.\n    SYNTHETIC DEMO \u2014 NOT VALID"
+    },
+    {
+      "page_id": "APP-KAG-0057-ID_VOTER_EPIC",
+      "application_id": "APP-KAG-0057",
+      "source_csv_row": 57,
       "split": "dev",
       "label": "id_card",
       "template_family": "ID_VOTER_EPIC",
       "is_negative": false,
-      "text": "SYNTHETIC DEMO \u2014 NOT VALID\n    ELECTION COMMISSION OF INDIA - IDENTITY CARD\n    ELECTOR PHOTO IDENTITY CARD (EPIC)\n    EPIC Number: XYZ0000056\n    \n    Elector Name   : Neha Patel\n    Relation Name  : Aditya Patel\n    Gender / Sex   : Female\n    Date of Birth  : 1986-04-02\n    Constituency   : Pune Central Assembly Segment\n    Electoral Registration Officer Seal: Issued by ECI Authority.\n    SYNTHETIC DEMO \u2014 NOT VALID"
+      "text": "SYNTHETIC DEMO \u2014 NOT VALID\n    ELECTION COMMISSION OF INDIA - IDENTITY CARD\n    ELECTOR PHOTO IDENTITY CARD (EPIC)\n    EPIC Number: XYZ0000057\n    \n    Elector Name   : Varun Agarwal\n    Relation Name  : Gaurav Agarwal\n    Gender / Sex   : Female\n    Date of Birth  : 2000-09-22\n    Constituency   : Pune Central Assembly Segment\n    Electoral Registration Officer Seal: Issued by ECI Authority.\n    SYNTHETIC DEMO \u2014 NOT VALID"
     },
     {
       "page_id": "APP-KAG-0058-APP_FORM_DIGITAL_APP",
@@ -5195,16 +5204,6 @@
       "template_family": "APP_FORM_DIGITAL_APP",
       "is_negative": false,
       "text": "SYNTHETIC DEMO \u2014 NOT VALID\n    NEXUS FINTECH LENDING PLATFORM \u2014 DIGITAL APPLICATION SUMMARY\n    Session Token: DIGI-APP-APP-KAG-0058 | Trace: KAG-CSV-58\n    Timestamp: 2025-09-12T09:14:22Z | Digital Channel: Web-Portal\n\n    USER VERIFICATION & KYC DATA:\n    Applicant Legal Name : Manoj Reddy\n    Parentage Name       : Gaurav Reddy\n    DOB & Sex            : 1983-07-02 [Female]\n    PAN Verification     : ITJLD5862N [NSDL VALIDATED]\n    Aadhaar Token        : XXXX-XXXX-4730 [UIDAI OTP AUTHENTICATED]\n    Education & Family   : Graduate, 5 dependent(s)\n\n    DIGITAL SANCTION SUMMARY:\n    - Facility Applied   : Retail Personal Term Loan\n    - Loan Ticket Size   : Rs. 30,500,000.00\n    - Requested Duration : 216 Months\n    - Monthly Instalment : Rs. 276,164.52 / month\n    - Primary Work       : Cognizant Technology Solutions (Lead Consultant)\n    - Annualized Gross   : Rs. 9,300,000.00\n    - In-hand Monthly    : Rs. 589,133.33\n    - Risk Bureau Score  : 841\n\n    E-SIGN CONSENT:\n    Applicant digitally agreed to T&C and information sharing via Aadhaar e-Sign.\n    SYNTHETIC DEMO \u2014 NOT VALID"
-    },
-    {
-      "page_id": "APP-KAG-0058-PAYSLIP_PUBLIC_SECTOR",
-      "application_id": "APP-KAG-0058",
-      "source_csv_row": 58,
-      "split": "dev",
-      "label": "payslip",
-      "template_family": "PAYSLIP_PUBLIC_SECTOR",
-      "is_negative": false,
-      "text": "SYNTHETIC DEMO \u2014 NOT VALID\n    GOVERNMENT & STATUTORY CORPORATION PAY ADVICE\n    Office of Accounts & Disbursals, Chennai Circle\n    Statement of Salary & Allowances for Month of August 2025\n\n    Employee Identification Details:\n    Name of Officer / Employee : Manoj Reddy\n    Cadre / Designation        : Lead Consultant\n    Organization / Agency      : Cognizant Technology Solutions\n    PAN Number                 : ITJLD5862N\n    Credit Destination         : Punjab National Bank (A/c: 501007433110)\n\n    CREDITS SCHEDULE (INR):\n    - Substantive Pay (Basic)  : 387,500.00\n    - Dearness Allowance       : 135,625.00\n    - House Rent Compensation  : 96,875.00\n    - Special Conveyance Pool  : 155,000.00\n    GROSS SALARY ACCRUAL       : INR 775,000.00\n\n    DEBITS SCHEDULE (INR):\n    - General Provident Fund   : 46,500.00\n    - Professional Tax         : 200.00\n    - Income Tax Withheld      : 139,166.67\n    TOTAL DEBITS               : INR 185,866.67\n\n    NET PAYMENT SANCTIONED     : INR 589,133.33\n    Passed for Treasury Payment: Verified against cadre payroll rolls.\n    SYNTHETIC DEMO \u2014 NOT VALID"
     },
     {
       "page_id": "APP-KAG-0051-BANK_STMT_WEALTH_OVERVIEW",
@@ -5227,18 +5226,18 @@
       "text": "SYNTHETIC DEMO \u2014 NOT VALID\n    ELECTION COMMISSION OF INDIA - IDENTITY CARD\n    ELECTOR PHOTO IDENTITY CARD (EPIC)\n    EPIC Number: XYZ0000053\n    \n    Elector Name   : Kavita Iyer\n    Relation Name  : Ananya Iyer\n    Gender / Sex   : Male\n    Date of Birth  : 1986-08-04\n    Constituency   : Ahmedabad Central Assembly Segment\n    Electoral Registration Officer Seal: Issued by ECI Authority.\n    SYNTHETIC DEMO \u2014 NOT VALID"
     },
     {
-      "page_id": "APP-KAG-0059-APP_FORM_DIGITAL_APP",
-      "application_id": "APP-KAG-0059",
-      "source_csv_row": 59,
+      "page_id": "NEG-DEV-005-resume_cv",
+      "application_id": "NONE_NEGATIVE_DEV_005",
+      "source_csv_row": -1,
       "split": "dev",
-      "label": "application_form",
-      "template_family": "APP_FORM_DIGITAL_APP",
-      "is_negative": false,
-      "text": "SYNTHETIC DEMO \u2014 NOT VALID\n    NEXUS FINTECH LENDING PLATFORM \u2014 DIGITAL APPLICATION SUMMARY\n    Session Token: DIGI-APP-APP-KAG-0059 | Trace: KAG-CSV-59\n    Timestamp: 2025-09-12T09:14:22Z | Digital Channel: Web-Portal\n\n    USER VERIFICATION & KYC DATA:\n    Applicant Legal Name : Swati Pandey\n    Parentage Name       : Deepika Pandey\n    DOB & Sex            : 1992-01-25 [Female]\n    PAN Verification     : ZEIZL7176T [NSDL VALIDATED]\n    Aadhaar Token        : XXXX-XXXX-8883 [UIDAI OTP AUTHENTICATED]\n    Education & Family   : Graduate, 1 dependent(s)\n\n    DIGITAL SANCTION SUMMARY:\n    - Facility Applied   : Retail Personal Term Loan\n    - Loan Ticket Size   : Rs. 18,400,000.00\n    - Requested Duration : 240 Months\n    - Monthly Instalment : Rs. 159,679.47 / month\n    - Primary Work       : Tata Consultancy Services Ltd (Assistant Vice President)\n    - Annualized Gross   : Rs. 7,400,000.00\n    - In-hand Monthly    : Rs. 471,966.67\n    - Risk Bureau Score  : 421\n\n    E-SIGN CONSENT:\n    Applicant digitally agreed to T&C and information sharing via Aadhaar e-Sign.\n    SYNTHETIC DEMO \u2014 NOT VALID"
+      "label": "UNKNOWN",
+      "template_family": "NEGATIVE_RESUME_CV",
+      "is_negative": true,
+      "text": "SYNTHETIC DEMO \u2014 NOT VALID\n        CURRICULUM VITAE - HARISH BABU\n        Email: harish.babu@email.com | Phone: +91 9845123981 | Bengaluru\n        PROFESSIONAL SUMMARY:\n        Full-stack engineer with 6 years experience in Python, TypeScript, React and Postgres.\n        WORK EXPERIENCE:\n        - Senior Engineer at InnoTech Labs (2022-Present): Designed microservices.\n        - Software Developer at CloudSoft (2019-2022): API integrations and databases.\n        EDUCATION:\n        - B.Tech in Computer Science, National Institute of Technology (2019).\n        SYNTHETIC DEMO \u2014 NOT VALID"
     },
     {
-      "page_id": "NEG-DEV-002-gibberish_tokens",
-      "application_id": "NONE_NEGATIVE",
+      "page_id": "NEG-DEV-001-gibberish_tokens",
+      "application_id": "NONE_NEGATIVE_DEV_001",
       "source_csv_row": -1,
       "split": "dev",
       "label": "UNKNOWN",
@@ -5247,24 +5246,14 @@
       "text": "asdfjkl qwerty uiop zxcvbnm 12389745 kjashdf lkjh"
     },
     {
-      "page_id": "NEG-DEV-000-empty_string",
-      "application_id": "NONE_NEGATIVE",
+      "page_id": "NEG-DEV-002-utility_bill",
+      "application_id": "NONE_NEGATIVE_DEV_002",
       "source_csv_row": -1,
       "split": "dev",
       "label": "UNKNOWN",
-      "template_family": "NEGATIVE_EMPTY_STRING",
+      "template_family": "NEGATIVE_UTILITY_BILL",
       "is_negative": true,
-      "text": ""
-    },
-    {
-      "page_id": "APP-KAG-0057-BANK_STMT_WEALTH_OVERVIEW",
-      "application_id": "APP-KAG-0057",
-      "source_csv_row": 57,
-      "split": "dev",
-      "label": "bank_statement",
-      "template_family": "BANK_STMT_WEALTH_OVERVIEW",
-      "is_negative": false,
-      "text": "SYNTHETIC DEMO \u2014 NOT VALID\n    PRIVATE WEALTH MANAGEMENT CLIENT CONSOLIDATED STATEMENT\n    Financial Institution: ICICI Bank Ltd Wealth Services\n    Portfolio Client: Varun Agarwal | Account: 501007511913\n    Currency: Indian Rupee (INR) | Statement Date: 31-Aug-2025\n\n    MONTHLY LIQUIDITY SUMMARY:\n    - Average Quarterly Balance (AQB) : INR 772,200.00\n    - Total Payroll Credits Inflow     : INR 842,400.00\n    - Closing Liquid Funds             : INR 702,000.00\n\n    TRANSACTION LOG (REPRESENTATIVE CREDITS & OUTFLOWS):\n    1. 01-Jun-2025 : Corporate Payroll Inflow (Infosys Technologies Ltd) -> CR INR 280,800.00\n    2. 12-Jun-2025 : Investment Outflow / Mutual Fund SIP       -> DR INR 15,000.00\n    3. 01-Jul-2025 : Corporate Payroll Inflow (Infosys Technologies Ltd) -> CR INR 280,800.00\n    4. 20-Jul-2025 : Point-of-Sale International Debit           -> DR INR 8,400.00\n    5. 01-Aug-2025 : Corporate Payroll Inflow (Infosys Technologies Ltd) -> CR INR 280,800.00\n\n    Account in Good Standing: No negative liens or dishonour events noted.\n    SYNTHETIC DEMO \u2014 NOT VALID"
+      "text": "SYNTHETIC DEMO \u2014 NOT VALID\n        CITY ELECTRICITY SUPPLY CORPORATION - MONTHLY UTILITY INVOICE\n        Consumer Account No: 98127391 | Meter No: ELEC-9812\n        Consumer Name: Ramesh Gupta | Billing Month: August 2025\n        Units Consumed: 342 kWh | Tariff Rate: Rs. 6.50 / unit\n        Energy Charges: Rs. 2,223.00 | Fuel Surcharge: Rs. 140.00\n        Total Bill Payable by Due Date: Rs. 2,363.00\n        SYNTHETIC DEMO \u2014 NOT VALID"
     },
     {
       "page_id": "APP-KAG-0053-APP_FORM_DIGITAL_APP",
@@ -5277,8 +5266,8 @@
       "text": "SYNTHETIC DEMO \u2014 NOT VALID\n    NEXUS FINTECH LENDING PLATFORM \u2014 DIGITAL APPLICATION SUMMARY\n    Session Token: DIGI-APP-APP-KAG-0053 | Trace: KAG-CSV-53\n    Timestamp: 2025-09-12T09:14:22Z | Digital Channel: Web-Portal\n\n    USER VERIFICATION & KYC DATA:\n    Applicant Legal Name : Kavita Iyer\n    Parentage Name       : Ananya Iyer\n    DOB & Sex            : 1986-08-04 [Male]\n    PAN Verification     : XSDOJ8269W [NSDL VALIDATED]\n    Aadhaar Token        : XXXX-XXXX-1439 [UIDAI OTP AUTHENTICATED]\n    Education & Family   : Not Graduate, 5 dependent(s)\n\n    DIGITAL SANCTION SUMMARY:\n    - Facility Applied   : Retail Personal Term Loan\n    - Loan Ticket Size   : Rs. 7,600,000.00\n    - Requested Duration : 48 Months\n    - Monthly Instalment : Rs. 187,327.11 / month\n    - Primary Work       : Titan Company Ltd (Senior Software Engineer)\n    - Annualized Gross   : Rs. 3,800,000.00\n    - In-hand Monthly    : Rs. 249,966.67\n    - Risk Bureau Score  : 689\n\n    E-SIGN CONSENT:\n    Applicant digitally agreed to T&C and information sharing via Aadhaar e-Sign.\n    SYNTHETIC DEMO \u2014 NOT VALID"
     },
     {
-      "page_id": "NEG-DEV-004-medical_prescription",
-      "application_id": "NONE_NEGATIVE",
+      "page_id": "NEG-DEV-003-medical_prescription",
+      "application_id": "NONE_NEGATIVE_DEV_003",
       "source_csv_row": -1,
       "split": "dev",
       "label": "UNKNOWN",
@@ -5327,14 +5316,14 @@
       "text": "SYNTHETIC DEMO \u2014 NOT VALID\n    PRIVATE WEALTH MANAGEMENT CLIENT CONSOLIDATED STATEMENT\n    Financial Institution: State Bank of India Wealth Services\n    Portfolio Client: Meera Saxena | Account: 501008342545\n    Currency: Indian Rupee (INR) | Statement Date: 31-Aug-2025\n\n    MONTHLY LIQUIDITY SUMMARY:\n    - Average Quarterly Balance (AQB) : INR 975,700.00\n    - Total Payroll Credits Inflow     : INR 1,064,400.00\n    - Closing Liquid Funds             : INR 887,000.00\n\n    TRANSACTION LOG (REPRESENTATIVE CREDITS & OUTFLOWS):\n    1. 01-Jun-2025 : Corporate Payroll Inflow (Hindustan Unilever Ltd) -> CR INR 354,800.00\n    2. 12-Jun-2025 : Investment Outflow / Mutual Fund SIP       -> DR INR 15,000.00\n    3. 01-Jul-2025 : Corporate Payroll Inflow (Hindustan Unilever Ltd) -> CR INR 354,800.00\n    4. 20-Jul-2025 : Point-of-Sale International Debit           -> DR INR 8,400.00\n    5. 01-Aug-2025 : Corporate Payroll Inflow (Hindustan Unilever Ltd) -> CR INR 354,800.00\n\n    Account in Good Standing: No negative liens or dishonour events noted.\n    SYNTHETIC DEMO \u2014 NOT VALID"
     },
     {
-      "page_id": "NEG-DEV-007-shipping_consignment",
-      "application_id": "NONE_NEGATIVE",
-      "source_csv_row": -1,
+      "page_id": "APP-KAG-0058-TAX_ACK_INTIMATION_143_1",
+      "application_id": "APP-KAG-0058",
+      "source_csv_row": 58,
       "split": "dev",
-      "label": "UNKNOWN",
-      "template_family": "NEGATIVE_SHIPPING_CONSIGNMENT",
-      "is_negative": true,
-      "text": "SYNTHETIC DEMO \u2014 NOT VALID\n        APEX COURIER & LOGISTICS CONSIGNMENT NOTE\n        Consignment Tracking No: APX-98124912-IN\n        Sender: Global Impex Pvt Ltd, Mumbai\n        Consignee: Orient Traders, Kolkata | Packages: 2 Carton Boxes (Weight: 4.5 KG)\n        Declared Value: Rs. 15,000/- | Payment Mode: Freight Prepaid\n        Proof of Delivery: Received in good condition with seal intact.\n        SYNTHETIC DEMO \u2014 NOT VALID"
+      "label": "tax_acknowledgement",
+      "template_family": "TAX_ACK_INTIMATION_143_1",
+      "is_negative": false,
+      "text": "SYNTHETIC DEMO \u2014 NOT VALID\n    GOVERNMENT OF INDIA - INCOME TAX DEPARTMENT\n    INTIMATION UNDER SECTION 143(1) OF THE INCOME TAX ACT, 1961\n    CPC, Post Box No. 1, Electronic City Office, Bengaluru\n    DIN: CPC/2526/1431/00000058 | PAN: ITJLD5862N\n    To: MANOJ REDDY, Chennai\n\n    COMPARATIVE COMPUTATION TABLE\n    Particulars                         As Provided in Return   As Computed u/s 143(1)\n    Gross Income from Salary / Source   INR 9,300,000.00        INR 9,300,000.00\n    Total Deductions Under Chapter VIA  INR 150,000.00          INR 150,000.00\n    Aggregate Taxable Income            INR 9,100,000.00      INR 9,100,000.00\n    Net Tax Payable                     INR 1,092,000.00     INR 1,092,000.00\n    Prepaid Taxes / TDS Relief          INR 1,092,000.00     INR 1,092,000.00\n    Net Amount Refundable / Demand      NIL                     NIL\n\n    This is an automated computerized intimation requiring no signature.\n    SYNTHETIC DEMO \u2014 NOT VALID"
     },
     {
       "page_id": "APP-KAG-0056-BANK_STMT_WEALTH_OVERVIEW",
@@ -5487,14 +5476,14 @@
       "text": "SYNTHETIC DEMO \u2014 NOT VALID\n    ELECTION COMMISSION OF INDIA - IDENTITY CARD\n    ELECTOR PHOTO IDENTITY CARD (EPIC)\n    EPIC Number: XYZ0000058\n    \n    Elector Name   : Manoj Reddy\n    Relation Name  : Gaurav Reddy\n    Gender / Sex   : Female\n    Date of Birth  : 1983-07-02\n    Constituency   : Chennai Central Assembly Segment\n    Electoral Registration Officer Seal: Issued by ECI Authority.\n    SYNTHETIC DEMO \u2014 NOT VALID"
     },
     {
-      "page_id": "NEG-DEV-006-resume_cv",
-      "application_id": "NONE_NEGATIVE",
+      "page_id": "NEG-DEV-006-shipping_consignment",
+      "application_id": "NONE_NEGATIVE_DEV_006",
       "source_csv_row": -1,
       "split": "dev",
       "label": "UNKNOWN",
-      "template_family": "NEGATIVE_RESUME_CV",
+      "template_family": "NEGATIVE_SHIPPING_CONSIGNMENT",
       "is_negative": true,
-      "text": "SYNTHETIC DEMO \u2014 NOT VALID\n        CURRICULUM VITAE - HARISH BABU\n        Email: harish.babu@email.com | Phone: +91 9845123981 | Bengaluru\n        PROFESSIONAL SUMMARY:\n        Full-stack engineer with 6 years experience in Python, TypeScript, React and Postgres.\n        WORK EXPERIENCE:\n        - Senior Engineer at InnoTech Labs (2022-Present): Designed microservices.\n        - Software Developer at CloudSoft (2019-2022): API integrations and databases.\n        EDUCATION:\n        - B.Tech in Computer Science, National Institute of Technology (2019).\n        SYNTHETIC DEMO \u2014 NOT VALID"
+      "text": "SYNTHETIC DEMO \u2014 NOT VALID\n        APEX COURIER & LOGISTICS CONSIGNMENT NOTE\n        Consignment Tracking No: APX-98124912-IN\n        Sender: Global Impex Pvt Ltd, Mumbai\n        Consignee: Orient Traders, Kolkata | Packages: 2 Carton Boxes (Weight: 4.5 KG)\n        Declared Value: Rs. 15,000/- | Payment Mode: Freight Prepaid\n        Proof of Delivery: Received in good condition with seal intact.\n        SYNTHETIC DEMO \u2014 NOT VALID"
     },
     {
       "page_id": "APP-KAG-0063-BANK_STMT_NEOBANK_LEDGER",
@@ -5538,7 +5527,7 @@
     },
     {
       "page_id": "NEG-TEST-004-hospital_discharge_summary",
-      "application_id": "NONE_NEGATIVE",
+      "application_id": "NONE_NEGATIVE_TEST_004",
       "source_csv_row": -1,
       "split": "test",
       "label": "UNKNOWN",
@@ -5558,7 +5547,7 @@
     },
     {
       "page_id": "NEG-TEST-007-offer_letter",
-      "application_id": "NONE_NEGATIVE",
+      "application_id": "NONE_NEGATIVE_TEST_007",
       "source_csv_row": -1,
       "split": "test",
       "label": "UNKNOWN",
@@ -5568,13 +5557,13 @@
     },
     {
       "page_id": "NEG-TEST-001-whitespace_only",
-      "application_id": "NONE_NEGATIVE",
+      "application_id": "NONE_NEGATIVE_TEST_001",
       "source_csv_row": -1,
       "split": "test",
       "label": "UNKNOWN",
       "template_family": "NEGATIVE_WHITESPACE_ONLY",
       "is_negative": true,
-      "text": "\\n\\t\\r\\n"
+      "text": "   \\n\\t\\r\\n   "
     },
     {
       "page_id": "APP-KAG-0066-TAX_ACK_EFILING_RECEIPT",
@@ -5688,7 +5677,7 @@
     },
     {
       "page_id": "NEG-TEST-000-empty_string",
-      "application_id": "NONE_NEGATIVE",
+      "application_id": "NONE_NEGATIVE_TEST_000",
       "source_csv_row": -1,
       "split": "test",
       "label": "UNKNOWN",
@@ -5778,7 +5767,7 @@
     },
     {
       "page_id": "NEG-TEST-006-purchase_order",
-      "application_id": "NONE_NEGATIVE",
+      "application_id": "NONE_NEGATIVE_TEST_006",
       "source_csv_row": -1,
       "split": "test",
       "label": "UNKNOWN",
@@ -5878,7 +5867,7 @@
     },
     {
       "page_id": "NEG-TEST-003-broadband_invoice",
-      "application_id": "NONE_NEGATIVE",
+      "application_id": "NONE_NEGATIVE_TEST_003",
       "source_csv_row": -1,
       "split": "test",
       "label": "UNKNOWN",
@@ -6068,7 +6057,7 @@
     },
     {
       "page_id": "NEG-TEST-002-gibberish_tokens",
-      "application_id": "NONE_NEGATIVE",
+      "application_id": "NONE_NEGATIVE_TEST_002",
       "source_csv_row": -1,
       "split": "test",
       "label": "UNKNOWN",
@@ -6108,7 +6097,7 @@
     },
     {
       "page_id": "NEG-TEST-005-vehicle_insurance",
-      "application_id": "NONE_NEGATIVE",
+      "application_id": "NONE_NEGATIVE_TEST_005",
       "source_csv_row": -1,
       "split": "test",
       "label": "UNKNOWN",

@@ -83,7 +83,7 @@ def test_v2_negative_samples_present_and_watermarked():
     dev_unknowns = [p for p in splits["dev"] if p["label"] == "UNKNOWN"]
     test_unknowns = [p for p in splits["test"] if p["label"] == "UNKNOWN"]
 
-    assert len(dev_unknowns) >= 8, f"Expected >=8 dev negatives, got {len(dev_unknowns)}"
+    assert len(dev_unknowns) >= 7, f"Expected >=7 dev negatives, got {len(dev_unknowns)}"
     assert len(test_unknowns) >= 8, f"Expected >=8 test negatives, got {len(test_unknowns)}"
 
     # Check synthetic documents have visible watermark
@@ -109,7 +109,7 @@ def test_kaggle_provenance_manifest_and_sha256():
 
     assert manifest["metadata"]["source_csv_sha256"] == actual_hash, "SHA-256 mismatch in provenance manifest!"
     assert manifest["metadata"]["n_applicants"] == 70
-    assert len(manifest["records"]) == 606
+    assert len(manifest["records"]) == 605
 
     # Ensure applicant records have real Kaggle properties
     first_app = manifest["records"][0]

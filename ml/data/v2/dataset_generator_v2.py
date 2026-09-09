@@ -783,8 +783,7 @@ def render_id_family4_passport(p: Dict[str, Any]) -> str:
 # ==============================================================================
 
 DEV_NEGATIVES = [
-    {"label": "UNKNOWN", "text": "", "reason": "empty_string"},
-    {"label": "UNKNOWN", "text": "   \\n\\t   ", "reason": "whitespace_only"},
+    {"label": "UNKNOWN", "text": "   \n\t   ", "reason": "whitespace_only"},
     {"label": "UNKNOWN", "text": "asdfjkl qwerty uiop zxcvbnm 12389745 kjashdf lkjh", "reason": "gibberish_tokens"},
     {
         "label": "UNKNOWN",
@@ -1048,13 +1047,13 @@ def generate_v2_dataset(
         page_id = f"NEG-DEV-{i:03d}-{neg['reason']}"
         rec = {
             "page_id": page_id,
-            "application_id": "NONE_NEGATIVE",
+            "application_id": f"NONE_NEGATIVE_DEV_{i:03d}",
             "source_csv_row": -1,
             "split": "dev",
             "label": "UNKNOWN",
             "template_family": f"NEGATIVE_{neg['reason'].upper()}",
             "is_negative": True,
-            "text": neg["text"].strip(),
+            "text": neg["text"] if "whitespace" in neg["reason"] else neg["text"].strip(),
         }
         dev_samples.append(rec)
         manifest_records.append(rec)
@@ -1087,13 +1086,13 @@ def generate_v2_dataset(
         page_id = f"NEG-TEST-{i:03d}-{neg['reason']}"
         rec = {
             "page_id": page_id,
-            "application_id": "NONE_NEGATIVE",
+            "application_id": f"NONE_NEGATIVE_TEST_{i:03d}",
             "source_csv_row": -1,
             "split": "test",
             "label": "UNKNOWN",
             "template_family": f"NEGATIVE_{neg['reason'].upper()}",
             "is_negative": True,
-            "text": neg["text"].strip(),
+            "text": neg["text"] if "whitespace" in neg["reason"] else neg["text"].strip(),
         }
         test_samples.append(rec)
         manifest_records.append(rec)

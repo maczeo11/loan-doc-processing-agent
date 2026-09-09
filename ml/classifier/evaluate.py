@@ -23,6 +23,11 @@ from typing import Dict, Any, List, Optional, Tuple
 import numpy as np
 from sklearn.metrics import f1_score, accuracy_score, classification_report, confusion_matrix
 
+try:
+    import mlflow
+except ImportError:
+    from ml.classifier import mlflow_compat as mlflow
+
 
 def get_process_rss_mb() -> float:
     """Measures actual OS process Resident Set Size (RSS) memory in MB."""
@@ -277,7 +282,8 @@ def get_comparison_summary(
 
 
 if __name__ == "__main__":
-    from ml.classifier.baseline_tfidf import load_baseline_classifier
+    from ml.classifier.baseline_tfidf import load_baseline_classifier, DEFAULT_MODEL_PATH
+    active_model_path = DEFAULT_MODEL_PATH
 
     print("=" * 70)
     print("FINSCAN AI: DOCUMENT CLASSIFIER EVALUATION & BENCHMARK (v2)")
@@ -366,6 +372,33 @@ if __name__ == "__main__":
         json.dump(per_sample, f, indent=2)
 
     print("Audit artifacts saved to audit/v2/evaluation_results_v2.json and audit/v2/per_sample_predictions_v2.json")
+
+    # 5. Log to MLflow
+    mlflow.set_tracking_uri("./mlruns")
+    mlflow.set_experiment("finscan-classifier")
+    with mlflow.start_run(run_name="evaluate_baseline_tfidf"):
+        mlflow.log_params({
+            "dataset": active_splits_path,
+            "optimal_threshold": opt_thresh,
+            "dev_samples": len(dev_texts) if "dev_texts" in locals() else 0,
+            "test_samples": len(test_texts),
+            "model_path": active_model_path,
+        })
+        mlflow.log_metrics({
+            "macro_f1": metrics["macro_f1"],
+            "weighted_f1": metrics["weighted_f1"],
+            "accuracy": metrics["accuracy"],
+            "p50_latency_ms": metrics["p50_latency_ms"],
+            "p95_latency_ms": metrics["p95_latency_ms"],
+            "mean_latency_ms": metrics["mean_latency_ms"],
+            "process_rss_mb": metrics["process_rss_mb"],
+            "heap_delta_mb": metrics["heap_delta_mb"],
+        })
+        mlflow.log_artifact("audit/v2/evaluation_results_v2.json", artifact_path="audit")
+        mlflow.log_artifact("audit/v2/per_sample_predictions_v2.json", artifact_path="audit")
+        if os.path.exists(active_model_path):
+            mlflow.log_artifact(active_model_path, artifact_path="model")
+    print("Logged evaluation metrics, params, and artifacts to MLflow (./mlruns).")
 
 
 

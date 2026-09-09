@@ -14,7 +14,6 @@ Rules:
 
 import time
 import logging
-from typing import Optional
 from fastapi import HTTPException, status
 import redis.asyncio as aioredis
 

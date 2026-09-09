@@ -8,7 +8,6 @@ and authoritative PostgreSQL DocumentModel/ApplicationModel state update.
 
 import os
 import re
-import io
 import asyncio
 import hashlib
 import tempfile

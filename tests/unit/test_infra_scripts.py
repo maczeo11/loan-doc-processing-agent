@@ -6,11 +6,9 @@ Caddy production configuration, and version-stamped API health endpoint.
 
 import os
 import json
-import pytest
 from fastapi.testclient import TestClient
 
 from apps.api.main import app
-from apps.api.config import settings
 
 client = TestClient(app)
 

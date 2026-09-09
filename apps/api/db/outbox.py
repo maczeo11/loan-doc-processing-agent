@@ -49,7 +49,7 @@ def create_outbox_event(
 ) -> OutboxEventModel:
     """
     Creates and attaches an outbox event record to the caller's active database session.
-    
+
     IMPORTANT:
     This function NEVER commits internally. The caller must commit the enclosing transaction.
     Every outbox-created JobRef must have attempt_count >= 1 (defaults to 1, never 0).
@@ -89,7 +89,7 @@ async def dispatch_pending_outbox_events(
     Claims a batch of PENDING outbox events using SELECT ... FOR UPDATE SKIP LOCKED
     (on PostgreSQL), validates each against the frozen JobRef model, publishes
     the typed JobRef to the queue, and updates status.
-    
+
     Returns:
         Dict with metrics: claimed, published, retried, failed.
     """

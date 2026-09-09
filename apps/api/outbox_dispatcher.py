@@ -8,7 +8,6 @@ and reliably forwards them to the configured QueuePort (Postgres or AWS SQS).
 import asyncio
 import logging
 import signal
-import sys
 from typing import Optional
 
 from apps.api.config import settings

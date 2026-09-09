@@ -1,7 +1,7 @@
 """Initial PostgreSQL schema for FinScan AI foundation.
 
 Revision ID: 001_initial_schema
-Revises: 
+Revises:
 Create Date: 2026-09-08 20:10:00.000000
 
 """

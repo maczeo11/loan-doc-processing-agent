@@ -101,14 +101,14 @@ async def close_redis_client():
 def resolve_user_identity(request: Request) -> str:
     """
     Resolves client identity for rate limiting and spend guard controls.
-    
+
     Strategy:
     - Extracts non-empty X-User-Id header when supplied.
     - In development/local mode, falls back to request.client.host if X-User-Id is absent.
     - In production/cloud mode, strictly requires a non-empty X-User-Id header; raises HTTP 400 Bad Request
       if absent or empty, explaining that the demo identity header is required until JWT/OIDC integration exists.
       Never uses a shared 'anonymous' identity in production to prevent noisy-neighbor lockouts.
-    
+
     TEMPORARY NOTE:
     This header-based identity strategy is a development / buildathon demo mechanism.
     Production deployments must replace this with verified JWT/OIDC claims

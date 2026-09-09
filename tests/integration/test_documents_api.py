@@ -25,7 +25,7 @@ from apps.api.db.models import Base, ApplicationModel, DocumentModel
 from apps.api.db.session import get_db
 from apps.api.storage import get_storage
 import apps.api.routes.documents as doc_route_module
-from adapters.storage.base import StoragePort, build_storage_key
+from adapters.storage.base import StoragePort
 from adapters.storage.local_fs import LocalFileSystemStorage
 
 

@@ -11,7 +11,7 @@ import apps.api.routes.documents as doc_module
 from apps.api.config import settings
 from apps.api.storage import get_storage
 import apps.api.storage as api_storage
-from adapters.storage.base import StoragePort, build_storage_key
+from adapters.storage.base import build_storage_key
 from adapters.storage.local_fs import LocalFileSystemStorage
 from adapters.storage.s3 import S3Storage
 from apps.api.routes.documents import sanitize_filename, validate_file_signature

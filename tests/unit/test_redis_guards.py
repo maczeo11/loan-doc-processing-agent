@@ -3,7 +3,6 @@ Unit tests for Redis sliding-window rate limiter, client identity resolution,
 and active-job spend guard primitives.
 """
 
-import time
 import pytest
 import fakeredis.aioredis
 from starlette.requests import Request

@@ -2,10 +2,9 @@
 Integration tests for Transactional Outbox Dispatcher (apps/api/db/outbox.py & outbox_dispatcher.py).
 """
 
-import asyncio
 import pytest
 import pytest_asyncio
-from typing import List, Dict, Any
+from typing import List, Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 
@@ -28,7 +27,7 @@ class InMemoryMockQueue(QueuePort):
         self.attempts += 1
         if self.attempts <= self.fail_count:
             raise RuntimeError(f"Simulated SQS/Postgres transport error (attempt {self.attempts})")
-        
+
         # Inviolable contract: Queue publishing must receive a typed JobRef
         assert isinstance(job_ref, JobRef), f"Expected typed JobRef instance, got {type(job_ref)}"
         assert job_ref.attempt_count >= 1, f"attempt_count must be >= 1, got {job_ref.attempt_count}"

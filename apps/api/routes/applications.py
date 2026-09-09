@@ -10,13 +10,11 @@ Core Requirements:
 - Enforces strict state transitions and idempotency for QUEUED/PROCESSING jobs.
 """
 
-import sys
-import types
 import uuid
 import logging
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 import redis.asyncio as aioredis

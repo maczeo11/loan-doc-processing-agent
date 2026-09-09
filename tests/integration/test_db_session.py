@@ -5,8 +5,8 @@ Integration tests for database session lifecycle, transactions, rollback, and Al
 import os
 import pytest
 import pytest_asyncio
-from sqlalchemy import select, text
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from alembic import command
 from alembic.config import Config
@@ -16,7 +16,7 @@ from apps.api.db.session import (
     get_session_factory,
     get_db,
 )
-from apps.api.db.models import Base, ApplicationModel, DocumentModel
+from apps.api.db.models import Base, ApplicationModel
 
 
 @pytest_asyncio.fixture

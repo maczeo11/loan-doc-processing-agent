@@ -4,7 +4,6 @@ Unit tests for FinScan AI database models and schema constraints.
 
 import pytest
 import pytest_asyncio
-from datetime import datetime, timezone
 import uuid
 
 from sqlalchemy import select, event

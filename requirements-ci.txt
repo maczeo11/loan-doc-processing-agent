@@ -24,6 +24,11 @@ boto3>=1.34.0
 pymupdf>=1.24.0
 pyyaml>=6.0
 
+# Retrieval (RAG) - prebuilt wheels / pure-python only; faiss + sentence-transformers
+# stay optional (try/except in core/rag/indexer.py) to keep CI fast
+numpy>=1.26.0
+rank-bm25>=0.2.2
+
 # Testing & Quality Gates
 pytest>=8.1.0
 pytest-cov>=4.1.0

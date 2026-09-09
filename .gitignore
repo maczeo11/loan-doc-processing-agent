@@ -45,6 +45,9 @@ checkpoints/
 Thumbs.db
 
 # UI / Node
+node_modules/
+apps/ui/node_modules/
+apps/ui/dist/
 ui/node_modules/
 ui/dist/
 ui/.next/

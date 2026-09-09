@@ -140,12 +140,12 @@ def test_s3_storage_get_signed_url():
     mock_s3.generate_presigned_url.return_value = "https://signed.s3.amazonaws.com/doc.pdf?token=123"
 
     storage = S3Storage(bucket_name="finscan-dossiers", s3_client=mock_s3)
-    url = storage.get_signed_url("apps/app01/bank.pdf", expires_in=1800)
+    url = storage.get_signed_url("dossiers/APP-25195/DOC-00001_bank.pdf", expires_in=1800)
 
     assert url == "https://signed.s3.amazonaws.com/doc.pdf?token=123"
     mock_s3.generate_presigned_url.assert_called_once_with(
         ClientMethod="get_object",
-        Params={"Bucket": "finscan-dossiers", "Key": "apps/app01/bank.pdf"},
+        Params={"Bucket": "finscan-dossiers", "Key": "dossiers/APP-25195/DOC-00001_bank.pdf"},
         ExpiresIn=1800,
     )
 

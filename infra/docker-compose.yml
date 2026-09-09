@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   db:
     image: postgres:16-alpine
@@ -8,23 +6,39 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgrespassword
       POSTGRES_DB: finscan
-    ports:
-      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d finscan"]
       interval: 5s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
 
   redis:
     image: redis:7-alpine
     container_name: finscan-redis
-    ports:
-      - "6379:6379"
     volumes:
       - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  migrate:
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile.api
+    container_name: finscan-migrate
+    command: ["alembic", "upgrade", "head"]
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgrespassword@db:5432/finscan
+    restart: "no"
 
   api:
     build:
@@ -35,15 +49,41 @@ services:
       db:
         condition: service_healthy
       redis:
-        condition: service_started
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     environment:
       DATABASE_URL: postgresql+asyncpg://postgres:postgrespassword@db:5432/finscan
       REDIS_URL: redis://redis:6379/0
       QUEUE_BACKEND: postgres
       STORAGE_BACKEND: local
+      STORAGE_BASE_DIR: /app/data/storage
       API_PORT: 8000
+      ENVIRONMENT: local
+    volumes:
+      - dossiers_storage:/app/data/storage
+    expose:
+      - "8000"
     ports:
       - "8000:8000"
+    restart: unless-stopped
+
+  outbox-dispatcher:
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile.api
+    container_name: finscan-outbox-dispatcher
+    command: ["python", "-m", "apps.api.outbox_dispatcher"]
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgrespassword@db:5432/finscan
+      QUEUE_BACKEND: postgres
+      ENVIRONMENT: local
+    restart: unless-stopped
 
   worker:
     build:
@@ -54,12 +94,38 @@ services:
       db:
         condition: service_healthy
       redis:
-        condition: service_started
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     environment:
       DATABASE_URL: postgresql://postgres:postgrespassword@db:5432/finscan
+      REDIS_URL: redis://redis:6379/0
       QUEUE_BACKEND: postgres
       STORAGE_BACKEND: local
+      STORAGE_BASE_DIR: /app/data/storage
+      CHECKPOINT_DB_PATH: /app/data/storage/checkpoints.sqlite3
+      ENVIRONMENT: local
+    volumes:
+      - dossiers_storage:/app/data/storage
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: finscan-caddy
+    depends_on:
+      api:
+        condition: service_started
+    ports:
+      - "80:80"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    restart: unless-stopped
 
 volumes:
   postgres_data:
   redis_data:
+  dossiers_storage:
+  caddy_data:
+  caddy_config:

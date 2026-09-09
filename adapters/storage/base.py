@@ -29,7 +29,9 @@ def sanitize_filename(filename: str) -> str:
     import os
     import re
 
-    base = os.path.basename(filename).strip()
+    # Normalize backslashes to forward slashes for cross-platform OS compatibility
+    normalized = filename.replace("\\", "/")
+    base = os.path.basename(normalized).strip()
     safe = re.sub(r"[^a-zA-Z0-9_.-]", "_", base)
     return safe or "document.pdf"
 

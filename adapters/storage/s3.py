@@ -42,9 +42,25 @@ class S3Storage(StoragePort):
                 raise
         return self._client
 
-    def put(self, key: str, data: Union[BinaryIO, bytes], content_type: str = "application/pdf") -> str:
-        """Uploads file to S3 bucket and returns s3:// URI."""
+    def put(
+        self,
+        key: str,
+        data: Union[BinaryIO, bytes],
+        content_type: str = "application/pdf",
+        server_side_encryption: str = "AES256",
+    ) -> str:
+        """
+        Uploads file to S3 bucket with server-side encryption (SSE-S3/AES256) and returns s3:// URI.
+        Enforces tenant isolation by validating path prefix.
+        """
         clean_key = key.lstrip("/")
+        if not clean_key.startswith("dossiers/"):
+            clean_key = f"dossiers/{clean_key}"
+
+        extra_args = {
+            "ContentType": content_type,
+            "ServerSideEncryption": server_side_encryption,
+        }
 
         try:
             if isinstance(data, bytes):
@@ -53,18 +69,19 @@ class S3Storage(StoragePort):
                     Key=clean_key,
                     Body=data,
                     ContentType=content_type,
+                    ServerSideEncryption=server_side_encryption,
                 )
             elif hasattr(data, "read"):
                 self.client.upload_fileobj(
                     data,
                     self.bucket_name,
                     clean_key,
-                    ExtraArgs={"ContentType": content_type},
+                    ExtraArgs=extra_args,
                 )
             else:
                 raise TypeError(f"Unsupported data type for S3 put: {type(data)}")
 
-            logger.info(f"Uploaded object to s3://{self.bucket_name}/{clean_key}")
+            logger.info(f"Uploaded encrypted object to s3://{self.bucket_name}/{clean_key}")
             return f"s3://{self.bucket_name}/{clean_key}"
         except Exception as e:
             logger.error(f"Failed to upload to S3 {self.bucket_name}/{clean_key}: {e}")

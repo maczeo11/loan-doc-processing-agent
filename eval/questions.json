@@ -13,7 +13,7 @@
       "application_id": "APP-25195",
       "question": "What is the net monthly salary stated on the applicant's payslip?",
       "expected_fact": "net_salary",
-      "ground_truth_answer": "Check payslip net salary field",
+      "ground_truth_answer": "Net salary INR 88,000",
       "expected_citations": ["APP-25195_p1"]
     },
     {
@@ -49,8 +49,233 @@
       "application_id": "APP-25195",
       "question": "What is the PAN number documented on the tax acknowledgement?",
       "expected_fact": "pan_number",
-      "ground_truth_answer": "Documented PAN",
+      "ground_truth_answer": "ABCDE1231F",
       "expected_citations": ["APP-25195_p3"]
+    },
+    {
+      "id": "Q-DEV-006",
+      "split": "dev",
+      "application_id": "POLICY",
+      "question": "What is the minimum gross monthly salary threshold under retail credit policy?",
+      "expected_fact": "policy_min_salary",
+      "ground_truth_answer": "₹25,000 gross or ₹20,000 net monthly salary",
+      "expected_citations": ["credit_policy_v1_p1"]
+    },
+    {
+      "id": "Q-DEV-007",
+      "split": "dev",
+      "application_id": "POLICY",
+      "question": "What is the minimum continuous employment tenure required with the current employer?",
+      "expected_fact": "policy_employment_tenure",
+      "ground_truth_answer": "Minimum 6 months with current employer",
+      "expected_citations": ["credit_policy_v1_p1"]
+    },
+    {
+      "id": "Q-DEV-008",
+      "split": "dev",
+      "application_id": "POLICY",
+      "question": "What is the acceptable tolerance margin between payslip salary and bank salary credits?",
+      "expected_fact": "policy_salary_tolerance",
+      "ground_truth_answer": "5.0% tolerance margin",
+      "expected_citations": ["credit_policy_v1_p1"]
+    },
+    {
+      "id": "Q-DEV-009",
+      "split": "dev",
+      "application_id": "APP-25195",
+      "question": "What is the gross salary and employer name stated on the applicant payslip?",
+      "expected_fact": "gross_salary_and_employer",
+      "ground_truth_answer": "Gross salary INR 100,000 at Tata Consultancy Services Ltd",
+      "expected_citations": ["APP-25195_p1"]
+    },
+    {
+      "id": "Q-DEV-010",
+      "split": "dev",
+      "application_id": "APP-25195",
+      "question": "What are the monthly recurring salary credit amounts in the bank statement?",
+      "expected_fact": "bank_salary_credits",
+      "ground_truth_answer": "INR 100,000 monthly credits",
+      "expected_citations": ["APP-25195_p2"]
+    },
+    {
+      "id": "Q-DEV-011",
+      "split": "dev",
+      "application_id": "APP-25195",
+      "question": "What is the primary bank account number and bank name for the applicant?",
+      "expected_fact": "bank_account_details",
+      "ground_truth_answer": "HDFC Bank account 501003522339",
+      "expected_citations": ["APP-25195_p2"]
+    },
+    {
+      "id": "Q-DEV-012",
+      "split": "dev",
+      "application_id": "APP-25195",
+      "question": "What is the gross total income declared on the applicant's tax return?",
+      "expected_fact": "itr_gross_total_income",
+      "ground_truth_answer": "INR 1,200,000",
+      "expected_citations": ["APP-25195_p3"]
+    },
+    {
+      "id": "Q-DEV-013",
+      "split": "dev",
+      "application_id": "APP-25195",
+      "question": "What is the total tax paid reported on the income tax return acknowledgement?",
+      "expected_fact": "itr_tax_paid",
+      "ground_truth_answer": "INR 144,000",
+      "expected_citations": ["APP-25195_p3"]
+    },
+    {
+      "id": "Q-DEV-014",
+      "split": "dev",
+      "application_id": "APP-25195",
+      "question": "What is the applicant's date of birth and masked Aadhaar number on KYC proof?",
+      "expected_fact": "kyc_dob_and_aadhaar",
+      "ground_truth_answer": "DOB 1994-06-15 and Aadhaar XXXX-XXXX-6239",
+      "expected_citations": ["APP-25195_p4"]
+    },
+    {
+      "id": "Q-DEV-015",
+      "split": "dev",
+      "application_id": "APP-25195",
+      "question": "What is the requested loan amount and loan tenure on the loan application form?",
+      "expected_fact": "loan_amount_and_term",
+      "ground_truth_answer": "INR 3,500,000 for 15 years",
+      "expected_citations": ["APP-25195_p5"]
+    },
+    {
+      "id": "Q-DEV-016",
+      "split": "dev",
+      "application_id": "APP-25195",
+      "question": "What is the applicant's CIBIL credit score stated on the loan profile?",
+      "expected_fact": "cibil_score",
+      "ground_truth_answer": "780 CIBIL score",
+      "expected_citations": ["APP-25195_p5"]
+    },
+    {
+      "id": "Q-DEV-017",
+      "split": "dev",
+      "application_id": "POLICY",
+      "question": "What are the mandatory documents required in every retail loan application dossier?",
+      "expected_fact": "mandatory_documents_list",
+      "ground_truth_answer": "Application form, 3 payslips, bank statements, ITR/Form 16, KYC",
+      "expected_citations": ["credit_policy_v1_p2"]
+    },
+    {
+      "id": "Q-DEV-018",
+      "split": "dev",
+      "application_id": "POLICY",
+      "question": "What is the credit assessment transaction limit above which PAN is mandatory?",
+      "expected_fact": "kyc_pan_threshold",
+      "ground_truth_answer": "Mandatory for credit assessments exceeding ₹50,000",
+      "expected_citations": ["kyc_guidelines_v1_p1"]
+    },
+    {
+      "id": "Q-HELD-001",
+      "split": "held_out",
+      "application_id": "POLICY",
+      "question": "What are acceptable government-issued identity and address proof documents?",
+      "expected_fact": "kyc_acceptable_docs",
+      "ground_truth_answer": "Passport, Aadhaar Card, Voter ID, Driving Licence",
+      "expected_citations": ["kyc_guidelines_v1_p1"]
+    },
+    {
+      "id": "Q-HELD-002",
+      "split": "held_out",
+      "application_id": "POLICY",
+      "question": "What is the minimum fuzzy match confidence score required between PAN name and payslip name?",
+      "expected_fact": "kyc_fuzzy_match_threshold",
+      "ground_truth_answer": ">= 85% fuzzy match score",
+      "expected_citations": ["kyc_guidelines_v1_p1"]
+    },
+    {
+      "id": "Q-HELD-003",
+      "split": "held_out",
+      "application_id": "POLICY",
+      "question": "What underwriting action is required if the name mismatch fuzzy score is between 70% and 84%?",
+      "expected_fact": "kyc_minor_name_discrepancy",
+      "ground_truth_answer": "Flag finding with reviewer verification required",
+      "expected_citations": ["kyc_guidelines_v1_p1"]
+    },
+    {
+      "id": "Q-HELD-004",
+      "split": "held_out",
+      "application_id": "POLICY",
+      "question": "What finding verdict is assigned if PAN or Primary ID is missing or unreadable?",
+      "expected_fact": "kyc_missing_doc_verdict",
+      "ground_truth_answer": "Rule RULE-KYC-001 returns flag",
+      "expected_citations": ["kyc_guidelines_v1_p1"]
+    },
+    {
+      "id": "Q-HELD-005",
+      "split": "held_out",
+      "application_id": "APP-29630",
+      "question": "What is the net monthly salary and employer name for applicant Vikram Malhotra?",
+      "expected_fact": "net_salary_vikram",
+      "ground_truth_answer": "Net salary INR 132,000 at Apex Global Solutions",
+      "expected_citations": ["APP-29630_p1"]
+    },
+    {
+      "id": "Q-HELD-006",
+      "split": "held_out",
+      "application_id": "APP-29630",
+      "question": "What monthly salary credits appear in the bank statement for Vikram Malhotra?",
+      "expected_fact": "bank_salary_credits_vikram",
+      "ground_truth_answer": "Monthly credits of INR 52,500",
+      "expected_citations": ["APP-29630_p2"]
+    },
+    {
+      "id": "Q-HELD-007",
+      "split": "held_out",
+      "application_id": "APP-29630",
+      "question": "What is the gross total income and PAN number for Vikram Malhotra on the tax return?",
+      "expected_fact": "tax_return_vikram",
+      "ground_truth_answer": "Gross income INR 1,800,000 and PAN ABCDE2038F",
+      "expected_citations": ["APP-29630_p3"]
+    },
+    {
+      "id": "Q-HELD-008",
+      "split": "held_out",
+      "application_id": "APP-29630",
+      "question": "What is the date of birth and masked Aadhaar on Vikram Malhotra's KYC document?",
+      "expected_fact": "kyc_vikram",
+      "ground_truth_answer": "DOB 1994-06-15 and Aadhaar XXXX-XXXX-9314",
+      "expected_citations": ["APP-29630_p4"]
+    },
+    {
+      "id": "Q-HELD-009",
+      "split": "held_out",
+      "application_id": "APP-29630",
+      "question": "What is the loan amount and CIBIL score requested by Vikram Malhotra?",
+      "expected_fact": "loan_app_vikram",
+      "ground_truth_answer": "INR 6,000,000 loan with 690 CIBIL score",
+      "expected_citations": ["APP-29630_p5"]
+    },
+    {
+      "id": "Q-HELD-010",
+      "split": "held_out",
+      "application_id": "POLICY",
+      "question": "How many consecutive months of payslips are required under the mandatory checklist?",
+      "expected_fact": "policy_payslip_count",
+      "ground_truth_answer": "Recent 3 consecutive months payslips",
+      "expected_citations": ["credit_policy_v1_p2"]
+    },
+    {
+      "id": "Q-HELD-011",
+      "split": "held_out",
+      "application_id": "POLICY",
+      "question": "What is the minimum trailing month statement window required for bank account statements?",
+      "expected_fact": "policy_bank_statement_window",
+      "ground_truth_answer": "3 to 6 months bank account statement",
+      "expected_citations": ["credit_policy_v1_p2"]
+    },
+    {
+      "id": "Q-HELD-012",
+      "split": "held_out",
+      "application_id": "POLICY",
+      "question": "What action must be taken if salary reconciliation discrepancy exceeds the 5 percent tolerance margin?",
+      "expected_fact": "policy_salary_discrepancy_action",
+      "ground_truth_answer": "Underwriter manual flag and secondary review required",
+      "expected_citations": ["credit_policy_v1_p1"]
     }
   ]
 }

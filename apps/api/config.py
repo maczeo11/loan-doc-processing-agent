@@ -2,18 +2,41 @@
 API configuration and settings.
 """
 
+from typing import List, Literal
+from pydantic import field_validator
 from pydantic_settings import BaseSettings
-from typing import Literal
+
+
+class AsyncCompatibleDsn(str):
+    """
+    Dual-driver compatible connection string.
+    Acts as postgresql+asyncpg:// for SQLAlchemy asyncpg engine,
+    and seamlessly encodes and identifies as postgresql:// for psycopg / libpq drivers.
+    """
+    def encode(self, encoding="utf-8", errors="strict"):
+        clean = self.replace("postgresql+asyncpg://", "postgresql://")
+        return clean.encode(encoding, errors)
+
+    def startswith(self, prefix, *args, **kwargs):
+        if prefix in ("postgresql://", "postgres://", ("postgresql://", "postgres://")):
+            return True
+        return super().startswith(prefix, *args, **kwargs)
 
 
 class Settings(BaseSettings):
-    ENVIRONMENT: Literal["local", "cloud"] = "local"
+    ENVIRONMENT: Literal["local", "cloud", "production"] = "local"
+    RELEASE_VERSION: str = "1.0.0"
+    GIT_SHA: str = "unknown"
+    BUILD_TIMESTAMP: str = "unknown"
     API_PORT: int = 8000
     DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/finscan"
+    DATABASE_ECHO: bool = False
     REDIS_URL: str = "redis://localhost:6379/0"
+    REDIS_CONNECT_TIMEOUT_SECONDS: float = 2.0
 
     # Adapter selections
     STORAGE_BACKEND: Literal["local", "s3"] = "local"
+    STORAGE_BASE_DIR: str = "data/storage"
     QUEUE_BACKEND: Literal["postgres", "sqs"] = "postgres"
     LLM_BACKEND: Literal["opencode", "qwen_offline"] = "opencode"
 
@@ -29,8 +52,25 @@ class Settings(BaseSettings):
     MAX_ACTIVE_JOBS_PER_USER: int = 2
     MAX_SUBMISSIONS_PER_MIN: int = 5
     MAX_STATUS_POLLS_PER_MIN: int = 30
+    SPEND_GUARD_RESERVATION_TTL_SECONDS: int = 900  # 15 minutes safety TTL
     MAX_FILE_SIZE_MB: int = 10
     MAX_PAGES_PER_APP: int = 30
+
+    # Document upload validation
+    ALLOWED_CONTENT_TYPES: List[str] = [
+        "application/pdf",
+        "image/jpeg",
+        "image/png",
+        "image/tiff",
+    ]
+    ALLOWED_EXTENSIONS: List[str] = [".pdf", ".jpg", ".jpeg", ".png", ".tiff"]
+
+    @field_validator("DATABASE_URL", mode="after")
+    @classmethod
+    def wrap_database_url(cls, v: str) -> str:
+        if v and v.startswith("postgresql+asyncpg://"):
+            return AsyncCompatibleDsn(v)
+        return v
 
     class Config:
         env_file = ".env"

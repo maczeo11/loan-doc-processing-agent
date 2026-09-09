@@ -185,6 +185,13 @@ Document text extracted from user-uploaded PDFs is **untrusted external input**.
   - Max 30 pages per application dossier.
 - AWS Textract is hard-capped in code under 100 total pages and disabled by default.
 
+### 5.5 S3 & Object Storage Security Architecture
+- **Server-Side Encryption at Rest:** Every uploaded object is stored with mandatory Server-Side Encryption (`ServerSideEncryption='AES256'` or AWS KMS). Unencrypted uploads are rejected.
+- **Strict Tenant & Dossier Isolation:** Files are stored strictly under the canonical hierarchy `dossiers/{application_id}/{document_id}_{sanitized_filename}`. Cross-application path access is blocked.
+- **Path Traversal & Filename Sanitization:** Filenames pass through `sanitize_filename()` before key construction, stripping directory traversal tokens (`../`, `..\\`) and replacing special characters with underscores.
+- **Short-Lived Presigned URLs:** The React frontend never connects directly to S3 or uses static public URLs. All document viewing in `pdf.js` uses short-lived, cryptographically signed presigned download URLs (default TTL: 15–60 minutes).
+- **Public Access Blocked:** The production S3 bucket enables AWS Block Public Access on all 4 settings. Buckets are never public.
+
 ---
 
 ## 6. Comprehensive Team Dossiers, Ownership & Rules

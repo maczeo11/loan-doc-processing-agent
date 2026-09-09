@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 
 export default function App() {
-  const [selectedAppId, setSelectedAppId] = useState<string>('APP-25195');
+  const [selectedAppId] = useState<string>('APP-25195');
 
   return (
     <div style={{ fontFamily: 'system-ui, sans-serif', padding: '24px', maxWidth: '1200px', margin: '0 auto' }}>

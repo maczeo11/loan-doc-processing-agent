@@ -2,8 +2,6 @@
 Unit tests for deterministic Credit Appraisal Memo (CAM) builder.
 Human-authored tests ensuring formatting, PII masking, badges, and provenance.
 """
-
-import re
 from typing import Dict, Any, List
 from core.contracts.evidence import EvidenceRef, BoundingBox
 from core.contracts.facts import (

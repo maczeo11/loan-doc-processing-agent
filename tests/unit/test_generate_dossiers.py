@@ -12,9 +12,10 @@ Validates:
 - Complete compatibility with Member 3's extractor regexes
 """
 
-import os
 import json
-import pytest
+import os
+import subprocess
+import sys
 import pymupdf
 
 from scripts.generate_dossiers import (
@@ -275,3 +276,113 @@ def test_generated_text_contains_extractor_compatible_labels(tmp_path):
     assert id_facts.pan_number != "UNKNOWN"
     assert id_facts.aadhaar_masked is not None
     assert id_facts.aadhaar_masked.startswith("XXXX-XXXX-")
+
+
+def test_baseline_and_manipulated_values_ground_truth(tmp_path):
+    # 1. Clean scenario: manipulated_values must be empty dict {}
+    clean_manifest = generate_dossier(seed=201, scenario="clean", output_dir=str(tmp_path / "clean"))
+    assert "baseline_values" in clean_manifest
+    assert "applicant" in clean_manifest["baseline_values"]
+    assert "financial" in clean_manifest["baseline_values"]
+    assert clean_manifest["manipulated_values"] == {}
+
+    # 2. Salary mismatch scenario: manipulated_values records reconciliation details
+    sal_manifest = generate_dossier(seed=202, scenario="salary_mismatch", output_dir=str(tmp_path / "sal"))
+    assert "salary_reconciliation" in sal_manifest["manipulated_values"]
+    sal_manip = sal_manifest["manipulated_values"]["salary_reconciliation"]
+    assert sal_manip["configured_tolerance"] == 0.05
+    assert sal_manip["exceeds_tolerance"] is True
+    assert sal_manip["variance_ratio"] > 0.05
+
+    # 3. Tax mismatch scenario
+    tax_manifest = generate_dossier(seed=203, scenario="tax_mismatch", output_dir=str(tmp_path / "tax"))
+    assert "tax_reconciliation" in tax_manifest["manipulated_values"]
+    tax_manip = tax_manifest["manipulated_values"]["tax_reconciliation"]
+    assert tax_manip["configured_tolerance"] == 0.05
+    assert tax_manip["exceeds_tolerance"] is True
+    assert tax_manip["variance_ratio"] > 0.05
+
+    # 4. Identity mismatch scenario
+    id_manifest = generate_dossier(seed=204, scenario="identity_mismatch", output_dir=str(tmp_path / "id"))
+    assert "identity_check" in id_manifest["manipulated_values"]
+    id_manip = id_manifest["manipulated_values"]["identity_check"]
+    assert id_manip["kyc_pass_threshold"] == 0.85
+    assert id_manip["kyc_flag_threshold"] == 0.70
+    assert id_manip["expected_verdict"] == "flag"
+
+
+def test_expected_rule_details_structure_and_thresholds(tmp_path):
+    manifest = generate_dossier(seed=205, scenario="clean", output_dir=str(tmp_path))
+    assert "expected_rule_details" in manifest
+    details = manifest["expected_rule_details"]
+
+    assert "RULE-COMP-01" in details
+    assert details["RULE-COMP-01"]["rule_id"] == "RULE-COMP-01"
+    assert details["RULE-COMP-01"]["verdict"] == "pass"
+    assert len(details["RULE-COMP-01"]["expected_documents"]) == 7
+
+    assert "RULE-INC-01" in details
+    assert details["RULE-INC-01"]["configured_tolerance"] == 0.05
+    assert details["RULE-INC-01"]["verdict"] == "pass"
+
+    assert "RULE-TAX-01" in details
+    assert details["RULE-TAX-01"]["configured_tolerance"] == 0.05
+    assert details["RULE-TAX-01"]["verdict"] == "pass"
+
+    assert "RULE-ID-01" in details
+    assert details["RULE-ID-01"]["kyc_pass_threshold"] == 0.85
+    assert details["RULE-ID-01"]["kyc_flag_threshold"] == 0.70
+    assert details["RULE-ID-01"]["verdict"] == "pass"
+
+
+def test_all_supported_scenarios_generate_valid_ground_truth(tmp_path):
+    for idx, scenario in enumerate(SUPPORTED_SCENARIOS, 1):
+        s_dir = str(tmp_path / f"scen_{scenario}")
+        manifest = generate_dossier(seed=300 + idx, scenario=scenario, output_dir=s_dir)
+
+        # Baseline values must be present and structured
+        assert "baseline_values" in manifest
+        assert manifest["baseline_values"]["applicant"]["full_name"] != ""
+        assert manifest["baseline_values"]["financial"]["monthly_gross"] > 0
+
+        # Expected rule outcomes must cover all 4 rules
+        rules = manifest["expected_rule_outcomes"]
+        for rule_id in ("RULE-COMP-01", "RULE-INC-01", "RULE-TAX-01", "RULE-ID-01"):
+            assert rule_id in rules
+            assert rules[rule_id] in ("pass", "flag", "unknown")
+            assert manifest["expected_rule_details"][rule_id]["verdict"] == rules[rule_id]
+
+        # Clean has empty manipulated_values, others have content
+        if scenario == "clean":
+            assert manifest["manipulated_values"] == {}
+        else:
+            assert len(manifest["manipulated_values"]) > 0
+
+
+def test_cli_single_scenario_generation(tmp_path):
+    out_dir = str(tmp_path / "cli_output")
+    result = subprocess.run(
+        [
+            sys.executable,
+            os.path.join("scripts", "generate_dossiers.py"),
+            "--seed",
+            "42",
+            "--scenario",
+            "salary_mismatch",
+            "--output-dir",
+            out_dir,
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+
+    assert "Generated dossier: APP-00042" in result.stdout
+    manifest_path = os.path.join(out_dir, "APP-00042", "dossier_manifest.json")
+    assert os.path.exists(manifest_path)
+    with open(manifest_path, "r", encoding="utf-8") as f:
+        loaded = json.load(f)
+    assert loaded["scenario"] == "salary_mismatch"
+    assert loaded["expected_rule_outcomes"]["RULE-INC-01"] == "flag"
+    assert "baseline_values" in loaded
+    assert "manipulated_values" in loaded

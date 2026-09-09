@@ -15,14 +15,6 @@ import re
 from typing import Any, Dict, List, Optional, Union
 from core.contracts.state import LoanApplicationState
 from core.contracts.findings import Finding
-from core.contracts.facts import (
-    ApplicantFact,
-    PayslipFacts,
-    BankStatementFacts,
-    TaxReturnFacts,
-    MoneyFact,
-)
-from core.contracts.evidence import EvidenceRef
 
 
 def mask_pan(pan: Optional[str]) -> str:

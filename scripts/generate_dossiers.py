@@ -4,18 +4,21 @@ HUMAN-ONLY ZONE: Owned by Member 4 (Sravanthi).
 
 Generates realistic multi-document PDF retail loan dossiers with controlled anomalies
 for testing, model evaluation, and live hackathon demonstrations.
+Uses a deterministic synthetic schema inspired by retail banking loan appraisal domains
+(no external Kaggle CSV required).
 
 Invariants:
   1. Deterministic generation: Same seed always generates identical dossier values.
   2. Every PDF page bears the prominent watermark: 'SYNTHETIC DEMO — NOT VALID'.
   3. All monetary and textual facts match Member 3's extraction regexes.
   4. Internal arithmetic consistency: opening + credits - debits = closing balance; gross - deductions = net.
-  5. Ground truth manifest contains expected outcomes for all 4 deterministic rules.
+  5. Ground truth manifest contains expected outcomes and details for all 4 deterministic rules:
+     RULE-COMP-01, RULE-INC-01, RULE-TAX-01, RULE-ID-01.
 """
 
+import argparse
 import json
 import os
-import random
 from typing import Any, Dict, List, Optional, Tuple
 
 import pymupdf
@@ -156,8 +159,6 @@ def generate_dossier(
     if scenario not in SUPPORTED_SCENARIOS:
         raise ValueError(f"Unknown scenario '{scenario}'. Supported: {SUPPORTED_SCENARIOS}")
 
-    rng = random.Random(seed)
-
     app_id = f"APP-{seed:05d}"
     if output_dir is None:
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -183,11 +184,43 @@ def generate_dossier(
     annualized_gross = round(monthly_gross * 12.0, 2)
     total_tax_paid = round(annualized_gross * 0.10, 2)
 
-    # Bank Balance Arithmetic
+    # Bank Balance Arithmetic Baseline
     opening_balance = 50000.0
-    bank_salary_credit = net_salary  # Clean default
-    payslip_employee_name = applicant_name
-    itr_gross_income = annualized_gross
+    baseline_bank_salary_credit = net_salary
+    baseline_annualized_gross = annualized_gross
+    baseline_employee_name = applicant_name
+
+    # Baseline records before any manipulation
+    baseline_values: Dict[str, Any] = {
+        "applicant": {
+            "full_name": applicant_name,
+            "dob": dob,
+            "pan_number": pan_number,
+            "aadhaar_masked": aadhaar_masked,
+            "employer_name": company_name,
+            "bank_name": bank_name,
+            "account_number": account_number,
+        },
+        "financial": {
+            "monthly_gross": monthly_gross,
+            "epf_deduction": epf_deduction,
+            "tds_deduction": tds_deduction,
+            "deductions_total": deductions_total,
+            "net_salary": net_salary,
+            "annualized_gross": annualized_gross,
+            "bank_salary_credit": baseline_bank_salary_credit,
+            "opening_balance": opening_balance,
+            "itr_gross_income": baseline_annualized_gross,
+            "total_tax_paid": total_tax_paid,
+        },
+    }
+
+    # Manipulated Values tracking (empty dict for clean scenario)
+    manipulated_values: Dict[str, Any] = {}
+
+    bank_salary_credit = baseline_bank_salary_credit
+    payslip_employee_name = baseline_employee_name
+    itr_gross_income = baseline_annualized_gross
 
     # Expected Rule Outcomes Initialization
     expected_rules = {
@@ -202,18 +235,51 @@ def generate_dossier(
         expected_rules["RULE-COMP-01"] = "flag"
         expected_rules["RULE-INC-01"] = "unknown"
         expected_rules["RULE-TAX-01"] = "unknown"
+        manipulated_values["omitted_documents"] = ["payslip_1.pdf", "payslip_2.pdf", "payslip_3.pdf"]
+        manipulated_values["reason"] = "All 3 monthly payslips omitted from dossier"
     elif scenario in ("salary_mismatch", "bank_mismatch"):
-        bank_salary_credit = round(net_salary * 0.45, 2)  # Discrepancy > 5%
+        bank_salary_credit = round(net_salary * 0.45, 2)  # Discrepancy > 5% tolerance
         expected_rules["RULE-INC-01"] = "flag"
+        variance_ratio = round(abs(net_salary - bank_salary_credit) / net_salary, 4)
+        manipulated_values["salary_reconciliation"] = {
+            "field": "bank_salary_credit",
+            "stated_net_salary": net_salary,
+            "actual_bank_credit": bank_salary_credit,
+            "variance_ratio": variance_ratio,
+            "variance_pct": round(variance_ratio * 100.0, 2),
+            "configured_tolerance": 0.05,
+            "exceeds_tolerance": True,
+        }
     elif scenario == "tax_mismatch":
-        itr_gross_income = round(annualized_gross * 0.55, 2)  # Discrepancy > 5%
+        itr_gross_income = round(annualized_gross * 0.55, 2)  # Discrepancy > 5% tolerance
         expected_rules["RULE-TAX-01"] = "flag"
+        variance_ratio = round(abs(annualized_gross - itr_gross_income) / annualized_gross, 4)
+        manipulated_values["tax_reconciliation"] = {
+            "field": "itr_gross_total_income",
+            "annualized_stated_gross": annualized_gross,
+            "actual_itr_gross": itr_gross_income,
+            "variance_ratio": variance_ratio,
+            "variance_pct": round(variance_ratio * 100.0, 2),
+            "configured_tolerance": 0.05,
+            "exceeds_tolerance": True,
+        }
     elif scenario == "missing_itr":
         expected_rules["RULE-COMP-01"] = "flag"
         expected_rules["RULE-TAX-01"] = "unknown"
+        manipulated_values["omitted_documents"] = ["itr.pdf"]
+        manipulated_values["reason"] = "ITR-V acknowledgement omitted from dossier"
     elif scenario == "identity_mismatch":
         payslip_employee_name = "Vikram Joshi" if applicant_name != "Vikram Joshi" else "Sneha Kulkarni"
         expected_rules["RULE-ID-01"] = "flag"
+        manipulated_values["identity_check"] = {
+            "field": "payslip_employee_name",
+            "applicant_name": applicant_name,
+            "payslip_name": payslip_employee_name,
+            "expected_verdict": "flag",
+            "kyc_pass_threshold": 0.85,
+            "kyc_flag_threshold": 0.70,
+            "reason": "Name mismatch between KYC and payslip below 70% threshold",
+        }
     elif scenario == "multiple_inconsistencies":
         bank_salary_credit = round(net_salary * 0.45, 2)
         itr_gross_income = round(annualized_gross * 0.55, 2)
@@ -221,6 +287,37 @@ def generate_dossier(
         expected_rules["RULE-INC-01"] = "flag"
         expected_rules["RULE-TAX-01"] = "flag"
         expected_rules["RULE-ID-01"] = "flag"
+
+        salary_var = round(abs(net_salary - bank_salary_credit) / net_salary, 4)
+        tax_var = round(abs(annualized_gross - itr_gross_income) / annualized_gross, 4)
+
+        manipulated_values["salary_reconciliation"] = {
+            "field": "bank_salary_credit",
+            "stated_net_salary": net_salary,
+            "actual_bank_credit": bank_salary_credit,
+            "variance_ratio": salary_var,
+            "variance_pct": round(salary_var * 100.0, 2),
+            "configured_tolerance": 0.05,
+            "exceeds_tolerance": True,
+        }
+        manipulated_values["tax_reconciliation"] = {
+            "field": "itr_gross_total_income",
+            "annualized_stated_gross": annualized_gross,
+            "actual_itr_gross": itr_gross_income,
+            "variance_ratio": tax_var,
+            "variance_pct": round(tax_var * 100.0, 2),
+            "configured_tolerance": 0.05,
+            "exceeds_tolerance": True,
+        }
+        manipulated_values["identity_check"] = {
+            "field": "payslip_employee_name",
+            "applicant_name": applicant_name,
+            "payslip_name": payslip_employee_name,
+            "expected_verdict": "flag",
+            "kyc_pass_threshold": 0.85,
+            "kyc_flag_threshold": 0.70,
+            "reason": "Name mismatch below 70% threshold",
+        }
 
     # Strictly verify bank arithmetic: opening + credits - debits = closing
     salary_credits_total = round(bank_salary_credit * 3.0, 2)
@@ -337,6 +434,42 @@ def generate_dossier(
     )
     generated_docs.append("kyc.pdf")
 
+    # Detailed Expected Outcomes for Each Deterministic Rule
+    expected_rule_details: Dict[str, Any] = {
+        "RULE-COMP-01": {
+            "rule_id": "RULE-COMP-01",
+            "rule_name": "Dossier Completeness Check",
+            "verdict": expected_rules["RULE-COMP-01"],
+            "expected_documents": expected_docs,
+            "omitted_documents": manipulated_values.get("omitted_documents", []),
+        },
+        "RULE-INC-01": {
+            "rule_id": "RULE-INC-01",
+            "rule_name": "Salary vs Bank Credit Reconciliation",
+            "verdict": expected_rules["RULE-INC-01"],
+            "stated_net_salary": net_salary if scenario != "missing_payslip" else None,
+            "bank_monthly_salary_credit": bank_salary_credit,
+            "configured_tolerance": 0.05,
+        },
+        "RULE-TAX-01": {
+            "rule_id": "RULE-TAX-01",
+            "rule_name": "Tax Return vs Stated Income Audit",
+            "verdict": expected_rules["RULE-TAX-01"],
+            "annualized_stated_gross": annualized_gross if scenario != "missing_payslip" else None,
+            "itr_gross_total_income": itr_gross_income if scenario != "missing_itr" else None,
+            "configured_tolerance": 0.05,
+        },
+        "RULE-ID-01": {
+            "rule_id": "RULE-ID-01",
+            "rule_name": "Cross-Document Identity Consistency",
+            "verdict": expected_rules["RULE-ID-01"],
+            "applicant_name": applicant_name,
+            "payslip_name": payslip_employee_name,
+            "kyc_pass_threshold": 0.85,
+            "kyc_flag_threshold": 0.70,
+        },
+    }
+
     # Ground Truth Manifest
     manifest: Dict[str, Any] = {
         "application_id": app_id,
@@ -345,6 +478,8 @@ def generate_dossier(
         "split": split,
         "expected_documents": expected_docs,
         "generated_document_names": generated_docs,
+        "baseline_values": baseline_values,
+        "manipulated_values": manipulated_values,
         "applicant_facts": {
             "full_name": applicant_name,
             "dob": dob,
@@ -366,6 +501,7 @@ def generate_dossier(
             "total_tax_paid": total_tax_paid,
         },
         "expected_rule_outcomes": expected_rules,
+        "expected_rule_details": expected_rule_details,
         # Legacy compatibility keys
         "applicant_name": applicant_name,
         "injected_anomaly": scenario if scenario != "clean" else None,
@@ -510,9 +646,51 @@ def generate_dataset(
 
 
 if __name__ == "__main__":
-    out_dir = os.path.join(os.path.dirname(__file__), "..", "data", "synthetic_dossiers")
-    os.makedirs(out_dir, exist_ok=True)
-    print("Generating Deterministic Synthetic Loan Dataset (50 dossiers) for FinScan AI...")
-    ds_manifest = generate_dataset(output_dir=out_dir)
-    print(f"Complete dataset generated: {ds_manifest['total_dossiers']} dossiers.")
-    print(f"Split distribution: {ds_manifest['split_counts']}")
+    parser = argparse.ArgumentParser(
+        description="FinScan AI: Deterministic Synthetic Loan Dossier & Discrepancy Generator"
+    )
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=1,
+        help="Deterministic random seed (default: 1)",
+    )
+    parser.add_argument(
+        "--scenario",
+        type=str,
+        choices=SUPPORTED_SCENARIOS,
+        default=None,
+        help="Generate a single dossier for a specific scenario",
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=str,
+        default=None,
+        help="Output directory (default: data/synthetic_dossiers)",
+    )
+    parser.add_argument(
+        "--dataset",
+        action="store_true",
+        help="Generate the full 50-dossier dataset across all 4 splits",
+    )
+
+    args = parser.parse_args()
+
+    default_dir = os.path.join(os.path.dirname(__file__), "..", "data", "synthetic_dossiers")
+    target_dir = args.output_dir if args.output_dir is not None else default_dir
+    os.makedirs(target_dir, exist_ok=True)
+
+    if args.scenario:
+        print(f"Generating single dossier for scenario '{args.scenario}' with seed {args.seed}...")
+        single_manifest = generate_dossier(
+            seed=args.seed,
+            scenario=args.scenario,
+            output_dir=target_dir,
+        )
+        print(f"Generated dossier: {single_manifest['application_id']} in {target_dir}")
+        print(f"Expected rule outcomes: {single_manifest['expected_rule_outcomes']}")
+    else:
+        print(f"Generating Deterministic Synthetic Loan Dataset (50 dossiers) with base seed {args.seed}...")
+        ds_manifest = generate_dataset(output_dir=target_dir, base_seed=args.seed)
+        print(f"Complete dataset generated: {ds_manifest['total_dossiers']} dossiers.")
+        print(f"Split distribution: {ds_manifest['split_counts']}")

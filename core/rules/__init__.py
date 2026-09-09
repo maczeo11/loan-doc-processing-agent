@@ -7,7 +7,7 @@ Deterministic code decides. AI explains. A human approves.
 from core.rules.completeness import evaluate_completeness
 from core.rules.salary_audit import audit_salary_vs_bank
 from core.rules.tax_audit import audit_tax_vs_income
-from core.rules.identity import audit_identity_consistency, compute_name_similarity, normalize_name_tokens
+from core.rules.identity import audit_identity_consistency, compute_name_similarity, normalize_name_tokens, normalize_pan
 
 __all__ = [
     "evaluate_completeness",
@@ -16,4 +16,5 @@ __all__ = [
     "audit_identity_consistency",
     "compute_name_similarity",
     "normalize_name_tokens",
+    "normalize_pan",
 ]

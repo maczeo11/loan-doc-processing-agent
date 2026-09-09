@@ -15,7 +15,6 @@ Validates:
 
 import json
 import os
-import pytest
 import pymupdf
 
 from scripts.generate_dossiers import (
@@ -24,7 +23,6 @@ from scripts.generate_dossiers import (
     SUPPORTED_SCENARIOS,
     WATERMARK_TEXT,
     generate_dataset,
-    generate_dossier,
 )
 
 

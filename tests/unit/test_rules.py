@@ -4,9 +4,15 @@ Human-authored assertions ensuring money and completeness logic behaves determin
 """
 
 from core.contracts.evidence import EvidenceRef, BoundingBox
-from core.contracts.facts import MoneyFact
+from core.contracts.facts import ApplicantFact, MoneyFact
 from core.rules.completeness import evaluate_completeness
+from core.rules.identity import (
+    audit_identity_consistency,
+    compute_name_similarity,
+    normalize_name_tokens,
+)
 from core.rules.salary_audit import audit_salary_vs_bank
+from core.rules.tax_audit import audit_tax_vs_income
 
 
 def make_dummy_evidence(doc_id: str, text: str) -> EvidenceRef:
@@ -100,8 +106,6 @@ def test_salary_reconciliation_zero_or_negative_amount_returns_unknown():
 # Tax Audit Tests (RULE-TAX-01)
 # ==============================================================================
 
-from core.rules.tax_audit import audit_tax_vs_income
-
 
 def test_tax_audit_exact_match():
     ev_pay = make_dummy_evidence("DOC-PAY", "1200000")
@@ -176,9 +180,6 @@ def test_tax_audit_zero_amount_returns_unknown():
 # ==============================================================================
 # Identity Consistency Tests (RULE-ID-01)
 # ==============================================================================
-
-from core.contracts.facts import ApplicantFact
-from core.rules.identity import audit_identity_consistency, compute_name_similarity, normalize_name_tokens
 
 
 def make_applicant(name: str, pan: str = "ABCDE1234F") -> ApplicantFact:

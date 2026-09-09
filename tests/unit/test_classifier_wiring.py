@@ -8,7 +8,6 @@ Verifies:
 3. Node gracefully falls back to keyword heuristic if classifier raises an exception.
 """
 
-import pytest
 from unittest.mock import patch
 from core.graph.nodes import ocr_and_classify_node
 

@@ -17,7 +17,7 @@ to prevent train/dev/test data leakage.
 import json
 import os
 import random
-from typing import Dict, List, Tuple, Any
+from typing import Dict, List, Any
 
 DOCUMENT_CLASSES = [
     "application_form",
@@ -144,7 +144,7 @@ def _generate_payslip_page(applicant: Dict[str, Any], month_idx: int = 1) -> str
     PRIVATE & CONFIDENTIAL PAYSLIP
     {employer.upper()}
     Registered Corporate Office: Cyber City, Tower B, {applicant['city']}
-    
+
     PAYSLIP FOR THE PERIOD: {month_name}
     Employee ID: EMP{random.randint(100000, 999999)} | Cost Center: India Tech Ops
     Employee Name: {name}
@@ -255,7 +255,7 @@ def _generate_id_card_page(applicant: Dict[str, Any], id_type: str = "pan") -> s
         return f"""
         INCOME TAX DEPARTMENT - GOVT. OF INDIA
         PERMANENT ACCOUNT NUMBER CARD (PAN)
-        
+
         Permanent Account Number: {pan}
         Name: {name.upper()}
         Father's Name: {applicant['father_name'].upper()}
@@ -268,11 +268,11 @@ def _generate_id_card_page(applicant: Dict[str, Any], id_type: str = "pan") -> s
         return f"""
         GOVERNMENT OF INDIA - UNIQUE IDENTIFICATION AUTHORITY OF INDIA (UIDAI)
         AADHAAR CARD - PROOF OF IDENTITY
-        
+
         Enrollment No: 1045/{random.randint(10000, 99999)}/{random.randint(10000, 99999)}
         To: {name}
         Address: Flat {random.randint(101, 909)}, {applicant['city']}, India
-        
+
         Aadhaar Number: {aadhaar}
         Name: {name}
         DOB: {dob} | Gender: {applicant['gender']}

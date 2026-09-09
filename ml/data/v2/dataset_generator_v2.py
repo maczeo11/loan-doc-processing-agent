@@ -21,7 +21,7 @@ import os
 import json
 import random
 import hashlib
-from typing import Dict, Any, List, Tuple
+from typing import Dict, Any, List
 
 CANONICAL_CLASSES = [
     "application_form",
@@ -707,7 +707,7 @@ def render_id_family1_pan(p: Dict[str, Any]) -> str:
     SYNTHETIC DEMO — NOT VALID
     INCOME TAX DEPARTMENT - GOVT. OF INDIA
     PERMANENT ACCOUNT NUMBER CARD (PAN)
-    
+
     Permanent Account Number : {p['pan']}
     Name                     : {p['name'].upper()}
     Father's Name            : {p['father_name'].upper()}
@@ -724,7 +724,7 @@ def render_id_family2_aadhaar(p: Dict[str, Any]) -> str:
     SYNTHETIC DEMO — NOT VALID
     GOVERNMENT OF INDIA - UNIQUE IDENTIFICATION AUTHORITY OF INDIA (UIDAI)
     AADHAAR CARD - PROOF OF IDENTITY
-    
+
     Aadhaar Number : {p['aadhaar_masked']}
     Full Name      : {p['name']}
     Date of Birth  : {p['dob']} | Gender: {p['gender']}
@@ -743,7 +743,7 @@ def render_id_family3_voter(p: Dict[str, Any]) -> str:
     ELECTION COMMISSION OF INDIA - IDENTITY CARD
     ELECTOR PHOTO IDENTITY CARD (EPIC)
     EPIC Number: {epic_no}
-    
+
     Elector Name   : {p['name']}
     Relation Name  : {p['father_name']}
     Gender / Sex   : {p['gender']}
@@ -763,7 +763,7 @@ def render_id_family4_passport(p: Dict[str, Any]) -> str:
     SYNTHETIC DEMO — NOT VALID
     PASSPORT - REPUBLIC OF INDIA
     Type: P | Country Code: IND | Passport No: {pass_no}
-    
+
     Surname       : {surname}
     Given Names   : {given}
     Nationality   : INDIAN | Sex: {p['gender'][:1]}

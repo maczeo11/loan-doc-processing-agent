@@ -8,7 +8,6 @@ all parameters, metrics, and artifacts to MLflow.
 """
 
 import os
-import json
 from typing import Dict, Any, Optional
 
 try:

@@ -9,7 +9,6 @@ local file-based shim conforming to MLflow's local directory layout:
 """
 
 import os
-import sys
 import time
 import shutil
 import uuid

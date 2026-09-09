@@ -18,7 +18,6 @@ from ml.classifier.baseline_tfidf import (
     predict_with_details,
     aggregate_document_predictions,
     load_baseline_classifier,
-    CANONICAL_CLASSES,
     DEFAULT_CONFIDENCE_THRESHOLD,
 )
 

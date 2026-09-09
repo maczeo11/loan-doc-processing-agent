@@ -15,8 +15,6 @@ Verifies:
 import json
 import hashlib
 from pathlib import Path
-import pytest
-import numpy as np
 
 from ml.data.v2.dataset_generator_v2 import (
     load_v2_splits,
@@ -24,10 +22,7 @@ from ml.data.v2.dataset_generator_v2 import (
     WATERMARK,
 )
 from ml.classifier.baseline_tfidf import (
-    TfidfDocumentClassifier,
     load_v2_classifier,
-    predict_document_type_v2,
-    predict_with_details_v2,
     aggregate_document_predictions,
     V2_MODEL_PATH,
 )

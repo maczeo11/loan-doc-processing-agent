@@ -4,15 +4,12 @@ Owned by Member 5 (Karthik).
 """
 
 import pytest
-from typing import Dict, Any
 from ml.data.dataset_generator import create_grouped_splits, load_splits, DOCUMENT_CLASSES
 from ml.classifier.baseline_tfidf import (
     build_baseline_pipeline,
-    train_baseline_classifier,
     load_baseline_classifier,
     predict_document_type,
     predict_batch,
-    TfidfDocumentClassifier,
 )
 from ml.classifier.challenger_distilbert import DistilBertClassifier
 from ml.classifier.evaluate import evaluate_classifier, compare_models, get_comparison_summary

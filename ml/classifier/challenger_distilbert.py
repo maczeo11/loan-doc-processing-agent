@@ -16,7 +16,7 @@ Constraints from AGENTS.md:
 - Evaluated against TF-IDF baseline on macro-F1 and memory footprint.
 """
 
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 import os
 import json
 import numpy as np
@@ -62,12 +62,12 @@ class DistilBertClassifier:
 
     def _check_torch_availability(self) -> None:
         """Inspects whether torch and transformers are available in the runtime."""
-        try:
-            import torch
-            import transformers
-            self.is_torch_available = True
-        except ImportError:
-            self.is_torch_available = False
+        import importlib.util
+
+        self.is_torch_available = (
+            importlib.util.find_spec("torch") is not None
+            and importlib.util.find_spec("transformers") is not None
+        )
 
     def train(
         self,

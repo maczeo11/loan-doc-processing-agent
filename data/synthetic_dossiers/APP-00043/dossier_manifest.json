@@ -1,0 +1,84 @@
+{
+  "application_id": "APP-00043",
+  "seed": 43,
+  "scenario": "multiple_inconsistencies",
+  "split": "held-out",
+  "expected_documents": [
+    "application.pdf",
+    "payslip_1.pdf",
+    "payslip_2.pdf",
+    "payslip_3.pdf",
+    "bank_statement.pdf",
+    "itr.pdf",
+    "kyc.pdf"
+  ],
+  "generated_document_names": [
+    "application.pdf",
+    "payslip_1.pdf",
+    "payslip_2.pdf",
+    "payslip_3.pdf",
+    "bank_statement.pdf",
+    "itr.pdf",
+    "kyc.pdf"
+  ],
+  "applicant_facts": {
+    "full_name": "Sneha Kulkarni",
+    "dob": "1992-06-15",
+    "pan_number": "ABCDE2591F",
+    "aadhaar_masked": "XXXX-XXXX-3279",
+    "employer_name": "Tech Mahindra Ltd"
+  },
+  "financial_ground_truth": {
+    "gross_monthly_salary": 110000.0,
+    "net_monthly_salary": 93500.0,
+    "deductions_total": 16500.0,
+    "annualized_gross_income": 1320000.0,
+    "bank_monthly_salary_credit": 42075.0,
+    "bank_opening_balance": 50000.0,
+    "bank_total_credits": 126225.0,
+    "bank_total_debits": 88357.5,
+    "bank_closing_balance": 87867.5,
+    "itr_gross_total_income": 726000.0,
+    "total_tax_paid": 132000.0
+  },
+  "expected_rule_outcomes": {
+    "RULE-COMP-01": "pass",
+    "RULE-INC-01": "flag",
+    "RULE-TAX-01": "flag",
+    "RULE-ID-01": "flag"
+  },
+  "applicant_name": "Sneha Kulkarni",
+  "injected_anomaly": "multiple_inconsistencies",
+  "payslip": {
+    "employee_name": "Vikram Joshi",
+    "employer_name": "Tech Mahindra Ltd",
+    "gross_salary": 110000.0,
+    "net_salary": 93500.0,
+    "epf_deduction": 8800.0,
+    "tds_deduction": 7700.0
+  },
+  "bank_statement": {
+    "account_holder": "Sneha Kulkarni",
+    "bank_name": "Axis Bank",
+    "account_number": "501001003913",
+    "monthly_salary_credits": [
+      42075.0,
+      42075.0,
+      42075.0
+    ],
+    "average_balance": 39540.38,
+    "bounced_transactions": 0
+  },
+  "tax_return": {
+    "assessee_name": "Sneha Kulkarni",
+    "pan_number": "ABCDE2591F",
+    "gross_total_income": 726000.0,
+    "total_tax_paid": 132000.0
+  },
+  "kyc": {
+    "full_name": "Sneha Kulkarni",
+    "pan_number": "ABCDE2591F",
+    "dob": "1992-06-15",
+    "aadhaar_masked": "XXXX-XXXX-3279"
+  }
+}

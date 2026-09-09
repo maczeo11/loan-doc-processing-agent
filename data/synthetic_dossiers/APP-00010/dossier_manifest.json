@@ -1,0 +1,81 @@
+{
+  "application_id": "APP-00010",
+  "seed": 10,
+  "scenario": "missing_payslip",
+  "split": "dev",
+  "expected_documents": [
+    "application.pdf",
+    "payslip_1.pdf",
+    "payslip_2.pdf",
+    "payslip_3.pdf",
+    "bank_statement.pdf",
+    "itr.pdf",
+    "kyc.pdf"
+  ],
+  "generated_document_names": [
+    "application.pdf",
+    "bank_statement.pdf",
+    "itr.pdf",
+    "kyc.pdf"
+  ],
+  "applicant_facts": {
+    "full_name": "Vikram Malhotra",
+    "dob": "1992-06-15",
+    "pan_number": "ABCDE1370F",
+    "aadhaar_masked": "XXXX-XXXX-1530",
+    "employer_name": "Tata Consultancy Services Ltd"
+  },
+  "financial_ground_truth": {
+    "gross_monthly_salary": 80000.0,
+    "net_monthly_salary": 68000.0,
+    "deductions_total": 12000.0,
+    "annualized_gross_income": 960000.0,
+    "bank_monthly_salary_credit": 68000.0,
+    "bank_opening_balance": 50000.0,
+    "bank_total_credits": 204000.0,
+    "bank_total_debits": 142800.0,
+    "bank_closing_balance": 111200.0,
+    "itr_gross_total_income": 960000.0,
+    "total_tax_paid": 96000.0
+  },
+  "expected_rule_outcomes": {
+    "RULE-COMP-01": "flag",
+    "RULE-INC-01": "unknown",
+    "RULE-TAX-01": "unknown",
+    "RULE-ID-01": "pass"
+  },
+  "applicant_name": "Vikram Malhotra",
+  "injected_anomaly": "missing_payslip",
+  "payslip": {
+    "employee_name": "Vikram Malhotra",
+    "employer_name": "Tata Consultancy Services Ltd",
+    "gross_salary": 80000.0,
+    "net_salary": 68000.0,
+    "epf_deduction": 6400.0,
+    "tds_deduction": 5600.0
+  },
+  "bank_statement": {
+    "account_holder": "Vikram Malhotra",
+    "bank_name": "ICICI Bank",
+    "account_number": "501001000910",
+    "monthly_salary_credits": [
+      68000.0,
+      68000.0,
+      68000.0
+    ],
+    "average_balance": 50040.0,
+    "bounced_transactions": 0
+  },
+  "tax_return": {
+    "assessee_name": "Vikram Malhotra",
+    "pan_number": "ABCDE1370F",
+    "gross_total_income": 960000.0,
+    "total_tax_paid": 96000.0
+  },
+  "kyc": {
+    "full_name": "Vikram Malhotra",
+    "pan_number": "ABCDE1370F",
+    "dob": "1992-06-15",
+    "aadhaar_masked": "XXXX-XXXX-1530"
+  }
+}

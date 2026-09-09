@@ -1,0 +1,84 @@
+{
+  "application_id": "APP-00045",
+  "seed": 45,
+  "scenario": "multiple_inconsistencies",
+  "split": "held-out",
+  "expected_documents": [
+    "application.pdf",
+    "payslip_1.pdf",
+    "payslip_2.pdf",
+    "payslip_3.pdf",
+    "bank_statement.pdf",
+    "itr.pdf",
+    "kyc.pdf"
+  ],
+  "generated_document_names": [
+    "application.pdf",
+    "payslip_1.pdf",
+    "payslip_2.pdf",
+    "payslip_3.pdf",
+    "bank_statement.pdf",
+    "itr.pdf",
+    "kyc.pdf"
+  ],
+  "applicant_facts": {
+    "full_name": "Ananya Rao",
+    "dob": "1992-06-15",
+    "pan_number": "ABCDE2665F",
+    "aadhaar_masked": "XXXX-XXXX-3385",
+    "employer_name": "Tata Consultancy Services Ltd"
+  },
+  "financial_ground_truth": {
+    "gross_monthly_salary": 130000.0,
+    "net_monthly_salary": 110500.0,
+    "deductions_total": 19500.0,
+    "annualized_gross_income": 1560000.0,
+    "bank_monthly_salary_credit": 49725.0,
+    "bank_opening_balance": 50000.0,
+    "bank_total_credits": 149175.0,
+    "bank_total_debits": 104422.5,
+    "bank_closing_balance": 94752.5,
+    "itr_gross_total_income": 858000.0,
+    "total_tax_paid": 156000.0
+  },
+  "expected_rule_outcomes": {
+    "RULE-COMP-01": "pass",
+    "RULE-INC-01": "flag",
+    "RULE-TAX-01": "flag",
+    "RULE-ID-01": "flag"
+  },
+  "applicant_name": "Ananya Rao",
+  "injected_anomaly": "multiple_inconsistencies",
+  "payslip": {
+    "employee_name": "Vikram Joshi",
+    "employer_name": "Tata Consultancy Services Ltd",
+    "gross_salary": 130000.0,
+    "net_salary": 110500.0,
+    "epf_deduction": 10400.0,
+    "tds_deduction": 9100.0
+  },
+  "bank_statement": {
+    "account_holder": "Ananya Rao",
+    "bank_name": "State Bank of India",
+    "account_number": "501001004095",
+    "monthly_salary_credits": [
+      49725.0,
+      49725.0,
+      49725.0
+    ],
+    "average_balance": 42638.62,
+    "bounced_transactions": 0
+  },
+  "tax_return": {
+    "assessee_name": "Ananya Rao",
+    "pan_number": "ABCDE2665F",
+    "gross_total_income": 858000.0,
+    "total_tax_paid": 156000.0
+  },
+  "kyc": {
+    "full_name": "Ananya Rao",
+    "pan_number": "ABCDE2665F",
+    "dob": "1992-06-15",
+    "aadhaar_masked": "XXXX-XXXX-3385"
+  }
+}

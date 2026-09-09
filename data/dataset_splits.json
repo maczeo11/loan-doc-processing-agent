@@ -1,0 +1,1101 @@
+{
+  "total_dossiers": 50,
+  "split_counts": {
+    "dev": 25,
+    "tuning": 10,
+    "held-out": 10,
+    "demo": 5
+  },
+  "splits": {
+    "dev": [
+      "APP-00001",
+      "APP-00002",
+      "APP-00003",
+      "APP-00004",
+      "APP-00005",
+      "APP-00006",
+      "APP-00007",
+      "APP-00008",
+      "APP-00009",
+      "APP-00010",
+      "APP-00011",
+      "APP-00012",
+      "APP-00013",
+      "APP-00014",
+      "APP-00015",
+      "APP-00016",
+      "APP-00017",
+      "APP-00018",
+      "APP-00019",
+      "APP-00020",
+      "APP-00021",
+      "APP-00022",
+      "APP-00023",
+      "APP-00024",
+      "APP-00025"
+    ],
+    "tuning": [
+      "APP-00026",
+      "APP-00027",
+      "APP-00028",
+      "APP-00029",
+      "APP-00030",
+      "APP-00031",
+      "APP-00032",
+      "APP-00033",
+      "APP-00034",
+      "APP-00035"
+    ],
+    "held-out": [
+      "APP-00036",
+      "APP-00037",
+      "APP-00038",
+      "APP-00039",
+      "APP-00040",
+      "APP-00041",
+      "APP-00042",
+      "APP-00043",
+      "APP-00044",
+      "APP-00045"
+    ],
+    "demo": [
+      "APP-00046",
+      "APP-00047",
+      "APP-00048",
+      "APP-00049",
+      "APP-00050"
+    ]
+  },
+  "dossiers": {
+    "APP-00001": {
+      "seed": 1,
+      "split": "dev",
+      "scenario": "clean",
+      "applicant_name": "Priya Patel",
+      "generated_documents": [
+        "application.pdf",
+        "payslip_1.pdf",
+        "payslip_2.pdf",
+        "payslip_3.pdf",
+        "bank_statement.pdf",
+        "itr.pdf",
+        "kyc.pdf"
+      ],
+      "expected_rule_outcomes": {
+        "RULE-COMP-01": "pass",
+        "RULE-INC-01": "pass",
+        "RULE-TAX-01": "pass",
+        "RULE-ID-01": "pass"
+      }
+    },
+    "APP-00002": {
+      "seed": 2,
+      "split": "dev",
+      "scenario": "missing_payslip",
+      "applicant_name": "Vikram Malhotra",
+      "generated_documents": [
+        "application.pdf",
+        "bank_statement.pdf",
+        "itr.pdf",
+        "kyc.pdf"
+      ],
+      "expected_rule_outcomes": {
+        "RULE-COMP-01": "flag",
+        "RULE-INC-01": "unknown",
+        "RULE-TAX-01": "unknown",
+        "RULE-ID-01": "pass"
+      }
+    },
+    "APP-00003": {
+      "seed": 3,
+      "split": "dev",
+      "scenario": "salary_mismatch",
+      "applicant_name": "Sneha Kulkarni",
+      "generated_documents": [
+        "application.pdf",
+        "payslip_1.pdf",
+        "payslip_2.pdf",
+        "payslip_3.pdf",
+        "bank_statement.pdf",
+        "itr.pdf",
+        "kyc.pdf"
+      ],
+      "expected_rule_outcomes": {
+        "RULE-COMP-01": "pass",
+        "RULE-INC-01": "flag",
+        "RULE-TAX-01": "pass",
+        "RULE-ID-01": "pass"
+      }
+    },
+    "APP-00004": {
+      "seed": 4,
+      "split": "dev",
+      "scenario": "bank_mismatch",
+      "applicant_name": "Rajesh Nair",
+      "generated_documents": [
+        "application.pdf",
+        "payslip_1.pdf",
+        "payslip_2.pdf",
+        "payslip_3.pdf",
+        "bank_statement.pdf",
+        "itr.pdf",
+        "kyc.pdf"
+      ],
+      "expected_rule_outcomes": {
+        "RULE-COMP-01": "pass",
+        "RULE-INC-01": "flag",
+        "RULE-TAX-01": "pass",
+        "RULE-ID-01": "pass"
+      }
+    },
+    "APP-00005": {
+      "seed": 5,
+      "split": "dev",
+      "scenario": "tax_mismatch",
+      "applicant_name": "Ananya Rao",
+      "generated_documents": [
+        "application.pdf",
+        "payslip_1.pdf",
+        "payslip_2.pdf",
+        "payslip_3.pdf",
+        "bank_statement.pdf",
+        "itr.pdf",
+        "kyc.pdf"
+      ],
+      "expected_rule_outcomes": {
+        "RULE-COMP-01": "pass",
+        "RULE-INC-01": "pass",
+        "RULE-TAX-01": "flag",
+        "RULE-ID-01": "pass"
+      }
+    },
+    "APP-00006": {
+      "seed": 6,
+      "split": "dev",
+      "scenario": "missing_itr",
+      "applicant_name": "Kavita Iyer",
+      "generated_documents": [
+        "application.pdf",
+        "payslip_1.pdf",
+        "payslip_2.pdf",
+        "payslip_3.pdf",
+        "bank_statement.pdf",
+        "kyc.pdf"
+      ],
+      "expected_rule_outcomes": {
+        "RULE-COMP-01": "flag",
+        "RULE-INC-01": "pass",
+        "RULE-TAX-01": "unknown",
+        "RULE-ID-01": "pass"
+      }
+    },
+    "APP-00007": {
+      "seed": 7,
+      "split": "dev",
+      "scenario": "identity_mismatch",
+      "applicant_name": "Rohan Verma",
+      "generated_documents": [
+        "application.pdf",
+        "payslip_1.pdf",
+        "payslip_2.pdf",
+        "payslip_3.pdf",
+        "bank_statement.pdf",
+        "itr.pdf",
+        "kyc.pdf"
+      ],
+      "expected_rule_outcomes": {
+        "RULE-COMP-01": "pass",
+        "RULE-INC-01": "pass",
+        "RULE-TAX-01": "pass",
+        "RULE-ID-01": "flag"
+      }
+    },
+    "APP-00008": {
+      "seed": 8,
+      "split": "dev",
+      "scenario": "multiple_inconsistencies",
+      "applicant_name": "Aarav Sharma",
+      "generated_documents": [
+        "application.pdf",
+        "payslip_1.pdf",
+        "payslip_2.pdf",
+        "payslip_3.pdf",
+        "bank_statement.pdf",
+        "itr.pdf",
+        "kyc.pdf"
+      ],
+      "expected_rule_outcomes": {
+        "RULE-COMP-01": "pass",
+        "RULE-INC-01": "flag",
+        "RULE-TAX-01": "flag",
+        "RULE-ID-01": "flag"
+      }
+    },
+    "APP-00009": {
+      "seed": 9,
+      "split": "dev",
+      "scenario": "clean",
+      "applicant_name": "Priya Patel",
+      "generated_documents": [
+        "application.pdf",
+        "payslip_1.pdf",
+        "payslip_2.pdf",
+        "payslip_3.pdf",
+        "bank_statement.pdf",
+        "itr.pdf",
+        "kyc.pdf"
+      ],
+      "expected_rule_outcomes": {
+        "RULE-COMP-01": "pass",
+        "RULE-INC-01": "pass",
+        "RULE-TAX-01": "pass",
+        "RULE-ID-01": "pass"
+      }
+    },
+    "APP-00010": {
+      "seed": 10,
+      "split": "dev",
+      "scenario": "missing_payslip",
+      "applicant_name": "Vikram Malhotra",
+      "generated_documents": [
+        "application.pdf",
+        "bank_statement.pdf",
+        "itr.pdf",
+        "kyc.pdf"
+      ],
+      "expected_rule_outcomes": {
+        "RULE-COMP-01": "flag",
+        "RULE-INC-01": "unknown",
+        "RULE-TAX-01": "unknown",
+        "RULE-ID-01": "pass"
+      }
+    },
+    "APP-00011": {
+      "seed": 11,
+      "split": "dev",
+      "scenario": "salary_mismatch",
+      "applicant_name": "Sneha Kulkarni",
+      "generated_documents": [
+        "application.pdf",
+        "payslip_1.pdf",
+        "payslip_2.pdf",
+        "payslip_3.pdf",
+        "bank_statement.pdf",
+        "itr.pdf",
+        "kyc.pdf"
+      ],
+      "expected_rule_outcomes": {
+        "RULE-COMP-01": "pass",
+        "RULE-INC-01": "flag",
+        "RULE-TAX-01": "pass",
+        "RULE-ID-01": "pass"
+      }
+    },
+    "APP-00012": {
+      "seed": 12,
+      "split": "dev",
+      "scenario": "bank_mismatch",
+      "applicant_name": "Rajesh Nair",
+      "generated_documents": [
+        "application.pdf",
+        "payslip_1.pdf",
+        "payslip_2.pdf",
+        "payslip_3.pdf",
+        "bank_statement.pdf",
+        "itr.pdf",
+        "kyc.pdf"
+      ],
+      "expected_rule_outcomes": {
+        "RULE-COMP-01": "pass",
+        "RULE-INC-01": "flag",
+        "RULE-TAX-01": "pass",
+        "RULE-ID-01": "pass"
+      }
+    },
+    "APP-00013": {
+      "seed": 13,
+      "split": "dev",
+      "scenario": "tax_mismatch",
+      "applicant_name": "Ananya Rao",
+      "generated_documents": [
+        "application.pdf",
+        "payslip_1.pdf",
+        "payslip_2.pdf",
+        "payslip_3.pdf",
+        "bank_statement.pdf",
+        "itr.pdf",
+        "kyc.pdf"
+      ],
+      "expected_rule_outcomes": {
+        "RULE-COMP-01": "pass",
+        "RULE-INC-01": "pass",
+        "RULE-TAX-01": "flag",
+        "RULE-ID-01": "pass"
+      }
+    },
+    "APP-00014": {
+      "seed": 14,
+      "split": "dev",
+      "scenario": "missing_itr",
+      "applicant_name": "Kavita Iyer",
+      "generated_documents": [
+        "application.pdf",
+        "payslip_1.pdf",
+        "payslip_2.pdf",
+        "payslip_3.pdf",
+        "bank_statement.pdf",
+        "kyc.pdf"
+      ],
+      "expected_rule_outcomes": {
+        "RULE-COMP-01": "flag",
+        "RULE-INC-01": "pass",
+        "RULE-TAX-01": "unknown",
+        "RULE-ID-01": "pass"
+      }
+    },
+    "APP-00015": {
+      "seed": 15,
+      "split": "dev",
+      "scenario": "identity_mismatch",
+      "applicant_name": "Rohan Verma",
+      "generated_documents": [
+        "application.pdf",
+        "payslip_1.pdf",
+        "payslip_2.pdf",
+        "payslip_3.pdf",
+        "bank_statement.pdf",
+        "itr.pdf",
+        "kyc.pdf"
+      ],
+      "expected_rule_outcomes": {
+        "RULE-COMP-01": "pass",
+        "RULE-INC-01": "pass",
+        "RULE-TAX-01": "pass",
+        "RULE-ID-01": "flag"
+      }
+    },
+    "APP-00016": {
+      "seed": 16,
+      "split": "dev",
+      "scenario": "multiple_inconsistencies",
+      "applicant_name": "Aarav Sharma",
+      "generated_documents": [
+        "application.pdf",
+        "payslip_1.pdf",
+        "payslip_2.pdf",
+        "payslip_3.pdf",
+        "bank_statement.pdf",
+        "itr.pdf",
+        "kyc.pdf"
+      ],
+      "expected_rule_outcomes": {
+        "RULE-COMP-01": "pass",
+        "RULE-INC-01": "flag",
+        "RULE-TAX-01": "flag",
+        "RULE-ID-01": "flag"
+      }
+    },
+    "APP-00017": {
+      "seed": 17,
+      "split": "dev",
+      "scenario": "clean",
+      "applicant_name": "Priya Patel",
+      "generated_documents": [
+        "application.pdf",
+        "payslip_1.pdf",
+        "payslip_2.pdf",
+        "payslip_3.pdf",
+        "bank_statement.pdf",
+        "itr.pdf",
+        "kyc.pdf"
+      ],
+      "expected_rule_outcomes": {
+        "RULE-COMP-01": "pass",
+        "RULE-INC-01": "pass",
+        "RULE-TAX-01": "pass",
+        "RULE-ID-01": "pass"
+      }
+    },
+    "APP-00018": {
+      "seed": 18,
+      "split": "dev",
+      "scenario": "missing_payslip",
+      "applicant_name": "Vikram Malhotra",
+      "generated_documents": [
+        "application.pdf",
+        "bank_statement.pdf",
+        "itr.pdf",
+        "kyc.pdf"
+      ],
+      "expected_rule_outcomes": {
+        "RULE-COMP-01": "flag",
+        "RULE-INC-01": "unknown",
+        "RULE-TAX-01": "unknown",
+        "RULE-ID-01": "pass"
+      }
+    },
+    "APP-00019": {
+      "seed": 19,
+      "split": "dev",
+      "scenario": "salary_mismatch",
+      "applicant_name": "Sneha Kulkarni",
+      "generated_documents": [
+        "application.pdf",
+        "payslip_1.pdf",
+        "payslip_2.pdf",
+        "payslip_3.pdf",
+        "bank_statement.pdf",
+        "itr.pdf",
+        "kyc.pdf"
+      ],
+      "expected_rule_outcomes": {
+        "RULE-COMP-01": "pass",
+        "RULE-INC-01": "flag",
+        "RULE-TAX-01": "pass",
+        "RULE-ID-01": "pass"
+      }
+    },
+    "APP-00020": {
+      "seed": 20,
+      "split": "dev",
+      "scenario": "bank_mismatch",
+      "applicant_name": "Rajesh Nair",
+      "generated_documents": [
+        "application.pdf",
+        "payslip_1.pdf",
+        "payslip_2.pdf",
+        "payslip_3.pdf",
+        "bank_statement.pdf",
+        "itr.pdf",
+        "kyc.pdf"
+      ],
+      "expected_rule_outcomes": {
+        "RULE-COMP-01": "pass",
+        "RULE-INC-01": "flag",
+        "RULE-TAX-01": "pass",
+        "RULE-ID-01": "pass"
+      }
+    },
+    "APP-00021": {
+      "seed": 21,
+      "split": "dev",
+      "scenario": "tax_mismatch",
+      "applicant_name": "Ananya Rao",
+      "generated_documents": [
+        "application.pdf",
+        "payslip_1.pdf",
+        "payslip_2.pdf",
+        "payslip_3.pdf",
+        "bank_statement.pdf",
+        "itr.pdf",
+        "kyc.pdf"
+      ],
+      "expected_rule_outcomes": {
+        "RULE-COMP-01": "pass",
+        "RULE-INC-01": "pass",
+        "RULE-TAX-01": "flag",
+        "RULE-ID-01": "pass"
+      }
+    },
+    "APP-00022": {
+      "seed": 22,
+      "split": "dev",
+      "scenario": "missing_itr",
+      "applicant_name": "Kavita Iyer",
+      "generated_documents": [
+        "application.pdf",
+        "payslip_1.pdf",
+        "payslip_2.pdf",
+        "payslip_3.pdf",
+        "bank_statement.pdf",
+        "kyc.pdf"
+      ],
+      "expected_rule_outcomes": {
+        "RULE-COMP-01": "flag",
+        "RULE-INC-01": "pass",
+        "RULE-TAX-01": "unknown",
+        "RULE-ID-01": "pass"
+      }
+    },
+    "APP-00023": {
+      "seed": 23,
+      "split": "dev",
+      "scenario": "identity_mismatch",
+      "applicant_name": "Rohan Verma",
+      "generated_documents": [
+        "application.pdf",
+        "payslip_1.pdf",
+        "payslip_2.pdf",
+        "payslip_3.pdf",
+        "bank_statement.pdf",
+        "itr.pdf",
+        "kyc.pdf"
+      ],
+      "expected_rule_outcomes": {
+        "RULE-COMP-01": "pass",
+        "RULE-INC-01": "pass",
+        "RULE-TAX-01": "pass",
+        "RULE-ID-01": "flag"
+      }
+    },
+    "APP-00024": {
+      "seed": 24,
+      "split": "dev",
+      "scenario": "clean",
+      "applicant_name": "Aarav Sharma",
+      "generated_documents": [
+        "application.pdf",
+        "payslip_1.pdf",
+        "payslip_2.pdf",
+        "payslip_3.pdf",
+        "bank_statement.pdf",
+        "itr.pdf",
+        "kyc.pdf"
+      ],
+      "expected_rule_outcomes": {
+        "RULE-COMP-01": "pass",
+        "RULE-INC-01": "pass",
+        "RULE-TAX-01": "pass",
+        "RULE-ID-01": "pass"
+      }
+    },
+    "APP-00025": {
+      "seed": 25,
+      "split": "dev",
+      "scenario": "clean",
+      "applicant_name": "Priya Patel",
+      "generated_documents": [
+        "application.pdf",
+        "payslip_1.pdf",
+        "payslip_2.pdf",
+        "payslip_3.pdf",
+        "bank_statement.pdf",
+        "itr.pdf",
+        "kyc.pdf"
+      ],
+      "expected_rule_outcomes": {
+        "RULE-COMP-01": "pass",
+        "RULE-INC-01": "pass",
+        "RULE-TAX-01": "pass",
+        "RULE-ID-01": "pass"
+      }
+    },
+    "APP-00026": {
+      "seed": 26,
+      "split": "tuning",
+      "scenario": "clean",
+      "applicant_name": "Vikram Malhotra",
+      "generated_documents": [
+        "application.pdf",
+        "payslip_1.pdf",
+        "payslip_2.pdf",
+        "payslip_3.pdf",
+        "bank_statement.pdf",
+        "itr.pdf",
+        "kyc.pdf"
+      ],
+      "expected_rule_outcomes": {
+        "RULE-COMP-01": "pass",
+        "RULE-INC-01": "pass",
+        "RULE-TAX-01": "pass",
+        "RULE-ID-01": "pass"
+      }
+    },
+    "APP-00027": {
+      "seed": 27,
+      "split": "tuning",
+      "scenario": "missing_payslip",
+      "applicant_name": "Sneha Kulkarni",
+      "generated_documents": [
+        "application.pdf",
+        "bank_statement.pdf",
+        "itr.pdf",
+        "kyc.pdf"
+      ],
+      "expected_rule_outcomes": {
+        "RULE-COMP-01": "flag",
+        "RULE-INC-01": "unknown",
+        "RULE-TAX-01": "unknown",
+        "RULE-ID-01": "pass"
+      }
+    },
+    "APP-00028": {
+      "seed": 28,
+      "split": "tuning",
+      "scenario": "salary_mismatch",
+      "applicant_name": "Rajesh Nair",
+      "generated_documents": [
+        "application.pdf",
+        "payslip_1.pdf",
+        "payslip_2.pdf",
+        "payslip_3.pdf",
+        "bank_statement.pdf",
+        "itr.pdf",
+        "kyc.pdf"
+      ],
+      "expected_rule_outcomes": {
+        "RULE-COMP-01": "pass",
+        "RULE-INC-01": "flag",
+        "RULE-TAX-01": "pass",
+        "RULE-ID-01": "pass"
+      }
+    },
+    "APP-00029": {
+      "seed": 29,
+      "split": "tuning",
+      "scenario": "bank_mismatch",
+      "applicant_name": "Ananya Rao",
+      "generated_documents": [
+        "application.pdf",
+        "payslip_1.pdf",
+        "payslip_2.pdf",
+        "payslip_3.pdf",
+        "bank_statement.pdf",
+        "itr.pdf",
+        "kyc.pdf"
+      ],
+      "expected_rule_outcomes": {
+        "RULE-COMP-01": "pass",
+        "RULE-INC-01": "flag",
+        "RULE-TAX-01": "pass",
+        "RULE-ID-01": "pass"
+      }
+    },
+    "APP-00030": {
+      "seed": 30,
+      "split": "tuning",
+      "scenario": "tax_mismatch",
+      "applicant_name": "Kavita Iyer",
+      "generated_documents": [
+        "application.pdf",
+        "payslip_1.pdf",
+        "payslip_2.pdf",
+        "payslip_3.pdf",
+        "bank_statement.pdf",
+        "itr.pdf",
+        "kyc.pdf"
+      ],
+      "expected_rule_outcomes": {
+        "RULE-COMP-01": "pass",
+        "RULE-INC-01": "pass",
+        "RULE-TAX-01": "flag",
+        "RULE-ID-01": "pass"
+      }
+    },
+    "APP-00031": {
+      "seed": 31,
+      "split": "tuning",
+      "scenario": "missing_itr",
+      "applicant_name": "Rohan Verma",
+      "generated_documents": [
+        "application.pdf",
+        "payslip_1.pdf",
+        "payslip_2.pdf",
+        "payslip_3.pdf",
+        "bank_statement.pdf",
+        "kyc.pdf"
+      ],
+      "expected_rule_outcomes": {
+        "RULE-COMP-01": "flag",
+        "RULE-INC-01": "pass",
+        "RULE-TAX-01": "unknown",
+        "RULE-ID-01": "pass"
+      }
+    },
+    "APP-00032": {
+      "seed": 32,
+      "split": "tuning",
+      "scenario": "identity_mismatch",
+      "applicant_name": "Aarav Sharma",
+      "generated_documents": [
+        "application.pdf",
+        "payslip_1.pdf",
+        "payslip_2.pdf",
+        "payslip_3.pdf",
+        "bank_statement.pdf",
+        "itr.pdf",
+        "kyc.pdf"
+      ],
+      "expected_rule_outcomes": {
+        "RULE-COMP-01": "pass",
+        "RULE-INC-01": "pass",
+        "RULE-TAX-01": "pass",
+        "RULE-ID-01": "flag"
+      }
+    },
+    "APP-00033": {
+      "seed": 33,
+      "split": "tuning",
+      "scenario": "multiple_inconsistencies",
+      "applicant_name": "Priya Patel",
+      "generated_documents": [
+        "application.pdf",
+        "payslip_1.pdf",
+        "payslip_2.pdf",
+        "payslip_3.pdf",
+        "bank_statement.pdf",
+        "itr.pdf",
+        "kyc.pdf"
+      ],
+      "expected_rule_outcomes": {
+        "RULE-COMP-01": "pass",
+        "RULE-INC-01": "flag",
+        "RULE-TAX-01": "flag",
+        "RULE-ID-01": "flag"
+      }
+    },
+    "APP-00034": {
+      "seed": 34,
+      "split": "tuning",
+      "scenario": "clean",
+      "applicant_name": "Vikram Malhotra",
+      "generated_documents": [
+        "application.pdf",
+        "payslip_1.pdf",
+        "payslip_2.pdf",
+        "payslip_3.pdf",
+        "bank_statement.pdf",
+        "itr.pdf",
+        "kyc.pdf"
+      ],
+      "expected_rule_outcomes": {
+        "RULE-COMP-01": "pass",
+        "RULE-INC-01": "pass",
+        "RULE-TAX-01": "pass",
+        "RULE-ID-01": "pass"
+      }
+    },
+    "APP-00035": {
+      "seed": 35,
+      "split": "tuning",
+      "scenario": "multiple_inconsistencies",
+      "applicant_name": "Sneha Kulkarni",
+      "generated_documents": [
+        "application.pdf",
+        "payslip_1.pdf",
+        "payslip_2.pdf",
+        "payslip_3.pdf",
+        "bank_statement.pdf",
+        "itr.pdf",
+        "kyc.pdf"
+      ],
+      "expected_rule_outcomes": {
+        "RULE-COMP-01": "pass",
+        "RULE-INC-01": "flag",
+        "RULE-TAX-01": "flag",
+        "RULE-ID-01": "flag"
+      }
+    },
+    "APP-00036": {
+      "seed": 36,
+      "split": "held-out",
+      "scenario": "clean",
+      "applicant_name": "Rajesh Nair",
+      "generated_documents": [
+        "application.pdf",
+        "payslip_1.pdf",
+        "payslip_2.pdf",
+        "payslip_3.pdf",
+        "bank_statement.pdf",
+        "itr.pdf",
+        "kyc.pdf"
+      ],
+      "expected_rule_outcomes": {
+        "RULE-COMP-01": "pass",
+        "RULE-INC-01": "pass",
+        "RULE-TAX-01": "pass",
+        "RULE-ID-01": "pass"
+      }
+    },
+    "APP-00037": {
+      "seed": 37,
+      "split": "held-out",
+      "scenario": "missing_payslip",
+      "applicant_name": "Ananya Rao",
+      "generated_documents": [
+        "application.pdf",
+        "bank_statement.pdf",
+        "itr.pdf",
+        "kyc.pdf"
+      ],
+      "expected_rule_outcomes": {
+        "RULE-COMP-01": "flag",
+        "RULE-INC-01": "unknown",
+        "RULE-TAX-01": "unknown",
+        "RULE-ID-01": "pass"
+      }
+    },
+    "APP-00038": {
+      "seed": 38,
+      "split": "held-out",
+      "scenario": "salary_mismatch",
+      "applicant_name": "Kavita Iyer",
+      "generated_documents": [
+        "application.pdf",
+        "payslip_1.pdf",
+        "payslip_2.pdf",
+        "payslip_3.pdf",
+        "bank_statement.pdf",
+        "itr.pdf",
+        "kyc.pdf"
+      ],
+      "expected_rule_outcomes": {
+        "RULE-COMP-01": "pass",
+        "RULE-INC-01": "flag",
+        "RULE-TAX-01": "pass",
+        "RULE-ID-01": "pass"
+      }
+    },
+    "APP-00039": {
+      "seed": 39,
+      "split": "held-out",
+      "scenario": "bank_mismatch",
+      "applicant_name": "Rohan Verma",
+      "generated_documents": [
+        "application.pdf",
+        "payslip_1.pdf",
+        "payslip_2.pdf",
+        "payslip_3.pdf",
+        "bank_statement.pdf",
+        "itr.pdf",
+        "kyc.pdf"
+      ],
+      "expected_rule_outcomes": {
+        "RULE-COMP-01": "pass",
+        "RULE-INC-01": "flag",
+        "RULE-TAX-01": "pass",
+        "RULE-ID-01": "pass"
+      }
+    },
+    "APP-00040": {
+      "seed": 40,
+      "split": "held-out",
+      "scenario": "tax_mismatch",
+      "applicant_name": "Aarav Sharma",
+      "generated_documents": [
+        "application.pdf",
+        "payslip_1.pdf",
+        "payslip_2.pdf",
+        "payslip_3.pdf",
+        "bank_statement.pdf",
+        "itr.pdf",
+        "kyc.pdf"
+      ],
+      "expected_rule_outcomes": {
+        "RULE-COMP-01": "pass",
+        "RULE-INC-01": "pass",
+        "RULE-TAX-01": "flag",
+        "RULE-ID-01": "pass"
+      }
+    },
+    "APP-00041": {
+      "seed": 41,
+      "split": "held-out",
+      "scenario": "missing_itr",
+      "applicant_name": "Priya Patel",
+      "generated_documents": [
+        "application.pdf",
+        "payslip_1.pdf",
+        "payslip_2.pdf",
+        "payslip_3.pdf",
+        "bank_statement.pdf",
+        "kyc.pdf"
+      ],
+      "expected_rule_outcomes": {
+        "RULE-COMP-01": "flag",
+        "RULE-INC-01": "pass",
+        "RULE-TAX-01": "unknown",
+        "RULE-ID-01": "pass"
+      }
+    },
+    "APP-00042": {
+      "seed": 42,
+      "split": "held-out",
+      "scenario": "identity_mismatch",
+      "applicant_name": "Vikram Malhotra",
+      "generated_documents": [
+        "application.pdf",
+        "payslip_1.pdf",
+        "payslip_2.pdf",
+        "payslip_3.pdf",
+        "bank_statement.pdf",
+        "itr.pdf",
+        "kyc.pdf"
+      ],
+      "expected_rule_outcomes": {
+        "RULE-COMP-01": "pass",
+        "RULE-INC-01": "pass",
+        "RULE-TAX-01": "pass",
+        "RULE-ID-01": "flag"
+      }
+    },
+    "APP-00043": {
+      "seed": 43,
+      "split": "held-out",
+      "scenario": "multiple_inconsistencies",
+      "applicant_name": "Sneha Kulkarni",
+      "generated_documents": [
+        "application.pdf",
+        "payslip_1.pdf",
+        "payslip_2.pdf",
+        "payslip_3.pdf",
+        "bank_statement.pdf",
+        "itr.pdf",
+        "kyc.pdf"
+      ],
+      "expected_rule_outcomes": {
+        "RULE-COMP-01": "pass",
+        "RULE-INC-01": "flag",
+        "RULE-TAX-01": "flag",
+        "RULE-ID-01": "flag"
+      }
+    },
+    "APP-00044": {
+      "seed": 44,
+      "split": "held-out",
+      "scenario": "clean",
+      "applicant_name": "Rajesh Nair",
+      "generated_documents": [
+        "application.pdf",
+        "payslip_1.pdf",
+        "payslip_2.pdf",
+        "payslip_3.pdf",
+        "bank_statement.pdf",
+        "itr.pdf",
+        "kyc.pdf"
+      ],
+      "expected_rule_outcomes": {
+        "RULE-COMP-01": "pass",
+        "RULE-INC-01": "pass",
+        "RULE-TAX-01": "pass",
+        "RULE-ID-01": "pass"
+      }
+    },
+    "APP-00045": {
+      "seed": 45,
+      "split": "held-out",
+      "scenario": "multiple_inconsistencies",
+      "applicant_name": "Ananya Rao",
+      "generated_documents": [
+        "application.pdf",
+        "payslip_1.pdf",
+        "payslip_2.pdf",
+        "payslip_3.pdf",
+        "bank_statement.pdf",
+        "itr.pdf",
+        "kyc.pdf"
+      ],
+      "expected_rule_outcomes": {
+        "RULE-COMP-01": "pass",
+        "RULE-INC-01": "flag",
+        "RULE-TAX-01": "flag",
+        "RULE-ID-01": "flag"
+      }
+    },
+    "APP-00046": {
+      "seed": 46,
+      "split": "demo",
+      "scenario": "clean",
+      "applicant_name": "Kavita Iyer",
+      "generated_documents": [
+        "application.pdf",
+        "payslip_1.pdf",
+        "payslip_2.pdf",
+        "payslip_3.pdf",
+        "bank_statement.pdf",
+        "itr.pdf",
+        "kyc.pdf"
+      ],
+      "expected_rule_outcomes": {
+        "RULE-COMP-01": "pass",
+        "RULE-INC-01": "pass",
+        "RULE-TAX-01": "pass",
+        "RULE-ID-01": "pass"
+      }
+    },
+    "APP-00047": {
+      "seed": 47,
+      "split": "demo",
+      "scenario": "salary_mismatch",
+      "applicant_name": "Rohan Verma",
+      "generated_documents": [
+        "application.pdf",
+        "payslip_1.pdf",
+        "payslip_2.pdf",
+        "payslip_3.pdf",
+        "bank_statement.pdf",
+        "itr.pdf",
+        "kyc.pdf"
+      ],
+      "expected_rule_outcomes": {
+        "RULE-COMP-01": "pass",
+        "RULE-INC-01": "flag",
+        "RULE-TAX-01": "pass",
+        "RULE-ID-01": "pass"
+      }
+    },
+    "APP-00048": {
+      "seed": 48,
+      "split": "demo",
+      "scenario": "bank_mismatch",
+      "applicant_name": "Aarav Sharma",
+      "generated_documents": [
+        "application.pdf",
+        "payslip_1.pdf",
+        "payslip_2.pdf",
+        "payslip_3.pdf",
+        "bank_statement.pdf",
+        "itr.pdf",
+        "kyc.pdf"
+      ],
+      "expected_rule_outcomes": {
+        "RULE-COMP-01": "pass",
+        "RULE-INC-01": "flag",
+        "RULE-TAX-01": "pass",
+        "RULE-ID-01": "pass"
+      }
+    },
+    "APP-00049": {
+      "seed": 49,
+      "split": "demo",
+      "scenario": "tax_mismatch",
+      "applicant_name": "Priya Patel",
+      "generated_documents": [
+        "application.pdf",
+        "payslip_1.pdf",
+        "payslip_2.pdf",
+        "payslip_3.pdf",
+        "bank_statement.pdf",
+        "itr.pdf",
+        "kyc.pdf"
+      ],
+      "expected_rule_outcomes": {
+        "RULE-COMP-01": "pass",
+        "RULE-INC-01": "pass",
+        "RULE-TAX-01": "flag",
+        "RULE-ID-01": "pass"
+      }
+    },
+    "APP-00050": {
+      "seed": 50,
+      "split": "demo",
+      "scenario": "identity_mismatch",
+      "applicant_name": "Vikram Malhotra",
+      "generated_documents": [
+        "application.pdf",
+        "payslip_1.pdf",
+        "payslip_2.pdf",
+        "payslip_3.pdf",
+        "bank_statement.pdf",
+        "itr.pdf",
+        "kyc.pdf"
+      ],
+      "expected_rule_outcomes": {
+        "RULE-COMP-01": "pass",
+        "RULE-INC-01": "pass",
+        "RULE-TAX-01": "pass",
+        "RULE-ID-01": "flag"
+      }
+    }
+  }
+}

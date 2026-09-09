@@ -1,0 +1,84 @@
+{
+  "application_id": "APP-00039",
+  "seed": 39,
+  "scenario": "bank_mismatch",
+  "split": "held-out",
+  "expected_documents": [
+    "application.pdf",
+    "payslip_1.pdf",
+    "payslip_2.pdf",
+    "payslip_3.pdf",
+    "bank_statement.pdf",
+    "itr.pdf",
+    "kyc.pdf"
+  ],
+  "generated_document_names": [
+    "application.pdf",
+    "payslip_1.pdf",
+    "payslip_2.pdf",
+    "payslip_3.pdf",
+    "bank_statement.pdf",
+    "itr.pdf",
+    "kyc.pdf"
+  ],
+  "applicant_facts": {
+    "full_name": "Rohan Verma",
+    "dob": "1992-06-15",
+    "pan_number": "ABCDE2443F",
+    "aadhaar_masked": "XXXX-XXXX-3067",
+    "employer_name": "HCL Technologies Ltd"
+  },
+  "financial_ground_truth": {
+    "gross_monthly_salary": 170000.0,
+    "net_monthly_salary": 144500.0,
+    "deductions_total": 25500.0,
+    "annualized_gross_income": 2040000.0,
+    "bank_monthly_salary_credit": 65025.0,
+    "bank_opening_balance": 50000.0,
+    "bank_total_credits": 195075.0,
+    "bank_total_debits": 136552.5,
+    "bank_closing_balance": 108522.5,
+    "itr_gross_total_income": 2040000.0,
+    "total_tax_paid": 204000.0
+  },
+  "expected_rule_outcomes": {
+    "RULE-COMP-01": "pass",
+    "RULE-INC-01": "flag",
+    "RULE-TAX-01": "pass",
+    "RULE-ID-01": "pass"
+  },
+  "applicant_name": "Rohan Verma",
+  "injected_anomaly": "bank_mismatch",
+  "payslip": {
+    "employee_name": "Rohan Verma",
+    "employer_name": "HCL Technologies Ltd",
+    "gross_salary": 170000.0,
+    "net_salary": 144500.0,
+    "epf_deduction": 13600.0,
+    "tds_deduction": 11900.0
+  },
+  "bank_statement": {
+    "account_holder": "Rohan Verma",
+    "bank_name": "Axis Bank",
+    "account_number": "501001003549",
+    "monthly_salary_credits": [
+      65025.0,
+      65025.0,
+      65025.0
+    ],
+    "average_balance": 48835.12,
+    "bounced_transactions": 0
+  },
+  "tax_return": {
+    "assessee_name": "Rohan Verma",
+    "pan_number": "ABCDE2443F",
+    "gross_total_income": 2040000.0,
+    "total_tax_paid": 204000.0
+  },
+  "kyc": {
+    "full_name": "Rohan Verma",
+    "pan_number": "ABCDE2443F",
+    "dob": "1992-06-15",
+    "aadhaar_masked": "XXXX-XXXX-3067"
+  }
+}

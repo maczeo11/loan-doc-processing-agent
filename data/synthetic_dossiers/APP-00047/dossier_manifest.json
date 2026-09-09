@@ -1,0 +1,84 @@
+{
+  "application_id": "APP-00047",
+  "seed": 47,
+  "scenario": "salary_mismatch",
+  "split": "demo",
+  "expected_documents": [
+    "application.pdf",
+    "payslip_1.pdf",
+    "payslip_2.pdf",
+    "payslip_3.pdf",
+    "bank_statement.pdf",
+    "itr.pdf",
+    "kyc.pdf"
+  ],
+  "generated_document_names": [
+    "application.pdf",
+    "payslip_1.pdf",
+    "payslip_2.pdf",
+    "payslip_3.pdf",
+    "bank_statement.pdf",
+    "itr.pdf",
+    "kyc.pdf"
+  ],
+  "applicant_facts": {
+    "full_name": "Rohan Verma",
+    "dob": "1992-06-15",
+    "pan_number": "ABCDE2739F",
+    "aadhaar_masked": "XXXX-XXXX-3491",
+    "employer_name": "Wipro Enterprises Ltd"
+  },
+  "financial_ground_truth": {
+    "gross_monthly_salary": 150000.0,
+    "net_monthly_salary": 127500.0,
+    "deductions_total": 22500.0,
+    "annualized_gross_income": 1800000.0,
+    "bank_monthly_salary_credit": 57375.0,
+    "bank_opening_balance": 50000.0,
+    "bank_total_credits": 172125.0,
+    "bank_total_debits": 120487.5,
+    "bank_closing_balance": 101637.5,
+    "itr_gross_total_income": 1800000.0,
+    "total_tax_paid": 180000.0
+  },
+  "expected_rule_outcomes": {
+    "RULE-COMP-01": "pass",
+    "RULE-INC-01": "flag",
+    "RULE-TAX-01": "pass",
+    "RULE-ID-01": "pass"
+  },
+  "applicant_name": "Rohan Verma",
+  "injected_anomaly": "salary_mismatch",
+  "payslip": {
+    "employee_name": "Rohan Verma",
+    "employer_name": "Wipro Enterprises Ltd",
+    "gross_salary": 150000.0,
+    "net_salary": 127500.0,
+    "epf_deduction": 12000.0,
+    "tds_deduction": 10500.0
+  },
+  "bank_statement": {
+    "account_holder": "Rohan Verma",
+    "bank_name": "Axis Bank",
+    "account_number": "501001004277",
+    "monthly_salary_credits": [
+      57375.0,
+      57375.0,
+      57375.0
+    ],
+    "average_balance": 45736.88,
+    "bounced_transactions": 0
+  },
+  "tax_return": {
+    "assessee_name": "Rohan Verma",
+    "pan_number": "ABCDE2739F",
+    "gross_total_income": 1800000.0,
+    "total_tax_paid": 180000.0
+  },
+  "kyc": {
+    "full_name": "Rohan Verma",
+    "pan_number": "ABCDE2739F",
+    "dob": "1992-06-15",
+    "aadhaar_masked": "XXXX-XXXX-3491"
+  }
+}

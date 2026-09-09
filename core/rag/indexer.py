@@ -43,6 +43,9 @@ class IsolatedIndex:
         self.bm25_index: Any = None
         self._dense_embeddings: Optional[np.ndarray] = None
         self._dimension: Optional[int] = None
+        # Dense provenance: "unbuilt" | "external" | "bge" | "tfidf".
+        # The retriever uses this to pick a dimension-compatible query encoding.
+        self.embedding_kind: str = "unbuilt"
         self._corpus_tokens: List[List[str]] = []
         self._tfidf_vectorizer: Any = None
 
@@ -50,10 +53,15 @@ class IsolatedIndex:
         self,
         chunks: List[DocumentChunk],
         embeddings: Optional[Union[List[List[float]], np.ndarray]] = None,
+        use_bge: Optional[bool] = None,
     ) -> None:
         """
         Add chunks to both lexical BM25 and dense FAISS index.
         Maintains order alignment between chunks, BM25 corpus, and FAISS vectors.
+
+        Dense priority: explicit `embeddings` > BGE (BAAI/bge-small-en-v1.5,
+        unless FINSCAN_USE_BGE=0 or the model is unavailable) > TF-IDF fallback.
+        `use_bge=False` forces the deterministic TF-IDF path (CI / eval default).
         """
         if not chunks:
             return
@@ -95,21 +103,23 @@ class IsolatedIndex:
             emb_array = np.array(embeddings, dtype=np.float32)
             if emb_array.ndim == 1:
                 emb_array = emb_array.reshape(1, -1)
-            self._add_embeddings_to_faiss(emb_array)
+            self._set_external_embeddings(emb_array)
+        elif use_bge is not False:
+            bge_vecs = self._try_bge_for_new_chunks(new_chunk_ids)
+            if bge_vecs is not None:
+                self._append_dense_vectors(bge_vecs, kind="bge")
+            else:
+                # Generate deterministic dense representation using TF-IDF when external embeddings omitted
+                self._build_fallback_dense_index()
         else:
             # Generate deterministic dense representation using TF-IDF when external embeddings omitted
             self._build_fallback_dense_index()
 
-    def _add_embeddings_to_faiss(self, emb_array: np.ndarray) -> None:
-        """Normalizes vectors and updates FAISS exact flat index."""
-        if emb_array.shape[0] != len(self._chunk_ids):
-            # If batch added, ensure shapes match
-            if self._dense_embeddings is not None:
-                emb_array = np.vstack([self._dense_embeddings, emb_array])
-
-        dim = emb_array.shape[1]
+    def _set_dense_matrix(self, matrix: np.ndarray, kind: str) -> None:
+        """Normalizes vectors and (re)builds the FAISS exact flat index."""
+        dim = matrix.shape[1]
         self._dimension = dim
-        self._dense_embeddings = emb_array.astype(np.float32)
+        self._dense_embeddings = matrix.astype(np.float32)
 
         # L2 normalize for cosine similarity via inner product
         norms = np.linalg.norm(self._dense_embeddings, axis=1, keepdims=True)
@@ -122,6 +132,59 @@ class IsolatedIndex:
             self.faiss_index = index
         else:  # pragma: no cover
             self.faiss_index = None
+        self.embedding_kind = kind
+
+    def _set_external_embeddings(self, emb_array: np.ndarray) -> None:
+        """Stores caller-supplied vectors, stacking onto prior rows on incremental adds."""
+        arr = np.asarray(emb_array, dtype=np.float32)
+        if arr.ndim == 1:
+            arr = arr.reshape(1, -1)
+        if self._dense_embeddings is not None and self._dense_embeddings.shape[0] > 0:
+            if arr.shape[1] != self._dimension:
+                logger.warning("External embedding dim mismatch; replacing dense matrix.")
+            elif arr.shape[0] + self._dense_embeddings.shape[0] == len(self._chunk_ids):
+                arr = np.vstack([self._dense_embeddings, arr])
+        self._set_dense_matrix(arr, kind="external")
+
+    def _append_dense_vectors(self, vecs: np.ndarray, kind: str) -> None:
+        """Appends vectors for newly added chunks, stacking onto prior rows."""
+        arr = np.asarray(vecs, dtype=np.float32)
+        if arr.ndim == 1:
+            arr = arr.reshape(1, -1)
+        if self._dense_embeddings is not None and self._dense_embeddings.shape[0] > 0:
+            if arr.shape[1] != self._dimension:
+                logger.warning("Dense dim mismatch; rebuilding TF-IDF fallback index instead.")
+                self._build_fallback_dense_index()
+                return
+            expected_new = len(self._chunk_ids) - self._dense_embeddings.shape[0]
+            if arr.shape[0] == expected_new:
+                arr = np.vstack([self._dense_embeddings, arr])
+            elif arr.shape[0] != len(self._chunk_ids):
+                logger.warning("Embedding batch size mismatch; rebuilding TF-IDF fallback index instead.")
+                self._build_fallback_dense_index()
+                return
+        self._set_dense_matrix(arr, kind=kind)
+
+    def _try_bge_for_new_chunks(self, new_chunk_ids: List[str]) -> Optional[np.ndarray]:
+        """Embeds newly added chunks with BGE. Returns None when disabled/unavailable/incompatible."""
+        if not new_chunk_ids:
+            return None
+        try:
+            from core.rag.embeddings import (
+                BGE_DIMENSION,
+                embed_texts,
+                is_bge_enabled,
+                is_bge_installed,
+            )
+        except Exception:  # pragma: no cover
+            return None
+        if not is_bge_enabled() or not is_bge_installed():
+            return None
+        if self._dimension is not None and self._dimension != BGE_DIMENSION:
+            logger.warning("Index already uses dim %s; skipping BGE to keep query encoding compatible.", self._dimension)
+            return None
+        texts = [self.chunks[cid].text for cid in new_chunk_ids]
+        return embed_texts(texts)
 
     def _build_fallback_dense_index(self) -> None:
         """Creates dense TF-IDF vectors as fallback dense representation."""
@@ -135,7 +198,7 @@ class IsolatedIndex:
             vectorizer = TfidfVectorizer(max_features=256, stop_words="english")
             tfidf_mat = vectorizer.fit_transform(corpus_texts).toarray().astype(np.float32)
             self._tfidf_vectorizer = vectorizer
-            self._add_embeddings_to_faiss(tfidf_mat)
+            self._set_dense_matrix(tfidf_mat, kind="tfidf")
         except Exception as e:  # pragma: no cover
             logger.warning(f"Could not build TF-IDF dense fallback: {e}")
 
@@ -276,9 +339,10 @@ class IndexManager:
         """Clears all cached application indices."""
         self._app_indices.clear()
 
-    def load_policy_corpus(self, policy_dir: str = "policies") -> IsolatedIndex:
+    def load_policy_corpus(self, policy_dir: str = "policies", use_bge: Optional[bool] = None) -> IsolatedIndex:
         """
         Loads all markdown policy files from policy_dir into the shared policy index.
+        `use_bge=False` forces TF-IDF; None auto-tries BGE unless FINSCAN_USE_BGE=0.
         """
         policy_index = self.get_policy_index()
         if not os.path.exists(policy_dir):
@@ -289,7 +353,7 @@ class IndexManager:
         for p_file in sorted(policy_files):
             try:
                 chunks = load_and_chunk_policy_file(p_file)
-                policy_index.add_chunks(chunks)
+                policy_index.add_chunks(chunks, use_bge=use_bge)
                 logger.info(f"Loaded {len(chunks)} chunks from policy file: {p_file}")
             except Exception as e:
                 logger.error(f"Failed to load policy file {p_file}: {e}")

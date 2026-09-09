@@ -120,16 +120,14 @@ export const PdfPage: React.FC<PdfPageProps> = ({
         }}
         className="relative bg-white rounded-sm shadow-xl overflow-hidden border border-[#D5CFC5]"
       >
-        {/* Synthetic Demo Watermark per Skill 5 */}
-        <div className="absolute inset-0 pointer-events-none flex items-center justify-center z-20 overflow-hidden">
-          <span className="text-red-700/15 font-black text-3xl sm:text-4xl tracking-widest uppercase rotate-[-30deg] select-none border-4 border-red-700/15 px-6 py-2">
-            SYNTHETIC DEMO — NOT VALID
-          </span>
-        </div>
 
         {/* Real PDF Canvas */}
         {pdfDoc && !renderError ? (
           <canvas ref={canvasRef} className="block" />
+        ) : pdfDoc === null && !renderError ? (
+          <div className="w-full h-full flex items-center justify-center bg-gray-100 animate-pulse">
+            <span className="text-sm text-gray-500">Loading document...</span>
+          </div>
         ) : (
           /* High-Fidelity Vector Document Fallback if PDF binary is offline */
           <div className="w-full h-full p-8 flex flex-col justify-between text-stone-800 bg-[#FDFBF7] font-sans">

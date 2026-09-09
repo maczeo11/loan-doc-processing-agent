@@ -14,6 +14,7 @@ import time
 import uuid
 import hashlib
 import logging
+import weakref
 from typing import Optional, Tuple
 from fastapi import Request, HTTPException, status, Depends
 import redis.asyncio as aioredis
@@ -24,7 +25,11 @@ logger = logging.getLogger("finscan.rate_limit")
 
 _redis_client: Optional[aioredis.Redis] = None
 _local_fake_redis: Optional[any] = None
-_last_test_db_override: Optional[int] = None
+# Weak reference to the last-seen get_db dependency override. A weakref (not
+# id()) identifies test isolation boundaries: id() values are recycled by
+# CPython after the previous fixture closure is garbage-collected, which
+# silently reused a stale FakeRedis across tests and caused phantom 429s.
+_last_test_db_override_ref = None
 
 
 async def get_redis_client() -> aioredis.Redis:
@@ -33,7 +38,7 @@ async def get_redis_client() -> aioredis.Redis:
     In local development, falls back to in-memory fake if local Redis is offline.
     In cloud/production, strictly connects to configured REDIS_URL.
     """
-    global _redis_client, _local_fake_redis, _last_test_db_override
+    global _redis_client, _local_fake_redis, _last_test_db_override_ref
 
     if _redis_client is not None:
         return _redis_client
@@ -62,17 +67,25 @@ async def get_redis_client() -> aioredis.Redis:
         return _redis_client
     except Exception:
         # In test environments where each test configures an isolated DB session fixture,
-        # automatically provide an aligned fresh in-memory FakeRedis instance
+        # automatically provide an aligned fresh in-memory FakeRedis instance.
+        # Identity is tracked via weakref: a new override object means a new test.
         try:
             from apps.api.main import app
             from apps.api.db.session import get_db
 
             current_db_override = app.dependency_overrides.get(get_db)
             if current_db_override is not None:
-                override_id = id(current_db_override)
-                if _last_test_db_override != override_id:
+                previous = (
+                    _last_test_db_override_ref()
+                    if _last_test_db_override_ref is not None
+                    else None
+                )
+                if previous is not current_db_override:
+                    try:
+                        _last_test_db_override_ref = weakref.ref(current_db_override)
+                    except TypeError:
+                        _last_test_db_override_ref = None
                     import fakeredis.aioredis
-                    _last_test_db_override = override_id
                     _local_fake_redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
                     return _local_fake_redis
         except Exception:
@@ -87,7 +100,7 @@ async def get_redis_client() -> aioredis.Redis:
 
 async def close_redis_client():
     """Safely closes active Redis connection on application shutdown."""
-    global _redis_client, _local_fake_redis, _last_test_db_override
+    global _redis_client, _local_fake_redis, _last_test_db_override_ref
     if _redis_client is not None:
         try:
             await _redis_client.aclose()
@@ -95,7 +108,7 @@ async def close_redis_client():
             logger.warning(f"Error closing Redis client: {err}")
         _redis_client = None
     _local_fake_redis = None
-    _last_test_db_override = None
+    _last_test_db_override_ref = None
 
 
 def resolve_user_identity(request: Request) -> str:

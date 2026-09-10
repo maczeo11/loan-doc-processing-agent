@@ -1,0 +1,23 @@
+# FinScan AI Docker build context exclusions.
+# Keeps image builds fast and avoids baking local/dev artifacts into images.
+# NOTE: apps/ui/dist is intentionally INCLUDED (served same-origin by FastAPI).
+.git/
+.gitignore
+.github/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+venv/
+.venv/
+apps/ui/node_modules/
+demo_live/
+docs/
+data/synthetic_dossiers/
+*.log
+vite-5174.log
+docker-rebuild.log
+.DS_Store
+Thumbs.db

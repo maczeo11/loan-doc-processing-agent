@@ -53,10 +53,20 @@ def to_jsonable(value: Any) -> Any:
 
 
 def normalize_sync_dsn(dsn: str) -> str:
-    """Worker env may carry an asyncpg DSN; sync engine needs psycopg."""
-    if dsn.startswith("postgresql+asyncpg://"):
-        return "postgresql+psycopg://" + dsn[len("postgresql+asyncpg://"):]
-    return dsn
+    """Worker env may carry an asyncpg or bare DSN; sync engine needs psycopg.
+
+    NOTE: match the scheme exactly (never str.startswith("postgresql://")
+    on a possibly AsyncCompatibleDsn-wrapped value — its startswith lies).
+    """
+    scheme, sep, rest = str(dsn).partition("://")
+    if not sep:
+        return str(dsn)
+    if scheme == "postgresql+asyncpg":
+        return "postgresql+psycopg://" + rest
+    if scheme in ("postgresql", "postgres"):
+        # Bare sync URL: SQLAlchemy would default to psycopg2 (not installed).
+        return "postgresql+psycopg://" + rest
+    return str(dsn)
 
 
 def persist_pipeline_result(

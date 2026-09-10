@@ -4,8 +4,11 @@ HUMAN-ONLY ZONE: Owned by Member 4 (Sravanthi).
 
 Generates realistic multi-document PDF retail loan dossiers with controlled anomalies
 for testing, model evaluation, and live hackathon demonstrations.
-Uses a deterministic synthetic schema inspired by retail banking loan appraisal domains
-(no external Kaggle CSV required).
+Uses a deterministic synthetic schema inspired by retail banking loan appraisal domains.
+Financial realism can optionally be seeded from real Kaggle tabular loan records
+(`--kaggle-csv`): income/loan/cibil/asset columns flow into the dossier, while all
+names, employers, banks and IDs stay fictional. The Kaggle `loan_status` column is
+NEVER read (no tabular credit-approval label anywhere in this pipeline).
 
 Invariants:
   1. Deterministic generation: Same seed always generates identical dossier values.
@@ -14,11 +17,15 @@ Invariants:
   4. Internal arithmetic consistency: opening + credits - debits = closing balance; gross - deductions = net.
   5. Ground truth manifest contains expected outcomes and details for all 4 deterministic rules:
      RULE-COMP-01, RULE-INC-01, RULE-TAX-01, RULE-ID-01.
+  6. Every manifest carries a `provenance` block (source row ID, dataset version,
+     seed) kept strictly outside feature inputs.
 """
 
 import argparse
+import csv
 import json
 import os
+import random
 from typing import Any, Dict, List, Optional, Tuple
 
 import pymupdf
@@ -61,6 +68,83 @@ SUPPORTED_SCENARIOS = [
     "identity_mismatch",
     "multiple_inconsistencies",
 ]
+
+# Kaggle tabular seed wiring (AGENTS.md section 8.2).
+# Only financial/demographic realism columns are consumed. `loan_status` is
+# deliberately absent: it must never become a dossier label or model feature.
+KAGGLE_DATASET_VERSION = "kaggle_loan_approval_v1"
+KAGGLE_FINANCIAL_COLUMNS = [
+    "income_annum",
+    "loan_amount",
+    "loan_term",
+    "cibil_score",
+    "no_of_dependents",
+    "education",
+    "self_employed",
+    "residential_assets_value",
+    "commercial_assets_value",
+    "luxury_assets_value",
+    "bank_asset_value",
+]
+KAGGLE_ASSET_COLUMNS = [
+    "residential_assets_value",
+    "commercial_assets_value",
+    "luxury_assets_value",
+    "bank_asset_value",
+]
+
+
+def _to_float(value: Any, field: str, row_id: str) -> float:
+    """Strict float coercion for Kaggle numeric cells (blank -> error, never silent 0)."""
+    text = str(value).strip() if value is not None else ""
+    if not text:
+        raise ValueError(f"Kaggle row {row_id}: blank numeric cell in '{field}'")
+    return float(text)
+
+
+def load_kaggle_rows(csv_path: str) -> List[Dict[str, Any]]:
+    """
+    Loads Kaggle loan-approval rows in file order (deterministic, no shuffling).
+    Validates that every required financial column is present; `loan_status`
+    is ignored even if present.
+    """
+    rows: List[Dict[str, Any]] = []
+    with open(csv_path, "r", encoding="utf-8-sig", newline="") as f:
+        reader = csv.DictReader(f)
+        # Real-world CSVs often carry leading spaces / BOM in headers — normalize.
+        key_map = {(name.strip() if name else ""): name for name in (reader.fieldnames or [])}
+        missing = [c for c in (["loan_id"] + KAGGLE_FINANCIAL_COLUMNS) if c not in key_map]
+        if missing:
+            raise ValueError(f"Kaggle CSV {csv_path} missing columns: {missing}")
+        for record in reader:
+            row_id = str(record[key_map["loan_id"]]).strip()
+            if not row_id:
+                continue
+            cleaned: Dict[str, Any] = {"loan_id": row_id}
+            for col in KAGGLE_FINANCIAL_COLUMNS:
+                cell = record[key_map[col]]
+                if col in ("education", "self_employed"):
+                    cleaned[col] = str(cell).strip()
+                elif col == "no_of_dependents":
+                    cleaned[col] = int(str(cell).strip())
+                else:
+                    cleaned[col] = _to_float(cell, col, row_id)
+            rows.append(cleaned)
+    if not rows:
+        raise ValueError(f"Kaggle CSV {csv_path} contained no usable rows")
+    return rows
+
+
+def sample_kaggle_rows(
+    rows: List[Dict[str, Any]],
+    n: int,
+    seed: int = 42,
+) -> List[Dict[str, Any]]:
+    """Deterministically samples n Kaggle rows (seeded, reproducible)."""
+    if n > len(rows):
+        raise ValueError(f"Requested {n} Kaggle rows but CSV only holds {len(rows)}")
+    rng = random.Random(seed)
+    return rng.sample(rows, n)
 
 
 def render_synthetic_pdf(
@@ -146,6 +230,7 @@ def generate_dossier(
     scenario: str = "clean",
     output_dir: Optional[str] = None,
     split: Optional[str] = None,
+    kaggle_row: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
     Generates a deterministic synthetic loan dossier with ground truth manifest and PDFs.
@@ -155,6 +240,11 @@ def generate_dossier(
       scenario: One of SUPPORTED_SCENARIOS.
       output_dir: Directory to output the dossier folder. Defaults to data/synthetic_dossiers.
       split: Optional dataset split name (e.g. 'dev', 'tuning', 'held-out', 'demo').
+      kaggle_row: Optional Kaggle tabular record (see load_kaggle_rows). When given,
+        income/loan/cibil/asset columns seed the financial baseline (income/12 =
+        monthly gross) and are recorded under `provenance` + `tabular_features`.
+        Identity fields (names, employers, banks, IDs) always stay fictional.
+        `loan_status` is never consumed.
     """
     if scenario not in SUPPORTED_SCENARIOS:
         raise ValueError(f"Unknown scenario '{scenario}'. Supported: {SUPPORTED_SCENARIOS}")
@@ -175,8 +265,28 @@ def generate_dossier(
     account_number = f"50100{1000000 + (seed * 91) % 9000000}"
     dob = "1992-06-15"
 
-    # Deterministic Financial Baseline
-    monthly_gross = round(80000.0 + (seed % 10) * 10000.0, 2)
+    # Deterministic Financial Baseline (synthetic-schema defaults; Kaggle row
+    # overrides when provided — annual income / 12 is the derived monthly gross)
+    loan_amount = 3500000.0
+    loan_term_years = 15
+    cibil_score: Optional[int] = None
+    tabular_extra: Dict[str, Any] = {}
+    if kaggle_row is not None:
+        kaggle_income = float(kaggle_row["income_annum"])
+        monthly_gross = round(kaggle_income / 12.0, 2)
+        loan_amount = float(kaggle_row["loan_amount"])
+        loan_term_years = int(float(kaggle_row["loan_term"]))
+        cibil_score = int(float(kaggle_row["cibil_score"]))
+        tabular_extra = {
+            "no_of_dependents": kaggle_row["no_of_dependents"],
+            "education": kaggle_row["education"],
+            "self_employed": kaggle_row["self_employed"],
+            "income_annum": kaggle_row["income_annum"],
+            "cibil_score": cibil_score,
+            "assets_total": round(sum(float(kaggle_row[c]) for c in KAGGLE_ASSET_COLUMNS), 2),
+        }
+    else:
+        monthly_gross = round(80000.0 + (seed % 10) * 10000.0, 2)
     epf_deduction = round(monthly_gross * 0.08, 2)
     tds_deduction = round(monthly_gross * 0.07, 2)
     deductions_total = round(epf_deduction + tds_deduction, 2)
@@ -350,8 +460,8 @@ def generate_dossier(
             ("Employer Name", company_name),
             ("Stated Monthly Gross Income", f"INR {monthly_gross:,.2f}"),
             ("Stated Monthly Net Income", f"INR {net_salary:,.2f}"),
-            ("Loan Amount Requested", "INR 3,500,000.00"),
-            ("Loan Term (Years)", "15"),
+            ("Loan Amount Requested", f"INR {loan_amount:,.2f}"),
+            ("Loan Term (Years)", f"{loan_term_years}"),
             ("Purpose of Loan", "Personal / Home Improvement"),
             ("Declaration", "I hereby declare that all information provided is true and accurate."),
         ],
@@ -482,11 +592,34 @@ def generate_dossier(
     }
 
     # Ground Truth Manifest
+    if kaggle_row is not None:
+        provenance: Dict[str, Any] = {
+            "source": "kaggle",
+            "csv": "data/kaggle_loan_approval_dataset.csv",
+            "dataset_version": KAGGLE_DATASET_VERSION,
+            "source_row_id": kaggle_row["loan_id"],
+            "generator_seed": seed,
+        }
+    else:
+        provenance = {
+            "source": "synthetic-schema",
+            "dataset_version": KAGGLE_DATASET_VERSION,
+            "source_row_id": None,
+            "generator_seed": seed,
+        }
+    tabular_features: Dict[str, Any] = {
+        "loan_amount": loan_amount,
+        "loan_term": loan_term_years,
+        "cibil_score": cibil_score,
+    }
+    tabular_features.update(tabular_extra)
     manifest: Dict[str, Any] = {
         "application_id": app_id,
         "seed": seed,
         "scenario": scenario,
         "split": split,
+        "provenance": provenance,
+        "tabular_features": tabular_features,
         "expected_documents": expected_docs,
         "generated_document_names": generated_docs,
         "baseline_values": baseline_values,
@@ -588,6 +721,7 @@ SPLIT_SCENARIOS: Dict[str, List[str]] = {
 def generate_dataset(
     output_dir: Optional[str] = None,
     base_seed: int = 1,
+    kaggle_rows: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
     """
     Generates the complete synthetic dataset of 50 dossiers across 4 splits:
@@ -595,6 +729,9 @@ def generate_dataset(
       - 10 tuning (seeds 26 to 35)
       - 10 held-out (seeds 36 to 45)
       - 5 demo (seeds 46 to 50)
+
+    When kaggle_rows is given it must hold exactly 50 records, consumed in order
+    (dossier i uses row i); each manifest records its source row ID.
 
     Saves each dossier in <output_dir>/APP-xxxxx/ and writes
     <output_dir>/dataset_splits.json as the authoritative master split manifest.
@@ -608,6 +745,13 @@ def generate_dataset(
     dossiers_summary: Dict[str, Dict[str, Any]] = {}
     current_seed = base_seed
 
+    total_expected = sum(DATASET_SPLITS.values())
+    if kaggle_rows is not None and len(kaggle_rows) != total_expected:
+        raise ValueError(
+            f"Expected {total_expected} Kaggle rows for the full dataset, got {len(kaggle_rows)}"
+        )
+    row_cursor = 0
+
     for split_name, count in DATASET_SPLITS.items():
         scenarios = SPLIT_SCENARIOS[split_name]
         if len(scenarios) != count:
@@ -618,7 +762,9 @@ def generate_dataset(
                 scenario=scenario,
                 output_dir=output_dir,
                 split=split_name,
+                kaggle_row=kaggle_rows[row_cursor] if kaggle_rows is not None else None,
             )
+            row_cursor += 1 if kaggle_rows is not None else 0
             app_id = manifest["application_id"]
             splits_manifest[split_name].append(app_id)
             dossiers_summary[app_id] = {
@@ -628,6 +774,7 @@ def generate_dataset(
                 "applicant_name": manifest["applicant_facts"]["full_name"],
                 "generated_documents": manifest["generated_document_names"],
                 "expected_rule_outcomes": manifest["expected_rule_outcomes"],
+                "source_row_id": manifest["provenance"].get("source_row_id"),
             }
             current_seed += 1
 
@@ -684,6 +831,26 @@ if __name__ == "__main__":
         action="store_true",
         help="Generate the full 50-dossier dataset across all 4 splits",
     )
+    parser.add_argument(
+        "--kaggle-csv",
+        type=str,
+        default=None,
+        help="Optional Kaggle loan-approval CSV seeding financial realism "
+        "(columns: income_annum, loan_amount, loan_term, cibil_score, assets; "
+        "loan_status is never read)",
+    )
+    parser.add_argument(
+        "--kaggle-n",
+        type=int,
+        default=50,
+        help="Number of Kaggle rows to sample deterministically (default: 50)",
+    )
+    parser.add_argument(
+        "--kaggle-seed",
+        type=int,
+        default=42,
+        help="Seed for deterministic Kaggle row sampling (default: 42)",
+    )
 
     args = parser.parse_args()
 
@@ -691,17 +858,30 @@ if __name__ == "__main__":
     target_dir = args.output_dir if args.output_dir is not None else default_dir
     os.makedirs(target_dir, exist_ok=True)
 
+    sampled_rows: Optional[List[Dict[str, Any]]] = None
+    if args.kaggle_csv is not None:
+        all_rows = load_kaggle_rows(args.kaggle_csv)
+        if args.scenario:
+            sampled_rows = sample_kaggle_rows(all_rows, 1, seed=args.kaggle_seed)
+        else:
+            sampled_rows = sample_kaggle_rows(all_rows, args.kaggle_n, seed=args.kaggle_seed)
+        print(f"Seeded {len(sampled_rows)} dossier(s) from Kaggle rows of {args.kaggle_csv}")
+
     if args.scenario:
         print(f"Generating single dossier for scenario '{args.scenario}' with seed {args.seed}...")
         single_manifest = generate_dossier(
             seed=args.seed,
             scenario=args.scenario,
             output_dir=target_dir,
+            kaggle_row=sampled_rows[0] if sampled_rows else None,
         )
         print(f"Generated dossier: {single_manifest['application_id']} in {target_dir}")
         print(f"Expected rule outcomes: {single_manifest['expected_rule_outcomes']}")
+        print(f"Provenance: {single_manifest['provenance']}")
     else:
         print(f"Generating Deterministic Synthetic Loan Dataset (50 dossiers) with base seed {args.seed}...")
-        ds_manifest = generate_dataset(output_dir=target_dir, base_seed=args.seed)
+        ds_manifest = generate_dataset(
+            output_dir=target_dir, base_seed=args.seed, kaggle_rows=sampled_rows
+        )
         print(f"Complete dataset generated: {ds_manifest['total_dossiers']} dossiers.")
         print(f"Split distribution: {ds_manifest['split_counts']}")

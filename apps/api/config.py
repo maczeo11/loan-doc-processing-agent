@@ -50,8 +50,10 @@ class Settings(BaseSettings):
     OPENCODE_API_KEY: str = ""
 
     # Rate limits & spend guards
+    # Uploads raised 5 -> 20/min: a full 7-file dossier must upload in one
+    # burst without tripping the limiter (abuse still capped; polls unchanged).
     MAX_ACTIVE_JOBS_PER_USER: int = 2
-    MAX_SUBMISSIONS_PER_MIN: int = 5
+    MAX_SUBMISSIONS_PER_MIN: int = 20
     MAX_STATUS_POLLS_PER_MIN: int = 30
     SPEND_GUARD_RESERVATION_TTL_SECONDS: int = 900  # 15 minutes safety TTL
     MAX_FILE_SIZE_MB: int = 10

@@ -40,18 +40,21 @@ export const PolicyQaTab: React.FC<PolicyQaTabProps> = ({ applicationId }) => {
 
     try {
       const resp = await api.askQuestion(applicationId || 'APP-25195', { question: q });
-      setHistory((prev) => [{
-        question: q,
-        answer: resp.answer,
-        is_grounded: true,
-        citations: resp.citations.map(c => ({
-          chunk_id: c.chunk_id || '',
-          policy_name: c.title || 'Policy',
-          section: c.section || '',
-          text: c.text || '',
-          score: 0.9,
-        })),
-      }, ...prev]);
+      setHistory((prev) => [
+        {
+          question: q,
+          answer: resp.answer,
+          is_grounded: true,
+          citations: resp.citations.map((c) => ({
+            chunk_id: c.chunk_id || '',
+            policy_name: c.title || 'Policy',
+            section: c.section || '',
+            text: c.text || '',
+            score: 0.9,
+          })),
+        },
+        ...prev,
+      ]);
     } catch {
       // Fallback — API not available in demo mode
     } finally {
@@ -68,12 +71,12 @@ export const PolicyQaTab: React.FC<PolicyQaTabProps> = ({ applicationId }) => {
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
           placeholder="Ask policy guidelines (e.g. DTI limits, salary tolerance)..."
-          className="w-full bg-white border border-[#E3DDD3] rounded py-2 pl-3 pr-9 text-xs text-stone-900 placeholder-stone-400 focus:outline-none focus:border-stone-800 shadow-xs transition-colors"
+          className="w-full bg-theme-card border border-theme-border rounded-xs py-2 pl-3 pr-9 text-xs text-theme-primary placeholder-theme-muted focus:outline-none focus:border-theme-brand shadow-xs transition-colors"
         />
         <button
           type="submit"
           disabled={loading || !question.trim()}
-          className="absolute right-1.5 top-1/2 -translate-y-1/2 p-1.5 text-stone-600 hover:text-stone-900 disabled:opacity-40 transition-opacity"
+          className="absolute right-1.5 top-1/2 -translate-y-1/2 p-1.5 text-theme-muted hover:text-theme-primary disabled:opacity-40 transition-opacity cursor-pointer"
         >
           {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
         </button>
@@ -82,27 +85,27 @@ export const PolicyQaTab: React.FC<PolicyQaTabProps> = ({ applicationId }) => {
       {/* Q&A Stream */}
       <div className="space-y-3">
         {history.map((item, idx) => (
-          <div key={idx} className="p-3.5 rounded bg-white border border-[#E3DDD3] shadow-sm text-xs space-y-2">
+          <div
+            key={idx}
+            className="p-3.5 rounded-xs bg-theme-card border border-theme-border shadow-xs text-xs space-y-2"
+          >
             <div className="flex items-start gap-2">
-              <BookOpen className="w-3.5 h-3.5 text-[#14532D] mt-0.5 flex-shrink-0" />
-              <p className="font-serif font-bold text-stone-900 text-xs">{item.question}</p>
+              <BookOpen className="w-3.5 h-3.5 text-theme-pass mt-0.5 flex-shrink-0" />
+              <p className="font-serif font-bold text-theme-primary text-xs">{item.question}</p>
             </div>
 
-            <p className="text-stone-700 text-xs leading-relaxed pl-5.5">
+            <p className="text-theme-secondary text-xs leading-relaxed pl-5.5">
               {item.answer}
             </p>
 
             {item.citations.length > 0 && (
-              <div className="mt-2 pt-2 border-t border-[#E3DDD3] pl-5.5 space-y-1.5">
-                <div className="flex items-center gap-1.5 text-[10px] uppercase font-mono font-semibold text-[#14532D]">
+              <div className="mt-2 pt-2 border-t border-theme-border pl-5.5 space-y-1.5">
+                <div className="flex items-center gap-1.5 text-[10px] uppercase font-mono font-semibold text-theme-pass">
                   <ShieldCheck className="w-3 h-3" />
                   <span>Authoritative Citation: {item.citations[0].policy_name}</span>
                 </div>
-                <div className="p-2 rounded bg-[#FBF9F5] border border-[#E3DDD3] text-[11px] font-mono text-stone-800">
-                  <p className="text-stone-500 mb-1 text-[10px] font-bold">
-                    {item.citations[0].section} (Score: {(item.citations[0].score * 100).toFixed(0)}%)
-                  </p>
-                  <p className="italic font-serif">&ldquo;{item.citations[0].text}&rdquo;</p>
+                <div className="bg-theme-panel p-2 rounded-xs border border-theme-border text-[11px] text-theme-secondary font-mono italic">
+                  &ldquo;{item.citations[0].text}&rdquo;
                 </div>
               </div>
             )}

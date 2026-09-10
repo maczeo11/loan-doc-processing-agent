@@ -5,10 +5,11 @@ import { RightInspectorPane } from './components/layout/RightInspectorPane';
 import { PdfViewer } from './components/viewer/PdfViewer';
 import { KeyboardShortcutsModal } from './components/common/KeyboardShortcutsModal';
 import { ReviewActionModal } from './components/review/ReviewActionModal';
-import { DEMO_DOSSIER_APP_25195 } from './data/mockDossier';
+import { DEMO_DOSSIER_APP_25195, getDemoDossier } from './data/mockDossier';
 import { getDocumentTitle } from './utils/documentHelper';
 import { EvidenceNavigationProvider, useEvidenceNavigation } from './context/EvidenceNavigationContext';
 import { AuthProvider } from './context/AuthContext';
+import { ThemeProvider } from './context/ThemeContext';
 import type { LoanApplicationState } from './types/contracts';
 import type { LoanApplication, DossierDocument } from './types/application';
 import type { EvidenceRef } from './types/evidence';
@@ -43,6 +44,8 @@ function toLoanApplication(state: LoanApplicationState): LoanApplication {
     } as DossierDocument;
   });
 
+  const history = state.status_history || [];
+
   return {
     id: state.application_id,
     applicant_name: state.applicant?.full_name || 'Applicant',
@@ -50,7 +53,8 @@ function toLoanApplication(state: LoanApplicationState): LoanApplication {
     loan_amount: 2500000, // Demo seed value: ₹ 25,00,000
     currency: 'INR',
     status: state.status,
-    created_at: state.status_history?.[0]?.timestamp || new Date().toISOString(),
+    created_at: history[0]?.timestamp || new Date().toISOString(),
+    updated_at: history.length > 0 ? history[history.length - 1].timestamp : undefined,
     documents,
     findings: state.findings || [],
     payslip_facts: state.payslip || undefined,
@@ -83,12 +87,21 @@ function AppInner({
   const [reviewDecision, setReviewDecision] = useState<ReviewDecision | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Finding focus state
+  // Finding focus + inspection tracking
   const [focusedFindingIndex, setFocusedFindingIndex] = useState<number>(0);
+  const [inspectedKeys, setInspectedKeys] = useState<Set<string>>(new Set());
 
   // Evidence navigation
   const { activeEvidence, navigateToEvidence } = useEvidenceNavigation();
   const activeEvidenceKey = activeEvidence ? getEvidenceKey(activeEvidence) : null;
+
+  const markInspected = useCallback((ev: EvidenceRef) => {
+    setInspectedKeys((prev) => {
+      const next = new Set(prev);
+      next.add(getEvidenceKey(ev));
+      return next;
+    });
+  }, []);
 
   // Convert state to LoanApplication for Swiss components
   const application = useMemo(() => toLoanApplication(dossierState), [dossierState]);
@@ -96,12 +109,13 @@ function AppInner({
   const fetchApplicationData = useCallback(async () => {
     setIsLoading(true);
     try {
-      // Always use demo data for now (backend not yet serving GET /applications/{id})
-      setDossierState(DEMO_DOSSIER_APP_25195);
-      if (DEMO_DOSSIER_APP_25195.document_ids && DEMO_DOSSIER_APP_25195.document_ids.length > 0) {
-        onSelectDoc(DEMO_DOSSIER_APP_25195.document_ids[0]);
+      // Load demo data for the chosen dossier archetype
+      const dossier = getDemoDossier(selectedAppId);
+      setDossierState(dossier);
+      if (dossier.document_ids && dossier.document_ids.length > 0) {
+        onSelectDoc(dossier.document_ids[0]);
       }
-      setNotification('Loaded demo dossier for APP-25195');
+      setNotification(`Loaded dossier for ${selectedAppId} (${dossier.applicant?.full_name || 'Applicant'})`);
     } catch (err) {
       setNotification(err instanceof Error ? err.message : 'Failed to fetch application');
     } finally {
@@ -121,8 +135,20 @@ function AppInner({
     setSelectedAppId(appId);
   };
 
-  const handleSelectEvidence = (ev: EvidenceRef) => {
-    navigateToEvidence(ev);
+  const handleSelectEvidence = useCallback(
+    (ev: EvidenceRef, ruleId?: string) => {
+      markInspected(ev);
+      navigateToEvidence(ev, ruleId);
+    },
+    [markInspected, navigateToEvidence]
+  );
+
+  const handleSelectFindingIndex = (idx: number) => {
+    setFocusedFindingIndex(idx);
+    const finding = dossierState.findings?.[idx];
+    if (finding && finding.supporting_evidence.length > 0) {
+      markInspected(finding.supporting_evidence[0]);
+    }
   };
 
   const handleTriggerAction = (decision: ReviewDecision) => {
@@ -168,6 +194,14 @@ function AppInner({
           e.preventDefault();
           setFocusedFindingIndex((prev) => Math.max(prev - 1, 0));
           break;
+        case 'Enter': {
+          const finding = findings[focusedFindingIndex];
+          if (finding && finding.supporting_evidence.length > 0) {
+            e.preventDefault();
+            handleSelectEvidence(finding.supporting_evidence[0], finding.rule_id);
+          }
+          break;
+        }
         case ']': {
           const docIds = dossierState.document_ids || [];
           const curIdx = docIds.indexOf(selectedDocId);
@@ -201,7 +235,7 @@ function AppInner({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [dossierState, selectedDocId, onSelectDoc]);
+  }, [dossierState, selectedDocId, onSelectDoc, focusedFindingIndex, handleSelectEvidence]);
 
   const currentDocTitle = getDocumentTitle(
     selectedDocId,
@@ -209,7 +243,7 @@ function AppInner({
   );
 
   return (
-    <div className="h-screen w-screen flex flex-col bg-[#F8F6F1] font-sans overflow-hidden">
+    <div className="h-screen w-screen flex flex-col bg-theme-app text-theme-primary font-sans overflow-hidden transition-colors duration-200">
       {/* Swiss Banking Header */}
       <Header
         selectedAppId={selectedAppId}
@@ -256,9 +290,10 @@ function AppInner({
           application={application}
           activeEvidenceKey={activeEvidenceKey}
           focusedFindingIndex={focusedFindingIndex}
-          onSelectFindingIndex={setFocusedFindingIndex}
+          onSelectFindingIndex={handleSelectFindingIndex}
           onSelectEvidence={handleSelectEvidence}
           onTriggerAction={handleTriggerAction}
+          inspectedKeys={inspectedKeys}
           width={390}
         />
       </div>
@@ -293,10 +328,12 @@ export default function App() {
   }, []);
 
   return (
-    <AuthProvider>
-      <EvidenceNavigationProvider onSelectDocument={handleSelectDocument}>
-        <AppInner selectedDocId={selectedDocId} onSelectDoc={handleSelectDocument} />
-      </EvidenceNavigationProvider>
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <EvidenceNavigationProvider onSelectDocument={handleSelectDocument}>
+          <AppInner selectedDocId={selectedDocId} onSelectDoc={handleSelectDocument} />
+        </EvidenceNavigationProvider>
+      </AuthProvider>
+    </ThemeProvider>
   );
 }

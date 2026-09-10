@@ -174,6 +174,10 @@ Document text extracted from user-uploaded PDFs is **untrusted external input**.
 - **No Autonomous Lending Dispositions:** The system is incapable of issuing a final loan approval or denial.
 - **The Interrupt Checkpoint:** The LangGraph pipeline unconditionally pauses at `interrupt()` when entering `READY_FOR_REVIEW`.
 - **Audit Immutability:** Any reviewer override, correction of extracted facts, or decision (`APPROVED`, `REJECTED`, `NEEDS_INFO`) is logged with an immutable audit event (`actor`, `timestamp`, `from_status`, `to_status`, `rationale`) in PostgreSQL.
+- **Two-Step Dual-Sign Confirmation Protocol:** To prevent accidental lending authorizations from underwriter fatigue or misclicks, the UI enforces a 3-tier friction gate:
+  1. *Intent Selection:* Reviewer selects disposition (`[A] Approve`, `[R] Reject`, `[N] Need Info`).
+  2. *Mandatory Rationale:* Substantive justification ($\ge 5$ characters) is strictly required for `REJECTED` and `NEEDS_INFO`.
+  3. *Dossier Identifier Challenge:* The underwriter must explicitly type the exact dossier identifier (`APP-XXXXX`) into a confirmation challenge field before the sign-off button unlocks.
 
 ### 5.4 Cloud Spend Guards & Quotas
 - Hard budget ceiling: **$25 for the week** (target **$8–$15**).

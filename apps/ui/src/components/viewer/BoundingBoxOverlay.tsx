@@ -12,6 +12,7 @@ interface PixelBounds {
 
 interface BoundingBoxOverlayProps {
   activeEvidence: EvidenceRef | null;
+  activeRuleId?: string | null;
   canvasWidth: number;
   canvasHeight: number;
   currentDocId: string;
@@ -67,6 +68,7 @@ function computePixelBounds(
 
 export const BoundingBoxOverlay: React.FC<BoundingBoxOverlayProps> = ({
   activeEvidence,
+  activeRuleId,
   canvasWidth,
   canvasHeight,
   currentDocId,
@@ -101,7 +103,7 @@ export const BoundingBoxOverlay: React.FC<BoundingBoxOverlayProps> = ({
       style={{ width: `${canvasWidth}px`, height: `${canvasHeight}px` }}
       className="absolute inset-0 pointer-events-none overflow-hidden"
     >
-      <EvidenceBox evidence={activeEvidence} bounds={bounds} isSelected={true} />
+      <EvidenceBox evidence={activeEvidence} bounds={bounds} isSelected={true} tag={activeRuleId} />
     </div>
   );
 };

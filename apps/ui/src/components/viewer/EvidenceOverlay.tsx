@@ -71,7 +71,7 @@ export const EvidenceOverlay: React.FC<EvidenceOverlayProps> = ({
               width: `${percent.width}%`,
               height: `${percent.height}%`,
             }}
-            className={`evidence-overlay-box ${verdictClass} ${
+            className={`evidence-overlay-box pointer-events-auto cursor-pointer ${verdictClass} ${
               isActive ? 'evidence-box-active' : ''
             }`}
           >

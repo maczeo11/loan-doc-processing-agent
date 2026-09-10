@@ -98,8 +98,10 @@ export const PdfPage: React.FC<PdfPageProps> = ({
     };
   }, [pdfDoc, pageNumber, scale]);
 
-  const widthPx = Math.floor(pageDimensions.width * scale);
-  const heightPx = Math.floor(pageDimensions.height * scale);
+  // NOTE: pageDimensions already include the viewport scale
+  // (getViewport({ scale })), so they must not be scaled a second time.
+  const widthPx = Math.floor(pageDimensions.width);
+  const heightPx = Math.floor(pageDimensions.height);
 
   return (
     <div

@@ -45,17 +45,25 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({
     clearActiveEvidence,
   } = useEvidenceNavigation();
 
-  // Navigate to target page when requested by evidence citation
+  // Navigate to target page when requested by evidence citation.
+  // NOTE: numPages may still reflect the previous document right after a
+  // document switch — keep the target pending until the new document loads
+  // instead of clearing it, otherwise the highlight is silently lost.
   useEffect(() => {
     if (
-      targetPageToNavigate !== null &&
-      pdfDocument &&
-      activeEvidence &&
-      activeEvidence.document_id === docId
+      targetPageToNavigate === null ||
+      !pdfDocument ||
+      !activeEvidence ||
+      activeEvidence.document_id !== docId
     ) {
-      if (currentPage !== targetPageToNavigate) {
-        goToPage(targetPageToNavigate);
-      }
+      return;
+    }
+    if (currentPage === targetPageToNavigate) {
+      clearTargetPage();
+      return;
+    }
+    if (targetPageToNavigate >= 1 && targetPageToNavigate <= numPages) {
+      goToPage(targetPageToNavigate);
       clearTargetPage();
     }
   }, [
@@ -64,6 +72,7 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({
     activeEvidence,
     docId,
     currentPage,
+    numPages,
     goToPage,
     clearTargetPage,
   ]);

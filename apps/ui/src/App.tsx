@@ -66,10 +66,15 @@ function toLoanApplication(state: LoanApplicationState): LoanApplication {
 /**
  * Inner App component that has access to EvidenceNavigation context.
  */
-function AppInner() {
+function AppInner({
+  selectedDocId,
+  onSelectDoc,
+}: {
+  selectedDocId: string;
+  onSelectDoc: (docId: string) => void;
+}) {
   const [selectedAppId, setSelectedAppId] = useState<string>('APP-25195');
   const [dossierState, setDossierState] = useState<LoanApplicationState>(DEMO_DOSSIER_APP_25195);
-  const [selectedDocId, setSelectedDocId] = useState<string>('doc-app-form');
   const [_isLoading, setIsLoading] = useState<boolean>(false);
   const [notification, setNotification] = useState<string | null>(null);
 
@@ -94,7 +99,7 @@ function AppInner() {
       // Always use demo data for now (backend not yet serving GET /applications/{id})
       setDossierState(DEMO_DOSSIER_APP_25195);
       if (DEMO_DOSSIER_APP_25195.document_ids && DEMO_DOSSIER_APP_25195.document_ids.length > 0) {
-        setSelectedDocId(DEMO_DOSSIER_APP_25195.document_ids[0]);
+        onSelectDoc(DEMO_DOSSIER_APP_25195.document_ids[0]);
       }
       setNotification('Loaded demo dossier for APP-25195');
     } catch (err) {
@@ -102,14 +107,14 @@ function AppInner() {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedAppId]);
+  }, [selectedAppId, onSelectDoc]);
 
   useEffect(() => {
     fetchApplicationData();
   }, [fetchApplicationData]);
 
   const handleSelectDoc = (docId: string) => {
-    setSelectedDocId(docId);
+    onSelectDoc(docId);
   };
 
   const handleSelectAppId = (appId: string) => {
@@ -166,13 +171,13 @@ function AppInner() {
         case ']': {
           const docIds = dossierState.document_ids || [];
           const curIdx = docIds.indexOf(selectedDocId);
-          if (curIdx < docIds.length - 1) setSelectedDocId(docIds[curIdx + 1]);
+          if (curIdx < docIds.length - 1) onSelectDoc(docIds[curIdx + 1]);
           break;
         }
         case '[': {
           const docIds = dossierState.document_ids || [];
           const curIdx = docIds.indexOf(selectedDocId);
-          if (curIdx > 0) setSelectedDocId(docIds[curIdx - 1]);
+          if (curIdx > 0) onSelectDoc(docIds[curIdx - 1]);
           break;
         }
         case 'a':
@@ -196,7 +201,7 @@ function AppInner() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [dossierState, selectedDocId]);
+  }, [dossierState, selectedDocId, onSelectDoc]);
 
   const currentDocTitle = getDocumentTitle(
     selectedDocId,
@@ -278,13 +283,19 @@ function AppInner() {
 }
 
 /**
- * Root App component: wraps with AuthProvider + EvidenceNavigationProvider.
+ * Root App component: owns the selected document (so evidence navigation can
+ * switch documents) and wraps with AuthProvider + EvidenceNavigationProvider.
  */
 export default function App() {
+  const [selectedDocId, setSelectedDocId] = useState<string>('doc-app-form');
+  const handleSelectDocument = useCallback((docId: string) => {
+    setSelectedDocId(docId);
+  }, []);
+
   return (
     <AuthProvider>
-      <EvidenceNavigationProvider>
-        <AppInner />
+      <EvidenceNavigationProvider onSelectDocument={handleSelectDocument}>
+        <AppInner selectedDocId={selectedDocId} onSelectDoc={handleSelectDocument} />
       </EvidenceNavigationProvider>
     </AuthProvider>
   );

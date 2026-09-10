@@ -1,0 +1,569 @@
+[
+  {
+    "index": 0,
+    "page_id": "APP-KAG-0063-BANK_STMT_NEOBANK_LEDGER",
+    "template_family": "BANK_STMT_NEOBANK_LEDGER",
+    "true_label": "bank_statement",
+    "predicted_label": "bank_statement",
+    "confidence": 0.5638,
+    "match": true
+  },
+  {
+    "index": 1,
+    "page_id": "APP-KAG-0062-BANK_STMT_NEOBANK_LEDGER",
+    "template_family": "BANK_STMT_NEOBANK_LEDGER",
+    "true_label": "bank_statement",
+    "predicted_label": "bank_statement",
+    "confidence": 0.5685,
+    "match": true
+  },
+  {
+    "index": 2,
+    "page_id": "APP-KAG-0061-TAX_ACK_EFILING_RECEIPT",
+    "template_family": "TAX_ACK_EFILING_RECEIPT",
+    "true_label": "tax_acknowledgement",
+    "predicted_label": "tax_acknowledgement",
+    "confidence": 0.617,
+    "match": true
+  },
+  {
+    "index": 3,
+    "page_id": "APP-KAG-0064-BANK_STMT_NEOBANK_LEDGER",
+    "template_family": "BANK_STMT_NEOBANK_LEDGER",
+    "true_label": "bank_statement",
+    "predicted_label": "bank_statement",
+    "confidence": 0.5879,
+    "match": true
+  },
+  {
+    "index": 4,
+    "page_id": "NEG-TEST-004-hospital_discharge_summary",
+    "template_family": "NEGATIVE_HOSPITAL_DISCHARGE_SUMMARY",
+    "true_label": "UNKNOWN",
+    "predicted_label": "UNKNOWN",
+    "confidence": 0.2906,
+    "match": true
+  },
+  {
+    "index": 5,
+    "page_id": "APP-KAG-0066-ID_PASSPORT_PAGE",
+    "template_family": "ID_PASSPORT_PAGE",
+    "true_label": "id_card",
+    "predicted_label": "UNKNOWN",
+    "confidence": 0.3975,
+    "match": false
+  },
+  {
+    "index": 6,
+    "page_id": "NEG-TEST-007-offer_letter",
+    "template_family": "NEGATIVE_OFFER_LETTER",
+    "true_label": "UNKNOWN",
+    "predicted_label": "UNKNOWN",
+    "confidence": 0.2498,
+    "match": true
+  },
+  {
+    "index": 7,
+    "page_id": "NEG-TEST-001-whitespace_only",
+    "template_family": "NEGATIVE_WHITESPACE_ONLY",
+    "true_label": "UNKNOWN",
+    "predicted_label": "UNKNOWN",
+    "confidence": 0.3114,
+    "match": true
+  },
+  {
+    "index": 8,
+    "page_id": "APP-KAG-0066-TAX_ACK_EFILING_RECEIPT",
+    "template_family": "TAX_ACK_EFILING_RECEIPT",
+    "true_label": "tax_acknowledgement",
+    "predicted_label": "tax_acknowledgement",
+    "confidence": 0.6153,
+    "match": true
+  },
+  {
+    "index": 9,
+    "page_id": "APP-KAG-0069-ID_PASSPORT_PAGE",
+    "template_family": "ID_PASSPORT_PAGE",
+    "true_label": "id_card",
+    "predicted_label": "id_card",
+    "confidence": 0.4213,
+    "match": true
+  },
+  {
+    "index": 10,
+    "page_id": "APP-KAG-0064-TAX_ACK_EFILING_RECEIPT",
+    "template_family": "TAX_ACK_EFILING_RECEIPT",
+    "true_label": "tax_acknowledgement",
+    "predicted_label": "tax_acknowledgement",
+    "confidence": 0.6256,
+    "match": true
+  },
+  {
+    "index": 11,
+    "page_id": "APP-KAG-0060-TAX_ACK_EFILING_RECEIPT",
+    "template_family": "TAX_ACK_EFILING_RECEIPT",
+    "true_label": "tax_acknowledgement",
+    "predicted_label": "tax_acknowledgement",
+    "confidence": 0.6231,
+    "match": true
+  },
+  {
+    "index": 12,
+    "page_id": "APP-KAG-0070-BANK_STMT_NEOBANK_LEDGER",
+    "template_family": "BANK_STMT_NEOBANK_LEDGER",
+    "true_label": "bank_statement",
+    "predicted_label": "bank_statement",
+    "confidence": 0.5616,
+    "match": true
+  },
+  {
+    "index": 13,
+    "page_id": "APP-KAG-0070-PAYSLIP_CONSULTING_COMPACT",
+    "template_family": "PAYSLIP_CONSULTING_COMPACT",
+    "true_label": "payslip",
+    "predicted_label": "payslip",
+    "confidence": 0.4976,
+    "match": true
+  },
+  {
+    "index": 14,
+    "page_id": "APP-KAG-0063-PAYSLIP_CONSULTING_COMPACT",
+    "template_family": "PAYSLIP_CONSULTING_COMPACT",
+    "true_label": "payslip",
+    "predicted_label": "payslip",
+    "confidence": 0.513,
+    "match": true
+  },
+  {
+    "index": 15,
+    "page_id": "APP-KAG-0068-ID_PASSPORT_PAGE",
+    "template_family": "ID_PASSPORT_PAGE",
+    "true_label": "id_card",
+    "predicted_label": "id_card",
+    "confidence": 0.412,
+    "match": true
+  },
+  {
+    "index": 16,
+    "page_id": "APP-KAG-0062-ID_PASSPORT_PAGE",
+    "template_family": "ID_PASSPORT_PAGE",
+    "true_label": "id_card",
+    "predicted_label": "id_card",
+    "confidence": 0.4008,
+    "match": true
+  },
+  {
+    "index": 17,
+    "page_id": "APP-KAG-0070-ID_PASSPORT_PAGE",
+    "template_family": "ID_PASSPORT_PAGE",
+    "true_label": "id_card",
+    "predicted_label": "id_card",
+    "confidence": 0.4207,
+    "match": true
+  },
+  {
+    "index": 18,
+    "page_id": "APP-KAG-0063-APP_FORM_COMMERCIAL_SME",
+    "template_family": "APP_FORM_COMMERCIAL_SME",
+    "true_label": "application_form",
+    "predicted_label": "application_form",
+    "confidence": 0.5515,
+    "match": true
+  },
+  {
+    "index": 19,
+    "page_id": "NEG-TEST-000-empty_string",
+    "template_family": "NEGATIVE_EMPTY_STRING",
+    "true_label": "UNKNOWN",
+    "predicted_label": "UNKNOWN",
+    "confidence": 0.0,
+    "match": true
+  },
+  {
+    "index": 20,
+    "page_id": "APP-KAG-0060-PAYSLIP_CONSULTING_COMPACT",
+    "template_family": "PAYSLIP_CONSULTING_COMPACT",
+    "true_label": "payslip",
+    "predicted_label": "payslip",
+    "confidence": 0.4972,
+    "match": true
+  },
+  {
+    "index": 21,
+    "page_id": "APP-KAG-0070-APP_FORM_COMMERCIAL_SME",
+    "template_family": "APP_FORM_COMMERCIAL_SME",
+    "true_label": "application_form",
+    "predicted_label": "application_form",
+    "confidence": 0.5542,
+    "match": true
+  },
+  {
+    "index": 22,
+    "page_id": "APP-KAG-0060-ID_PASSPORT_PAGE",
+    "template_family": "ID_PASSPORT_PAGE",
+    "true_label": "id_card",
+    "predicted_label": "id_card",
+    "confidence": 0.4157,
+    "match": true
+  },
+  {
+    "index": 23,
+    "page_id": "APP-KAG-0061-PAYSLIP_CONSULTING_COMPACT",
+    "template_family": "PAYSLIP_CONSULTING_COMPACT",
+    "true_label": "payslip",
+    "predicted_label": "payslip",
+    "confidence": 0.4974,
+    "match": true
+  },
+  {
+    "index": 24,
+    "page_id": "APP-KAG-0069-PAYSLIP_CONSULTING_COMPACT",
+    "template_family": "PAYSLIP_CONSULTING_COMPACT",
+    "true_label": "payslip",
+    "predicted_label": "payslip",
+    "confidence": 0.5095,
+    "match": true
+  },
+  {
+    "index": 25,
+    "page_id": "APP-KAG-0061-ID_PASSPORT_PAGE",
+    "template_family": "ID_PASSPORT_PAGE",
+    "true_label": "id_card",
+    "predicted_label": "id_card",
+    "confidence": 0.4038,
+    "match": true
+  },
+  {
+    "index": 26,
+    "page_id": "APP-KAG-0066-PAYSLIP_CONSULTING_COMPACT",
+    "template_family": "PAYSLIP_CONSULTING_COMPACT",
+    "true_label": "payslip",
+    "predicted_label": "payslip",
+    "confidence": 0.5066,
+    "match": true
+  },
+  {
+    "index": 27,
+    "page_id": "APP-KAG-0061-BANK_STMT_NEOBANK_LEDGER",
+    "template_family": "BANK_STMT_NEOBANK_LEDGER",
+    "true_label": "bank_statement",
+    "predicted_label": "bank_statement",
+    "confidence": 0.5756,
+    "match": true
+  },
+  {
+    "index": 28,
+    "page_id": "NEG-TEST-006-purchase_order",
+    "template_family": "NEGATIVE_PURCHASE_ORDER",
+    "true_label": "UNKNOWN",
+    "predicted_label": "UNKNOWN",
+    "confidence": 0.2801,
+    "match": true
+  },
+  {
+    "index": 29,
+    "page_id": "APP-KAG-0065-PAYSLIP_CONSULTING_COMPACT",
+    "template_family": "PAYSLIP_CONSULTING_COMPACT",
+    "true_label": "payslip",
+    "predicted_label": "payslip",
+    "confidence": 0.4393,
+    "match": true
+  },
+  {
+    "index": 30,
+    "page_id": "APP-KAG-0060-BANK_STMT_NEOBANK_LEDGER",
+    "template_family": "BANK_STMT_NEOBANK_LEDGER",
+    "true_label": "bank_statement",
+    "predicted_label": "bank_statement",
+    "confidence": 0.5694,
+    "match": true
+  },
+  {
+    "index": 31,
+    "page_id": "APP-KAG-0064-PAYSLIP_CONSULTING_COMPACT",
+    "template_family": "PAYSLIP_CONSULTING_COMPACT",
+    "true_label": "payslip",
+    "predicted_label": "payslip",
+    "confidence": 0.4307,
+    "match": true
+  },
+  {
+    "index": 32,
+    "page_id": "APP-KAG-0069-APP_FORM_COMMERCIAL_SME",
+    "template_family": "APP_FORM_COMMERCIAL_SME",
+    "true_label": "application_form",
+    "predicted_label": "application_form",
+    "confidence": 0.5354,
+    "match": true
+  },
+  {
+    "index": 33,
+    "page_id": "APP-KAG-0069-TAX_ACK_EFILING_RECEIPT",
+    "template_family": "TAX_ACK_EFILING_RECEIPT",
+    "true_label": "tax_acknowledgement",
+    "predicted_label": "tax_acknowledgement",
+    "confidence": 0.6225,
+    "match": true
+  },
+  {
+    "index": 34,
+    "page_id": "APP-KAG-0061-APP_FORM_COMMERCIAL_SME",
+    "template_family": "APP_FORM_COMMERCIAL_SME",
+    "true_label": "application_form",
+    "predicted_label": "application_form",
+    "confidence": 0.5379,
+    "match": true
+  },
+  {
+    "index": 35,
+    "page_id": "APP-KAG-0062-APP_FORM_COMMERCIAL_SME",
+    "template_family": "APP_FORM_COMMERCIAL_SME",
+    "true_label": "application_form",
+    "predicted_label": "application_form",
+    "confidence": 0.536,
+    "match": true
+  },
+  {
+    "index": 36,
+    "page_id": "APP-KAG-0066-APP_FORM_COMMERCIAL_SME",
+    "template_family": "APP_FORM_COMMERCIAL_SME",
+    "true_label": "application_form",
+    "predicted_label": "application_form",
+    "confidence": 0.5135,
+    "match": true
+  },
+  {
+    "index": 37,
+    "page_id": "APP-KAG-0066-BANK_STMT_NEOBANK_LEDGER",
+    "template_family": "BANK_STMT_NEOBANK_LEDGER",
+    "true_label": "bank_statement",
+    "predicted_label": "bank_statement",
+    "confidence": 0.5744,
+    "match": true
+  },
+  {
+    "index": 38,
+    "page_id": "NEG-TEST-003-broadband_invoice",
+    "template_family": "NEGATIVE_BROADBAND_INVOICE",
+    "true_label": "UNKNOWN",
+    "predicted_label": "UNKNOWN",
+    "confidence": 0.3566,
+    "match": true
+  },
+  {
+    "index": 39,
+    "page_id": "APP-KAG-0068-APP_FORM_COMMERCIAL_SME",
+    "template_family": "APP_FORM_COMMERCIAL_SME",
+    "true_label": "application_form",
+    "predicted_label": "application_form",
+    "confidence": 0.549,
+    "match": true
+  },
+  {
+    "index": 40,
+    "page_id": "APP-KAG-0065-TAX_ACK_EFILING_RECEIPT",
+    "template_family": "TAX_ACK_EFILING_RECEIPT",
+    "true_label": "tax_acknowledgement",
+    "predicted_label": "tax_acknowledgement",
+    "confidence": 0.6018,
+    "match": true
+  },
+  {
+    "index": 41,
+    "page_id": "APP-KAG-0065-ID_PASSPORT_PAGE",
+    "template_family": "ID_PASSPORT_PAGE",
+    "true_label": "id_card",
+    "predicted_label": "id_card",
+    "confidence": 0.4066,
+    "match": true
+  },
+  {
+    "index": 42,
+    "page_id": "APP-KAG-0064-APP_FORM_COMMERCIAL_SME",
+    "template_family": "APP_FORM_COMMERCIAL_SME",
+    "true_label": "application_form",
+    "predicted_label": "application_form",
+    "confidence": 0.546,
+    "match": true
+  },
+  {
+    "index": 43,
+    "page_id": "APP-KAG-0068-PAYSLIP_CONSULTING_COMPACT",
+    "template_family": "PAYSLIP_CONSULTING_COMPACT",
+    "true_label": "payslip",
+    "predicted_label": "payslip",
+    "confidence": 0.4403,
+    "match": true
+  },
+  {
+    "index": 44,
+    "page_id": "APP-KAG-0067-TAX_ACK_EFILING_RECEIPT",
+    "template_family": "TAX_ACK_EFILING_RECEIPT",
+    "true_label": "tax_acknowledgement",
+    "predicted_label": "tax_acknowledgement",
+    "confidence": 0.6348,
+    "match": true
+  },
+  {
+    "index": 45,
+    "page_id": "APP-KAG-0067-BANK_STMT_NEOBANK_LEDGER",
+    "template_family": "BANK_STMT_NEOBANK_LEDGER",
+    "true_label": "bank_statement",
+    "predicted_label": "bank_statement",
+    "confidence": 0.5723,
+    "match": true
+  },
+  {
+    "index": 46,
+    "page_id": "APP-KAG-0065-BANK_STMT_NEOBANK_LEDGER",
+    "template_family": "BANK_STMT_NEOBANK_LEDGER",
+    "true_label": "bank_statement",
+    "predicted_label": "bank_statement",
+    "confidence": 0.582,
+    "match": true
+  },
+  {
+    "index": 47,
+    "page_id": "APP-KAG-0062-TAX_ACK_EFILING_RECEIPT",
+    "template_family": "TAX_ACK_EFILING_RECEIPT",
+    "true_label": "tax_acknowledgement",
+    "predicted_label": "tax_acknowledgement",
+    "confidence": 0.611,
+    "match": true
+  },
+  {
+    "index": 48,
+    "page_id": "APP-KAG-0063-TAX_ACK_EFILING_RECEIPT",
+    "template_family": "TAX_ACK_EFILING_RECEIPT",
+    "true_label": "tax_acknowledgement",
+    "predicted_label": "tax_acknowledgement",
+    "confidence": 0.6299,
+    "match": true
+  },
+  {
+    "index": 49,
+    "page_id": "APP-KAG-0070-TAX_ACK_EFILING_RECEIPT",
+    "template_family": "TAX_ACK_EFILING_RECEIPT",
+    "true_label": "tax_acknowledgement",
+    "predicted_label": "tax_acknowledgement",
+    "confidence": 0.6275,
+    "match": true
+  },
+  {
+    "index": 50,
+    "page_id": "APP-KAG-0060-APP_FORM_COMMERCIAL_SME",
+    "template_family": "APP_FORM_COMMERCIAL_SME",
+    "true_label": "application_form",
+    "predicted_label": "application_form",
+    "confidence": 0.5394,
+    "match": true
+  },
+  {
+    "index": 51,
+    "page_id": "APP-KAG-0067-APP_FORM_COMMERCIAL_SME",
+    "template_family": "APP_FORM_COMMERCIAL_SME",
+    "true_label": "application_form",
+    "predicted_label": "application_form",
+    "confidence": 0.5388,
+    "match": true
+  },
+  {
+    "index": 52,
+    "page_id": "APP-KAG-0065-APP_FORM_COMMERCIAL_SME",
+    "template_family": "APP_FORM_COMMERCIAL_SME",
+    "true_label": "application_form",
+    "predicted_label": "application_form",
+    "confidence": 0.5253,
+    "match": true
+  },
+  {
+    "index": 53,
+    "page_id": "APP-KAG-0063-ID_PASSPORT_PAGE",
+    "template_family": "ID_PASSPORT_PAGE",
+    "true_label": "id_card",
+    "predicted_label": "id_card",
+    "confidence": 0.4174,
+    "match": true
+  },
+  {
+    "index": 54,
+    "page_id": "APP-KAG-0067-PAYSLIP_CONSULTING_COMPACT",
+    "template_family": "PAYSLIP_CONSULTING_COMPACT",
+    "true_label": "payslip",
+    "predicted_label": "payslip",
+    "confidence": 0.5239,
+    "match": true
+  },
+  {
+    "index": 55,
+    "page_id": "APP-KAG-0067-ID_PASSPORT_PAGE",
+    "template_family": "ID_PASSPORT_PAGE",
+    "true_label": "id_card",
+    "predicted_label": "id_card",
+    "confidence": 0.4131,
+    "match": true
+  },
+  {
+    "index": 56,
+    "page_id": "APP-KAG-0062-PAYSLIP_CONSULTING_COMPACT",
+    "template_family": "PAYSLIP_CONSULTING_COMPACT",
+    "true_label": "payslip",
+    "predicted_label": "payslip",
+    "confidence": 0.4284,
+    "match": true
+  },
+  {
+    "index": 57,
+    "page_id": "NEG-TEST-002-gibberish_tokens",
+    "template_family": "NEGATIVE_GIBBERISH_TOKENS",
+    "true_label": "UNKNOWN",
+    "predicted_label": "UNKNOWN",
+    "confidence": 0.2953,
+    "match": true
+  },
+  {
+    "index": 58,
+    "page_id": "APP-KAG-0069-BANK_STMT_NEOBANK_LEDGER",
+    "template_family": "BANK_STMT_NEOBANK_LEDGER",
+    "true_label": "bank_statement",
+    "predicted_label": "bank_statement",
+    "confidence": 0.5837,
+    "match": true
+  },
+  {
+    "index": 59,
+    "page_id": "APP-KAG-0068-TAX_ACK_EFILING_RECEIPT",
+    "template_family": "TAX_ACK_EFILING_RECEIPT",
+    "true_label": "tax_acknowledgement",
+    "predicted_label": "tax_acknowledgement",
+    "confidence": 0.6149,
+    "match": true
+  },
+  {
+    "index": 60,
+    "page_id": "APP-KAG-0064-ID_PASSPORT_PAGE",
+    "template_family": "ID_PASSPORT_PAGE",
+    "true_label": "id_card",
+    "predicted_label": "id_card",
+    "confidence": 0.4116,
+    "match": true
+  },
+  {
+    "index": 61,
+    "page_id": "NEG-TEST-005-vehicle_insurance",
+    "template_family": "NEGATIVE_VEHICLE_INSURANCE",
+    "true_label": "UNKNOWN",
+    "predicted_label": "UNKNOWN",
+    "confidence": 0.2895,
+    "match": true
+  },
+  {
+    "index": 62,
+    "page_id": "APP-KAG-0068-BANK_STMT_NEOBANK_LEDGER",
+    "template_family": "BANK_STMT_NEOBANK_LEDGER",
+    "true_label": "bank_statement",
+    "predicted_label": "bank_statement",
+    "confidence": 0.5755,
+    "match": true
+  }
+]

@@ -1,0 +1,126 @@
+{
+  "dataset": "ml/data/v2/splits_v2.json",
+  "threshold_used": 0.4,
+  "metrics": {
+    "macro_f1": 0.9823,
+    "weighted_f1": 0.9842,
+    "accuracy": 0.9841,
+    "p50_latency_ms": 6.16,
+    "p95_latency_ms": 7.31,
+    "mean_latency_ms": 6.0,
+    "heap_delta_mb": 1.56,
+    "process_rss_mb": 154.74,
+    "ram_mb": 154.74,
+    "total_samples": 63,
+    "evaluated_classes": [
+      "UNKNOWN",
+      "application_form",
+      "bank_statement",
+      "id_card",
+      "payslip",
+      "tax_acknowledgement"
+    ],
+    "classification_report": {
+      "UNKNOWN": {
+        "precision": 0.8888888888888888,
+        "recall": 1.0,
+        "f1-score": 0.9411764705882353,
+        "support": 8.0
+      },
+      "application_form": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1-score": 1.0,
+        "support": 11.0
+      },
+      "bank_statement": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1-score": 1.0,
+        "support": 11.0
+      },
+      "id_card": {
+        "precision": 1.0,
+        "recall": 0.9090909090909091,
+        "f1-score": 0.9523809523809523,
+        "support": 11.0
+      },
+      "payslip": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1-score": 1.0,
+        "support": 11.0
+      },
+      "tax_acknowledgement": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1-score": 1.0,
+        "support": 11.0
+      },
+      "accuracy": 0.9841269841269841,
+      "macro avg": {
+        "precision": 0.9814814814814815,
+        "recall": 0.9848484848484849,
+        "f1-score": 0.9822595704948647,
+        "support": 63.0
+      },
+      "weighted avg": {
+        "precision": 0.9858906525573192,
+        "recall": 0.9841269841269841,
+        "f1-score": 0.9842159085856564,
+        "support": 63.0
+      }
+    },
+    "classification_report_text": "                     precision    recall  f1-score   support\n\n            UNKNOWN       0.89      1.00      0.94         8\n   application_form       1.00      1.00      1.00        11\n     bank_statement       1.00      1.00      1.00        11\n            id_card       1.00      0.91      0.95        11\n            payslip       1.00      1.00      1.00        11\ntax_acknowledgement       1.00      1.00      1.00        11\n\n           accuracy                           0.98        63\n          macro avg       0.98      0.98      0.98        63\n       weighted avg       0.99      0.98      0.98        63\n",
+    "confusion_matrix": [
+      [
+        8,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        11,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        11,
+        0,
+        0,
+        0
+      ],
+      [
+        1,
+        0,
+        0,
+        10,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        11,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        0,
+        11
+      ]
+    ]
+  }
+}

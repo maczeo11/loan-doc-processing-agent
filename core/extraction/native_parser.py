@@ -9,7 +9,10 @@ Invariants & Guarantees:
 """
 
 from typing import List, Dict, Any, Optional, Union
-import fitz  # PyMuPDF
+try:
+    import fitz  # PyMuPDF
+except ImportError:
+    fitz = None
 from core.contracts.evidence import EvidenceRef, BoundingBox
 
 
@@ -40,10 +43,12 @@ def validate_and_clamp_bbox(
     )
 
 
-def open_pdf_document(pdf_input: Union[str, bytes]) -> fitz.Document:
+def open_pdf_document(pdf_input: Union[str, bytes]) -> Any:
     """
     Opens a PDF document from a filesystem path or in-memory byte buffer.
     """
+    if fitz is None:
+        raise ImportError("PyMuPDF (fitz) is not installed in the current environment.")
     if isinstance(pdf_input, bytes):
         return fitz.open(stream=pdf_input, filetype="pdf")
     if isinstance(pdf_input, str):

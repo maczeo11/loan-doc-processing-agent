@@ -29,6 +29,10 @@ pyyaml>=6.0
 numpy>=1.26.0
 rank-bm25>=0.2.2
 
+# Machine Learning & Document Classification
+scikit-learn==1.8.0
+joblib>=1.3.2
+
 # Testing & Quality Gates
 pytest>=8.1.0
 pytest-cov>=4.1.0

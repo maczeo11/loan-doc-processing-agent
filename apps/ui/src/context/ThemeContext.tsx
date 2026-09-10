@@ -20,7 +20,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         return saved;
       }
     }
-    return 'slate'; // Default: Modern FinTech Slate
+    return 'ledger'; // Default: Archival Swiss Ledger
   });
 
   const setTheme = (newTheme: UiTheme) => {

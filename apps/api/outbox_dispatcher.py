@@ -27,7 +27,7 @@ def get_queue_adapter() -> QueuePort:
         logger.info("Initializing SQSQueue adapter for outbox dispatcher.")
         return SQSQueue(
             queue_url=settings.SQS_QUEUE_URL,
-            dlq_url="",
+            dlq_url=settings.SQS_DLQ_URL,
             region=settings.AWS_REGION,
         )
     else:

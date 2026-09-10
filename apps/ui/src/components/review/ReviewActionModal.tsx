@@ -65,7 +65,10 @@ export const ReviewActionModal: React.FC<ReviewActionModalProps> = ({
   };
 
   const meta = getDecisionMeta();
-  const confirmMatches = confirmText.trim() === applicationId;
+  // Non-empty match required: an empty field must never unlock sign-off
+  // (''.trim() === '' is true, which previously auto-unlocked fresh modals).
+  const confirmMatches =
+    confirmText.trim() !== '' && confirmText.trim() === applicationId;
 
   const handleConfirm = async () => {
     if (!confirmMatches) {

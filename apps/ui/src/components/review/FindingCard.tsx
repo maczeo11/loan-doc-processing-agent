@@ -51,7 +51,7 @@ export const FindingCard: React.FC<FindingCardProps> = ({
       </p>
 
       {/* Supporting Evidence Citations */}
-      {finding.supporting_evidence.length > 0 && (
+      {finding.supporting_evidence.length > 0 ? (
         <div className="space-y-1.5 pt-2 border-t border-theme-border">
           <div className="text-[10px] uppercase tracking-wider font-semibold text-theme-muted flex items-center justify-between">
             <span>Verified Provenance ({finding.supporting_evidence.length})</span>
@@ -90,6 +90,10 @@ export const FindingCard: React.FC<FindingCardProps> = ({
               );
             })}
           </div>
+        </div>
+      ) : (
+        <div className="mt-2 p-2 rounded bg-[#FFFBEB] border border-[#D97706] text-[11px] font-mono text-[#92400E]">
+          No supporting evidence attached — treat as UNVERIFIED and confirm manually.
         </div>
       )}
 

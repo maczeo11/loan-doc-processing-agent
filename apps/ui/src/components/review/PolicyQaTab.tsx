@@ -17,7 +17,8 @@ export const PolicyQaTab: React.FC<PolicyQaTabProps> = ({ applicationId }) => {
       question: 'What is the salary reconciliation tolerance and DTI ceiling under policy?',
       answer:
         'Under FinScan Retail Underwriting Policy v2026.1 (Section 4.2), net monthly income must be verified against at least 3 consecutive salary credits with a maximum permissible variance of ±5.0%. Debt-to-Income (DTI) ratio must not exceed 50.0% for Tier-1 applicants.',
-      is_grounded: true,
+      // Illustrative seed shown before any live retrieval — NOT a grounded answer.
+      is_grounded: false,
       citations: [
         {
           chunk_id: 'POL-RET-2026-S4',
@@ -44,19 +45,31 @@ export const PolicyQaTab: React.FC<PolicyQaTabProps> = ({ applicationId }) => {
         {
           question: q,
           answer: resp.answer,
-          is_grounded: true,
-          citations: resp.citations.map((c) => ({
+          // Grounded only when the backend returns at least one citation.
+          is_grounded: (resp.citations || []).length > 0,
+          citations: (resp.citations || []).map((c: {
+            chunk_id?: string; doc_id?: string; title?: string; section?: string;
+            excerpt?: string; text?: string; score?: number; page_number?: number;
+          }) => ({
             chunk_id: c.chunk_id || '',
-            policy_name: c.title || 'Policy',
-            section: c.section || '',
-            text: c.text || '',
-            score: 0.9,
+            policy_name: c.doc_id || c.title || 'Policy',
+            section: c.section || (c.page_number ? `Page ${c.page_number}` : ''),
+            text: c.excerpt || c.text || '',
+            score: typeof c.score === 'number' ? c.score : 0,
           })),
         },
         ...prev,
       ]);
-    } catch {
-      // Fallback — API not available in demo mode
+    } catch (err: unknown) {
+      setHistory((prev) => [
+        {
+          question: q,
+          answer: `Policy Q&A request failed: ${err instanceof Error ? err.message : 'unknown error'}.`,
+          is_grounded: false,
+          citations: [],
+        },
+        ...prev,
+      ]);
     } finally {
       setLoading(false);
     }
@@ -102,7 +115,11 @@ export const PolicyQaTab: React.FC<PolicyQaTabProps> = ({ applicationId }) => {
               <div className="mt-2 pt-2 border-t border-theme-border pl-5.5 space-y-1.5">
                 <div className="flex items-center gap-1.5 text-[10px] uppercase font-mono font-semibold text-theme-pass">
                   <ShieldCheck className="w-3 h-3" />
-                  <span>Authoritative Citation: {item.citations[0].policy_name}</span>
+                  <span>
+                    {item.is_grounded
+                      ? `Authoritative Citation: ${item.citations[0].policy_name}`
+                      : 'Unverified — illustrative example, not retrieved evidence'}
+                  </span>
                 </div>
                 <div className="bg-theme-panel p-2 rounded-xs border border-theme-border text-[11px] text-theme-secondary font-mono italic">
                   &ldquo;{item.citations[0].text}&rdquo;

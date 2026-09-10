@@ -13,6 +13,7 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import { api } from '../../services/api';
+import { sanitizePiiInText } from '../../utils/pii';
 import { useEvidenceNavigation } from '../../context/EvidenceNavigationContext';
 import type { Citation, EvidenceRef, QuestionResponse } from '../../types/contracts';
 
@@ -103,13 +104,13 @@ function getDemoAnswerForQuery(query: string): QuestionResponse {
   if (q.includes('pan') || q.includes('identity') || q.includes('name') || q.includes('aadhaar') || q.includes('kyc')) {
     return {
       answer:
-        'Applicant identity for "Ananya Sharma" and PAN "ABCPS4821K" (masked as XXXXXX4821) have been reconciled across the PAN Card, ITR-V, Bank Statement, and Payslips with zero discrepancies detected (RULE-ID-01: PASS).',
+        'Applicant identity for "Ananya Sharma" and PAN "XXXXXX4821" have been reconciled across the PAN Card, ITR-V, Bank Statement, and Payslips with zero discrepancies detected (RULE-ID-01: PASS).',
       citations: [
         {
           document_id: 'doc-pan-card',
           document_type: 'id_card',
           page_number: 1,
-          quoted_span: 'Permanent Account Number: ABCPS4821K',
+          quoted_span: 'Permanent Account Number: XXXXXX4821',
           bounding_box: { x0: 0.295, y0: 0.133, x1: 0.721, y1: 0.149 },
           confidence: 0.99,
           extraction_method: 'pymupdf_native',
@@ -158,20 +159,12 @@ function getDemoAnswerForQuery(query: string): QuestionResponse {
     };
   }
 
+  // Abstention default: no fabricated verdicts. Unknown queries abstain
+  // exactly like the backend ("I abstain rather than guess").
   return {
     answer:
-      `Underwriting evaluation for application ${query ? `regarding "${query}"` : 'dossier'}: Verified monthly net income of ₹72,500 aligns with bank deposits. Annual gross income of ₹10,20,000 aligns with tax filings. All required documents are verified and within policy tolerances. Ready for underwriter sign-off.`,
-    citations: [
-      {
-        document_id: 'doc-payslip-aug',
-        document_type: 'payslip',
-        page_number: 1,
-        quoted_span: 'Net Pay: 72,500.00',
-        bounding_box: { x0: 0.295, y0: 0.56, x1: 0.52, y1: 0.576 },
-        confidence: 0.99,
-        extraction_method: 'pymupdf_native',
-      },
-    ],
+      'I cannot answer this question based on the provided documents. No grounded policy passage matched this query.',
+    citations: [],
   };
 }
 
@@ -436,7 +429,7 @@ export const QaPanel: React.FC<QaPanelProps> = ({ applicationId, isDemoMode = fa
                                   <span className="text-slate-500 font-sans">p.{cit.page_number}</span>
                                   {cit.quoted_span && (
                                     <span className="italic text-slate-400 max-w-[120px] truncate hidden sm:inline">
-                                      "{cit.quoted_span}"
+                                      "{sanitizePiiInText(cit.quoted_span)}"
                                     </span>
                                   )}
                                   <ExternalLink className="w-2.5 h-2.5 text-indigo-400" />

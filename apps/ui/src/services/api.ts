@@ -138,15 +138,26 @@ export const api = {
   },
 
   /**
-   * Export finalized dossier analysis (JSON or PDF)
+   * Export finalized dossier analysis (JSON metadata or PDF bytes).
+   * PDF responses are binary: callers receive an object URL to download,
+   * never parsed as JSON.
    */
   async exportApplication(
     applicationId: string,
     format: 'json' | 'pdf' = 'json'
-  ): Promise<ExportResponse> {
+  ): Promise<ExportResponse | { blobUrl: string; filename: string }> {
     const res = await fetch(
       `${BASE_URL}/applications/${encodeURIComponent(applicationId)}/export?format=${encodeURIComponent(format)}`
     );
-    return handleResponse<ExportResponse>(res);
+    if (!res.ok) {
+      return handleResponse<ExportResponse>(res);
+    }
+    const contentType = res.headers.get('content-type') || '';
+    if (format === 'pdf' || contentType.includes('application/pdf')) {
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      return { blobUrl, filename: `CAM_${applicationId}.pdf` };
+    }
+    return res.json() as Promise<ExportResponse>;
   },
 };

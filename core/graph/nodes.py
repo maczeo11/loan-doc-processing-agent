@@ -86,32 +86,83 @@ def triage_node(state: LoanApplicationState) -> Dict[str, Any]:
 def ocr_and_classify_node(state: LoanApplicationState) -> Dict[str, Any]:
     """
     Node 2: Determines document types for each uploaded file (PyMuPDF / PaddleOCR -> Classifier).
+    Calls classifier_adapter with keyword-heuristic fallback on UNKNOWN or exception.
     """
-    classified = dict(state.get("classified_types", {}))
-    manifest = state.get("document_manifest", {})
-    doc_ids = state.get("document_ids", [])
+    classified = dict(state.get("classified_types", {}) or {})
+    manifest = state.get("document_manifest", {}) or {}
+    doc_ids = state.get("document_ids", []) or list(manifest.keys())
+    doc_bytes_map = state.get("document_bytes", {}) or {}
+    doc_texts_map = state.get("document_texts", {}) or {}
 
+    storage = LocalFileSystemStorage()
     all_ids = list(set(doc_ids + list(manifest.keys())))
 
-    # Heuristic fallback if ML classifier is not pre-populated
     for doc_id in all_ids:
-        if doc_id not in classified:
+        if doc_id in classified and classified[doc_id] not in ("unknown", "UNKNOWN", None):
+            continue
+
+        page_texts: List[str] = []
+
+        # 1. Check if document texts provided directly in state
+        if doc_id in doc_texts_map:
+            val = doc_texts_map[doc_id]
+            if isinstance(val, list):
+                page_texts = [str(p) for p in val if str(p).strip()]
+            elif isinstance(val, str) and val.strip():
+                page_texts = [val.strip()]
+
+        # 2. If no text yet, extract from PDF bytes or storage/manifest
+        if not page_texts:
+            pdf_input: Optional[Union[str, bytes]] = None
+            if doc_id in doc_bytes_map:
+                pdf_input = doc_bytes_map[doc_id]
+            elif doc_id in manifest:
+                storage_key = manifest[doc_id]
+                try:
+                    pdf_input = storage.get(storage_key)
+                except Exception:
+                    if os.path.exists(storage_key):
+                        pdf_input = storage_key
+
+            if pdf_input:
+                try:
+                    pages = extract_all_pages_content(pdf_input)
+                    page_texts = [p.get("text", "") for p in pages if p.get("text", "").strip()]
+                except Exception as err:
+                    logger.debug(f"Failed to parse pages for {doc_id} in ocr_and_classify_node: {err}")
+
+        # 3. Call classifier adapter if text is available
+        predicted = "UNKNOWN"
+        if page_texts:
+            try:
+                from core.extraction.classifier_adapter import classify_document
+                res = classify_document(page_texts)
+                predicted = res.get("document_class", "UNKNOWN")
+            except Exception as ex:
+                logger.warning(f"Classifier adapter exception for doc_id {doc_id}: {ex}")
+                predicted = "UNKNOWN"
+
+        # 4. Keyword-heuristic fallback on UNKNOWN or exception
+        if predicted in ("UNKNOWN", "unknown"):
             doc_lower = doc_id.lower()
             uri_lower = manifest.get(doc_id, "").lower()
-            combo = f"{doc_lower} {uri_lower}"
+            text_snippet = " ".join(page_texts).lower() if page_texts else ""
+            combo = f"{doc_lower} {uri_lower} {text_snippet}"
 
             if "payslip" in combo or "salary" in combo:
-                classified[doc_id] = "payslip"
+                predicted = "payslip"
             elif "bank" in combo or "statement" in combo:
-                classified[doc_id] = "bank_statement"
+                predicted = "bank_statement"
             elif "tax" in combo or "itr" in combo or "form16" in combo:
-                classified[doc_id] = "tax_acknowledgement"
+                predicted = "tax_acknowledgement"
             elif "pan" in combo or "aadhaar" in combo or "kyc" in combo or "id" in combo:
-                classified[doc_id] = "id_card"
+                predicted = "id_card"
             elif "form" in combo or "app" in combo:
-                classified[doc_id] = "application_form"
+                predicted = "application_form"
             else:
-                classified[doc_id] = "unknown"
+                predicted = "unknown"
+
+        classified[doc_id] = predicted
 
     return {"classified_types": classified}
 

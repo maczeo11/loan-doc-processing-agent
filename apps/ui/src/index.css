@@ -1,0 +1,96 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    @apply h-full;
+  }
+
+  body {
+    @apply h-full bg-[#F8F6F1] text-stone-900 antialiased font-sans;
+    font-feature-settings: 'tnum' 1, 'cv05' 1;
+  }
+
+  #root {
+    @apply h-full;
+  }
+
+  ::selection {
+    @apply bg-[#FDE68A] text-stone-900;
+  }
+
+  /* Parchment scrollbars for archival panes */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #F2EDE4;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #D5CFC5;
+    border-radius: 5px;
+    border: 2px solid #F2EDE4;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #A8A29E;
+  }
+
+  kbd {
+    @apply font-mono;
+  }
+
+  select {
+    @apply font-mono;
+  }
+}
+
+@layer components {
+  /* Evidence bounding-box overlays on PDF canvas */
+  .evidence-overlay-box {
+    @apply absolute border-2 rounded-xs cursor-pointer pointer-events-auto transition-all;
+  }
+
+  .evidence-box-pass {
+    @apply border-[#16A34A]/70 bg-[#16A34A]/10 hover:bg-[#16A34A]/20;
+  }
+
+  .evidence-box-flag {
+    @apply border-[#DC2626]/70 bg-[#DC2626]/10 hover:bg-[#DC2626]/20;
+  }
+
+  .evidence-box-unknown {
+    @apply border-[#D97706]/70 bg-[#D97706]/10 hover:bg-[#D97706]/20;
+  }
+
+  .evidence-box-active {
+    @apply ring-2 ring-[#B45309] ring-offset-1 ring-offset-white border-[#B45309] bg-[#B45309]/20 shadow-md z-20;
+  }
+
+  /* Swiss ledger card */
+  .ledger-card {
+    @apply bg-white border border-[#E3DDD3] rounded-sm shadow-xs;
+  }
+}
+
+@layer utilities {
+  .animate-fade-in {
+    animation: fadeIn 0.15s ease-out;
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(2px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+}

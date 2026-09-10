@@ -27,11 +27,16 @@ def get_async_engine(
     url = database_url or settings.DATABASE_URL
     echo_mode = echo if echo is not None else getattr(settings, "DATABASE_ECHO", False)
 
-    if url.startswith("postgresql://"):
+    # NOTE: never use url.startswith("postgresql://") here. settings wraps the
+    # URL in AsyncCompatibleDsn whose startswith() deliberately returns True
+    # for +asyncpg URLs too — naive prefixing produced
+    # "postgresql+asyncpg://yncpg://..." (auth as user "yncpg"). Match the
+    # real scheme exactly instead.
+    scheme = str(url).split("://", 1)[0] if "://" in str(url) else ""
+    if scheme in ("postgresql", "postgres"):
         # Bare sync-scheme URL (e.g. worker env): the async engine needs an
-        # async driver, and asyncpg is the house driver. Normalize instead of
-        # crashing at import with MissingDriver (psycopg2).
-        url = "postgresql+asyncpg://" + url[len("postgresql://"):]
+        # async driver, and asyncpg is the house driver.
+        url = "postgresql+asyncpg://" + str(url).split("://", 1)[1]
 
     if url.startswith("sqlite"):
         # SQLite in-memory / file for testing

@@ -1,5 +1,6 @@
-﻿/** @type {import('tailwindcss').Config} */
+/** @type {import('tailwindcss').Config} */
 export default {
+  darkMode: ['class', '[data-theme="obsidian"]'],
   content: [
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
@@ -7,6 +8,31 @@ export default {
   theme: {
     extend: {
       colors: {
+        theme: {
+          app: 'var(--bg-app)',
+          header: 'var(--bg-header)',
+          panel: 'var(--bg-panel)',
+          'panel-hover': 'var(--bg-panel-hover)',
+          card: 'var(--bg-card)',
+          'card-subtle': 'var(--bg-card-subtle)',
+          desk: 'var(--bg-desk)',
+          border: 'var(--border-subtle)',
+          'border-card': 'var(--border-card)',
+          'border-active': 'var(--border-active)',
+          primary: 'var(--text-primary)',
+          secondary: 'var(--text-secondary)',
+          muted: 'var(--text-muted)',
+          brand: 'var(--accent-brand)',
+          pass: 'var(--accent-pass)',
+          'pass-bg': 'var(--accent-pass-bg)',
+          'pass-border': 'var(--accent-pass-border)',
+          flag: 'var(--accent-flag)',
+          'flag-bg': 'var(--accent-flag-bg)',
+          'flag-border': 'var(--accent-flag-border)',
+          unknown: 'var(--accent-unknown)',
+          'unknown-bg': 'var(--accent-unknown-bg)',
+          'unknown-border': 'var(--accent-unknown-border)',
+        },
         parchment: {
           50: '#FBF9F5',
           100: '#F8F6F1',

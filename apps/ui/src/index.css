@@ -3,12 +3,97 @@
 @tailwind utilities;
 
 @layer base {
+  :root,
+  [data-theme="slate"] {
+    --bg-app: #F8FAFC;
+    --bg-header: #FFFFFF;
+    --bg-panel: #F1F5F9;
+    --bg-panel-hover: #E2E8F0;
+    --bg-card: #FFFFFF;
+    --bg-card-subtle: #F8FAFC;
+    --bg-desk: #E2E8F0;
+    --border-subtle: #E2E8F0;
+    --border-card: #CBD5E1;
+    --border-active: #0F172A;
+    --text-primary: #0F172A;
+    --text-secondary: #334155;
+    --text-muted: #64748B;
+    --accent-brand: #4F46E5;
+    --accent-pass: #059669;
+    --accent-pass-bg: #ECFDF5;
+    --accent-pass-border: #A7F3D0;
+    --accent-flag: #DC2626;
+    --accent-flag-bg: #FEF2F2;
+    --accent-flag-border: #FECACA;
+    --accent-unknown: #D97706;
+    --accent-unknown-bg: #FFFBEB;
+    --accent-unknown-border: #FDE68A;
+    --highlight-glow: rgba(79, 70, 229, 0.15);
+  }
+
+  [data-theme="ledger"] {
+    --bg-app: #F8F6F1;
+    --bg-header: #FFFFFF;
+    --bg-panel: #FBF9F5;
+    --bg-panel-hover: #F2EDE4;
+    --bg-card: #FFFFFF;
+    --bg-card-subtle: #F8F6F1;
+    --bg-desk: #F5F2EB;
+    --border-subtle: #E3DDD3;
+    --border-card: #D5CFC5;
+    --border-active: #14532D;
+    --text-primary: #1C1917;
+    --text-secondary: #44403C;
+    --text-muted: #78716C;
+    --accent-brand: #14532D;
+    --accent-pass: #14532D;
+    --accent-pass-bg: #F0FDF4;
+    --accent-pass-border: #BBF7D0;
+    --accent-flag: #991B1B;
+    --accent-flag-bg: #FEF2F2;
+    --accent-flag-border: #FECACA;
+    --accent-unknown: #92400E;
+    --accent-unknown-bg: #FDF8EE;
+    --accent-unknown-border: #FDE68A;
+    --highlight-glow: rgba(180, 83, 9, 0.15);
+  }
+
+  [data-theme="obsidian"],
+  .dark {
+    --bg-app: #0B0F19;
+    --bg-header: #111827;
+    --bg-panel: #111827;
+    --bg-panel-hover: #1F2937;
+    --bg-card: #1E293B;
+    --bg-card-subtle: #0F172A;
+    --bg-desk: #090D16;
+    --border-subtle: #1F2937;
+    --border-card: #334155;
+    --border-active: #38BDF8;
+    --text-primary: #F8FAFC;
+    --text-secondary: #CBD5E1;
+    --text-muted: #94A3B8;
+    --accent-brand: #38BDF8;
+    --accent-pass: #10B981;
+    --accent-pass-bg: rgba(16, 185, 129, 0.15);
+    --accent-pass-border: rgba(16, 185, 129, 0.4);
+    --accent-flag: #F43F5E;
+    --accent-flag-bg: rgba(244, 63, 94, 0.15);
+    --accent-flag-border: rgba(244, 63, 94, 0.4);
+    --accent-unknown: #F59E0B;
+    --accent-unknown-bg: rgba(245, 158, 11, 0.15);
+    --accent-unknown-border: rgba(245, 158, 11, 0.4);
+    --highlight-glow: rgba(56, 189, 248, 0.2);
+  }
+
   html {
     @apply h-full;
   }
 
   body {
-    @apply h-full bg-[#F8F6F1] text-stone-900 antialiased font-sans;
+    background-color: var(--bg-app);
+    color: var(--text-primary);
+    @apply h-full antialiased font-sans transition-colors duration-200;
     font-feature-settings: 'tnum' 1, 'cv05' 1;
   }
 
@@ -17,24 +102,24 @@
   }
 
   ::selection {
-    @apply bg-[#FDE68A] text-stone-900;
+    background-color: #FDE68A;
+    color: #1C1917;
   }
 
-  /* Parchment scrollbars for archival panes */
+  /* Custom scrollbars matching theme */
   ::-webkit-scrollbar {
-    width: 10px;
-    height: 10px;
+    width: 8px;
+    height: 8px;
   }
   ::-webkit-scrollbar-track {
-    background: #F2EDE4;
+    background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background: #D5CFC5;
-    border-radius: 5px;
-    border: 2px solid #F2EDE4;
+    background: var(--border-card);
+    border-radius: 4px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: #A8A29E;
+    background: var(--text-muted);
   }
 
   kbd {
@@ -53,24 +138,39 @@
   }
 
   .evidence-box-pass {
-    @apply border-[#16A34A]/70 bg-[#16A34A]/10 hover:bg-[#16A34A]/20;
+    border-color: var(--accent-pass);
+    background-color: var(--accent-pass-bg);
   }
 
   .evidence-box-flag {
-    @apply border-[#DC2626]/70 bg-[#DC2626]/10 hover:bg-[#DC2626]/20;
+    border-color: var(--accent-flag);
+    background-color: var(--accent-flag-bg);
   }
 
   .evidence-box-unknown {
-    @apply border-[#D97706]/70 bg-[#D97706]/10 hover:bg-[#D97706]/20;
+    border-color: var(--accent-unknown);
+    background-color: var(--accent-unknown-bg);
   }
 
   .evidence-box-active {
-    @apply ring-2 ring-[#B45309] ring-offset-1 ring-offset-white border-[#B45309] bg-[#B45309]/20 shadow-md z-20;
+    ring-width: 2px;
+    ring-color: var(--accent-brand);
+    border-color: var(--accent-brand);
+    background-color: var(--highlight-glow);
+    @apply ring-2 shadow-md z-20;
   }
 
-  /* Swiss ledger card */
-  .ledger-card {
-    @apply bg-white border border-[#E3DDD3] rounded-sm shadow-xs;
+  /* Theme card */
+  .theme-card {
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: 4px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  }
+
+  .theme-panel {
+    background-color: var(--bg-panel);
+    border-color: var(--border-subtle);
   }
 }
 
@@ -92,5 +192,6 @@
 
   .tabular-nums {
     font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum' 1;
   }
 }

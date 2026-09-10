@@ -28,39 +28,39 @@ export const KeyboardShortcutsModal: React.FC<KeyboardShortcutsModalProps> = ({
   ];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/40 backdrop-blur-xs p-4">
-      <div className="w-full max-w-lg rounded-lg bg-white border border-[#E3DDD3] shadow-xl overflow-hidden flex flex-col">
-        <div className="flex items-center justify-between px-5 py-3.5 border-b border-[#E3DDD3] bg-[#FBF9F5]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-xs p-4">
+      <div className="w-full max-w-lg rounded-xs bg-theme-card border border-theme-border shadow-2xl overflow-hidden flex flex-col transition-colors duration-200">
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-theme-border bg-theme-panel">
           <div className="flex items-center gap-2">
-            <Keyboard className="w-4 h-4 text-stone-700" />
-            <h3 className="text-sm font-serif font-bold text-stone-900">
+            <Keyboard className="w-4 h-4 text-theme-brand" />
+            <h3 className="text-sm font-serif font-bold text-theme-primary">
               Underwriter Keyboard Shortcuts
             </h3>
           </div>
           <button
             onClick={onClose}
-            className="p-1 rounded text-stone-400 hover:text-stone-700 hover:bg-stone-200 transition-colors"
+            className="p-1 rounded-xs text-theme-muted hover:text-theme-primary hover:bg-theme-panel-hover transition-colors cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        <div className="p-5 overflow-y-auto max-h-[70vh] divide-y divide-[#E3DDD3]">
+        <div className="p-5 overflow-y-auto max-h-[70vh] divide-y divide-theme-border">
           {shortcuts.map((s, idx) => (
             <div key={idx} className="flex items-center justify-between py-2.5 first:pt-0 last:pb-0">
-              <span className="text-xs text-stone-700 font-medium">{s.description}</span>
-              <kbd className="px-2 py-1 text-[11px] font-mono font-bold bg-[#FBF9F5] text-stone-800 border border-[#D5CFC5] rounded shadow-xs">
+              <span className="text-xs text-theme-secondary font-medium">{s.description}</span>
+              <kbd className="px-2 py-1 text-[11px] font-mono font-bold bg-theme-panel text-theme-primary border border-theme-border rounded-xs shadow-2xs">
                 {s.key}
               </kbd>
             </div>
           ))}
         </div>
 
-        <div className="px-5 py-3 border-t border-[#E3DDD3] bg-[#FBF9F5] flex justify-between items-center text-xs text-stone-500">
+        <div className="px-5 py-3 border-t border-theme-border bg-theme-panel flex justify-between items-center text-xs text-theme-muted">
           <span className="font-serif italic">Shortcuts disabled inside input fields</span>
           <button
             onClick={onClose}
-            className="px-3 py-1 bg-stone-800 hover:bg-stone-900 text-white rounded text-xs transition-colors font-medium"
+            className="px-3 py-1 bg-theme-brand hover:opacity-90 text-white rounded-xs text-xs transition-opacity font-medium cursor-pointer"
           >
             Got it
           </button>

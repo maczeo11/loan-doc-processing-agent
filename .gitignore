@@ -46,12 +46,10 @@ Thumbs.db
 
 # UI / Node
 **/node_modules/
-node_modules/
-apps/ui/node_modules/
 apps/ui/dist/
-ui/node_modules/
 ui/dist/
 ui/.next/
+apps/ui/.next/
 
 # Large ML weights & binary datasets (>10MB)
 *.bin

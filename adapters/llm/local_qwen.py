@@ -14,8 +14,8 @@ import os
 import shutil
 import subprocess
 import logging
-from typing import List, Dict, Any, Optional
 import httpx
+from typing import List, Dict, Any, Optional
 from adapters.llm.base import LLMPort
 
 logger = logging.getLogger("finscan.adapters.llm.qwen")

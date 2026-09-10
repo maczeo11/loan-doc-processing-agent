@@ -44,6 +44,7 @@ class Settings(BaseSettings):
     AWS_REGION: str = "us-east-1"
     S3_BUCKET: str = "finscan-dossiers-dev"
     SQS_QUEUE_URL: str = ""
+    SQS_DLQ_URL: str = ""
 
     # OpenCode API
     OPENCODE_API_KEY: str = ""

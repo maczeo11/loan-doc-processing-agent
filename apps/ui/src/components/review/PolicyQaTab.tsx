@@ -12,12 +12,14 @@ interface PolicyQaTabProps {
 export const PolicyQaTab: React.FC<PolicyQaTabProps> = ({ applicationId }) => {
   const [question, setQuestion] = useState('');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [history, setHistory] = useState<PolicyQaResponse[]>([
     {
       question: 'What is the salary reconciliation tolerance and DTI ceiling under policy?',
       answer:
         'Under FinScan Retail Underwriting Policy v2026.1 (Section 4.2), net monthly income must be verified against at least 3 consecutive salary credits with a maximum permissible variance of ±5.0%. Debt-to-Income (DTI) ratio must not exceed 50.0% for Tier-1 applicants.',
-      is_grounded: true,
+      // Illustrative seed shown before any live retrieval — NOT a grounded answer.
+      is_grounded: false,
       citations: [
         {
           chunk_id: 'POL-RET-2026-S4',
@@ -36,6 +38,7 @@ export const PolicyQaTab: React.FC<PolicyQaTabProps> = ({ applicationId }) => {
 
     const q = question.trim();
     setLoading(true);
+    setError(null);
     setQuestion('');
 
     try {
@@ -43,17 +46,21 @@ export const PolicyQaTab: React.FC<PolicyQaTabProps> = ({ applicationId }) => {
       setHistory((prev) => [{
         question: q,
         answer: resp.answer,
-        is_grounded: true,
-        citations: resp.citations.map(c => ({
+        // Grounded only when the backend returns at least one citation.
+        is_grounded: (resp.citations || []).length > 0,
+        citations: (resp.citations || []).map((c: {
+          chunk_id?: string; doc_id?: string; title?: string; section?: string;
+          excerpt?: string; text?: string; score?: number; page_number?: number;
+        }) => ({
           chunk_id: c.chunk_id || '',
-          policy_name: c.title || 'Policy',
-          section: c.section || '',
-          text: c.text || '',
-          score: 0.9,
+          policy_name: c.doc_id || c.title || 'Policy',
+          section: c.section || (c.page_number ? `Page ${c.page_number}` : ''),
+          text: c.excerpt || c.text || '',
+          score: typeof c.score === 'number' ? c.score : 0,
         })),
       }, ...prev]);
-    } catch {
-      // Fallback — API not available in demo mode
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Policy Q&A request failed.');
     } finally {
       setLoading(false);
     }
@@ -81,6 +88,11 @@ export const PolicyQaTab: React.FC<PolicyQaTabProps> = ({ applicationId }) => {
 
       {/* Q&A Stream */}
       <div className="space-y-3">
+        {error && (
+          <div className="p-2.5 rounded bg-rose-50 border border-rose-200 text-rose-800 text-xs">
+            Policy Q&A error: {error}
+          </div>
+        )}
         {history.map((item, idx) => (
           <div key={idx} className="p-3.5 rounded bg-white border border-[#E3DDD3] shadow-sm text-xs space-y-2">
             <div className="flex items-start gap-2">
@@ -96,7 +108,11 @@ export const PolicyQaTab: React.FC<PolicyQaTabProps> = ({ applicationId }) => {
               <div className="mt-2 pt-2 border-t border-[#E3DDD3] pl-5.5 space-y-1.5">
                 <div className="flex items-center gap-1.5 text-[10px] uppercase font-mono font-semibold text-[#14532D]">
                   <ShieldCheck className="w-3 h-3" />
-                  <span>Authoritative Citation: {item.citations[0].policy_name}</span>
+                  <span>
+                    {item.is_grounded
+                      ? `Authoritative Citation: ${item.citations[0].policy_name}`
+                      : 'Unverified — illustrative example, not retrieved evidence'}
+                  </span>
                 </div>
                 <div className="p-2 rounded bg-[#FBF9F5] border border-[#E3DDD3] text-[11px] font-mono text-stone-800">
                   <p className="text-stone-500 mb-1 text-[10px] font-bold">

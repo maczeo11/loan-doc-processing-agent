@@ -15,11 +15,13 @@ export const FactsTab: React.FC<FactsTabProps> = ({ application, onSelectEvidenc
   const bank = application.bank_facts;
   const tax = application.tax_facts;
 
-  // Stated vs verified variance calculation for display
+  // Display-only reference figures. The PASS/FLAG/UNKNOWN verdict is NEVER
+  // computed here — it is rendered verbatim from the backend RULE-INC-01
+  // Finding (Prime Invariant: deterministic code decides).
   const statedNet = payslip?.net_salary?.amount || 0;
   const verifiedCredit = bank?.average_salary_credit?.amount || bank?.salary_credits?.[0]?.amount || 0;
-  const variance = statedNet > 0 ? ((verifiedCredit - statedNet) / statedNet) * 100 : 0;
-  const isVarianceAcceptable = Math.abs(variance) <= 5.0;
+  const incFinding = application.findings.find((f) => f.rule_id === 'RULE-INC-01');
+  const incVerdict = incFinding?.verdict ?? 'unknown';
 
   return (
     <div className="space-y-4">
@@ -31,17 +33,20 @@ export const FactsTab: React.FC<FactsTabProps> = ({ application, onSelectEvidenc
           </span>
           <span
             className={`inline-flex items-center gap-1 text-[11px] font-mono font-semibold px-2 py-0.5 rounded border ${
-              isVarianceAcceptable
+              incVerdict === 'pass'
                 ? 'bg-[#F0FDF4] border-[#15803D] text-[#14532D]'
-                : 'bg-[#FEF2F2] border-[#DC2626] text-[#991B1B]'
+                : incVerdict === 'flag'
+                  ? 'bg-[#FEF2F2] border-[#DC2626] text-[#991B1B]'
+                  : 'bg-[#FFFBEB] border-[#D97706] text-[#92400E]'
             }`}
+            title={incFinding ? `Backend ${incFinding.rule_id}: ${incFinding.reason}` : 'Backend has not issued RULE-INC-01 yet'}
           >
-            {isVarianceAcceptable ? (
+            {incVerdict === 'pass' ? (
               <Check className="w-3 h-3 text-[#15803D]" />
             ) : (
-              <AlertTriangle className="w-3 h-3 text-[#DC2626]" />
+              <AlertTriangle className={`w-3 h-3 ${incVerdict === 'flag' ? 'text-[#DC2626]' : 'text-[#D97706]'}`} />
             )}
-            <span>Variance: {variance >= 0 ? `+${variance.toFixed(2)}%` : `${variance.toFixed(2)}%`}</span>
+            <span>Backend RULE-INC-01: {incVerdict.toUpperCase()}</span>
           </span>
         </div>
 
@@ -69,11 +74,7 @@ export const FactsTab: React.FC<FactsTabProps> = ({ application, onSelectEvidenc
             <span className="text-[10px] text-stone-500 block mb-1 uppercase font-mono font-semibold">
               Verified Bank Deposit
             </span>
-            <span
-              className={`text-sm font-mono font-bold block ${
-                isVarianceAcceptable ? 'text-[#14532D]' : 'text-[#991B1B]'
-              }`}
-            >
+            <span className="text-sm font-mono font-bold block text-stone-900">
               {formatCurrency(verifiedCredit)}
             </span>
             {bank?.salary_credits?.[0]?.source && (
@@ -127,7 +128,7 @@ export const FactsTab: React.FC<FactsTabProps> = ({ application, onSelectEvidenc
                   : 'bg-[#FEF2F2] text-[#991B1B] border border-[#FECACA]'
               }`}
             >
-              {bank?.bounced_transactions ?? 0} Inward Bounces
+              {bank?.bounced_transactions ?? 'UNKNOWN'} Inward Bounces
             </span>
           </div>
         </div>

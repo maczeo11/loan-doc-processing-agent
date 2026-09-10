@@ -14,6 +14,13 @@ import type { LoanApplication, DossierDocument } from './types/application';
 import type { EvidenceRef } from './types/evidence';
 import type { ReviewDecision } from './types/api';
 import { getEvidenceKey } from './utils/coordinates';
+import { api } from './services/api';
+
+// Demo reviewer identity until AuthContext is wired to the review call.
+// Backend requires reviewer_id; production must use verified JWT claims.
+const DEMO_REVIEWER_ID = 'underwriter@finscan.ai';
+// Poll only while the pipeline is still running (spec: >=2s interval).
+const POLL_INTERVAL_MS = 2500;
 
 /**
  * Adapter: convert LoanApplicationState (backend contract) → LoanApplication (UI component model).
@@ -77,6 +84,8 @@ function AppInner({
   const [dossierState, setDossierState] = useState<LoanApplicationState>(DEMO_DOSSIER_APP_25195);
   const [_isLoading, setIsLoading] = useState<boolean>(false);
   const [notification, setNotification] = useState<string | null>(null);
+  // Live mode flips on the moment the backend answers; otherwise demo data.
+  const [liveMode, setLiveMode] = useState<boolean>(false);
 
   // Modal state
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
@@ -93,25 +102,44 @@ function AppInner({
   // Convert state to LoanApplication for Swiss components
   const application = useMemo(() => toLoanApplication(dossierState), [dossierState]);
 
-  const fetchApplicationData = useCallback(async () => {
-    setIsLoading(true);
+  const fetchApplicationData = useCallback(async (quiet = false) => {
+    if (!quiet) setIsLoading(true);
     try {
-      // Always use demo data for now (backend not yet serving GET /applications/{id})
+      const live = await api.getApplication(selectedAppId);
+      setDossierState(live as LoanApplicationState);
+      setLiveMode(true);
+      const ids = (live as LoanApplicationState).document_ids || [];
+      if (ids.length > 0) onSelectDoc(ids[0]);
+      if (!quiet) setNotification(`Live dossier ${selectedAppId} loaded from API`);
+    } catch (err) {
+      // Backend unreachable or unknown app: demo data keeps the desk usable.
+      setLiveMode(false);
       setDossierState(DEMO_DOSSIER_APP_25195);
       if (DEMO_DOSSIER_APP_25195.document_ids && DEMO_DOSSIER_APP_25195.document_ids.length > 0) {
         onSelectDoc(DEMO_DOSSIER_APP_25195.document_ids[0]);
       }
-      setNotification('Loaded demo dossier for APP-25195');
-    } catch (err) {
-      setNotification(err instanceof Error ? err.message : 'Failed to fetch application');
+      if (!quiet) {
+        setNotification(
+          `Backend unavailable (${err instanceof Error ? err.message : 'unknown error'}). Loaded demo dossier for APP-25195`
+        );
+      }
     } finally {
-      setIsLoading(false);
+      if (!quiet) setIsLoading(false);
     }
   }, [selectedAppId, onSelectDoc]);
 
   useEffect(() => {
     fetchApplicationData();
   }, [fetchApplicationData]);
+
+  // Single status poll while the pipeline runs (one GET per tick: <=30/min).
+  useEffect(() => {
+    if (dossierState.status !== 'QUEUED' && dossierState.status !== 'PROCESSING') return;
+    const timer = setInterval(() => {
+      fetchApplicationData(true);
+    }, POLL_INTERVAL_MS);
+    return () => clearInterval(timer);
+  }, [dossierState.status, fetchApplicationData]);
 
   const handleSelectDoc = (docId: string) => {
     onSelectDoc(docId);
@@ -132,13 +160,30 @@ function AppInner({
   const handleSubmitReview = async (notes: string) => {
     setIsSubmitting(true);
     try {
-      setDossierState((prev) => ({
-        ...prev,
-        status: reviewDecision === 'NEEDS_INFO' ? 'NEEDS_INFORMATION' : 'REVIEWED',
-        reviewer_decision: reviewDecision,
-        reviewer_notes: notes,
-      }));
-      setNotification(`Review submitted: ${reviewDecision}`);
+      if (liveMode && reviewDecision) {
+        const resp = await api.submitReview(selectedAppId, {
+          decision: reviewDecision,
+          reviewer_id: DEMO_REVIEWER_ID,
+          notes,
+        });
+        const liveStatus = (resp as { status?: LoanApplicationState['status'] }).status;
+        setDossierState((prev) => ({
+          ...prev,
+          status: liveStatus ?? prev.status,
+          reviewer_decision: reviewDecision,
+          reviewer_notes: notes,
+        }));
+        setNotification(`Review submitted: ${reviewDecision} (${resp.application_id})`);
+      } else {
+        // Demo mode: backend has no such app; record locally only.
+        setDossierState((prev) => ({
+          ...prev,
+          status: reviewDecision === 'NEEDS_INFO' ? 'NEEDS_INFORMATION' : 'REVIEWED',
+          reviewer_decision: reviewDecision,
+          reviewer_notes: notes,
+        }));
+        setNotification(`Review submitted locally (demo mode): ${reviewDecision}`);
+      }
       setReviewDecision(null);
     } catch (err) {
       setNotification(err instanceof Error ? err.message : 'Error submitting review');
@@ -154,6 +199,9 @@ function AppInner({
       if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') return;
 
       const findings = dossierState.findings || [];
+      // Sign-off hotkeys mirror the inspector gate: READY_FOR_REVIEW + findings.
+      const canSign =
+        dossierState.status === 'READY_FOR_REVIEW' && findings.length > 0;
       switch (e.key) {
         case '?':
           setShortcutsOpen((prev) => !prev);
@@ -182,15 +230,15 @@ function AppInner({
         }
         case 'a':
         case 'A':
-          if (dossierState.status !== 'REVIEWED') setReviewDecision('APPROVED');
+          if (canSign) setReviewDecision('APPROVED');
           break;
         case 'r':
         case 'R':
-          if (dossierState.status !== 'REVIEWED') setReviewDecision('REJECTED');
+          if (canSign) setReviewDecision('REJECTED');
           break;
         case 'n':
         case 'N':
-          if (dossierState.status !== 'REVIEWED') setReviewDecision('NEEDS_INFO');
+          if (canSign) setReviewDecision('NEEDS_INFO');
           break;
         case 'Escape':
           setShortcutsOpen(false);
@@ -247,7 +295,12 @@ function AppInner({
           <PdfViewer
             docId={selectedDocId}
             docTitle={currentDocTitle}
-            isDemoMode={true}
+            pdfSource={
+              liveMode
+                ? `/applications/${encodeURIComponent(selectedAppId)}/documents/${encodeURIComponent(selectedDocId)}`
+                : null
+            }
+            isDemoMode={!liveMode}
           />
         </div>
 

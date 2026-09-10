@@ -22,8 +22,9 @@ def main():
 
     if queue_backend == "sqs":
         queue_url = os.getenv("SQS_QUEUE_URL", "")
+        dlq_url = os.getenv("SQS_DLQ_URL", "")
         region = os.getenv("AWS_REGION", "us-east-1")
-        queue_adapter = SQSQueueAdapter(queue_url=queue_url, region_name=region)
+        queue_adapter = SQSQueueAdapter(queue_url=queue_url, dlq_url=dlq_url, region_name=region)
     else:
         db_url = os.getenv("DATABASE_URL", "postgresql://postgres:postgrespassword@localhost:5432/finscan")
         queue_adapter = PostgresQueueAdapter(connection_string=db_url)

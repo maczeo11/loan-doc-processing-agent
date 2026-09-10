@@ -32,7 +32,13 @@ export const RightInspectorPane: React.FC<RightInspectorPaneProps> = ({
   const [activeTab, setActiveTab] = useState<TabType>('findings');
 
   const flagCount = application.findings.filter((f) => f.verdict === 'flag').length;
-  const isActionDisabled = application.status === 'REVIEWED';
+  // Sign-off unlocks ONLY on a reviewed-ready dossier with findings present.
+  // Backend enforces the same (409 unless READY_FOR_REVIEW); this mirrors it
+  // so the underwriter can never authorize from UPLOADED/QUEUED/PROCESSING
+  // or sign an empty dossier.
+  const canSignOff =
+    application.status === 'READY_FOR_REVIEW' && application.findings.length > 0;
+  const isActionDisabled = !canSignOff;
 
   return (
     <aside
@@ -146,6 +152,12 @@ export const RightInspectorPane: React.FC<RightInspectorPaneProps> = ({
               </span>
               <span className="font-mono text-[10px] text-stone-500">Shortcuts: [A] [R] [N]</span>
             </div>
+            {!canSignOff && (
+              <p className="text-[11px] font-mono text-stone-500">
+                Sign-off unlocks when the pipeline reaches READY_FOR_REVIEW with findings present
+                (current: {application.status}, {application.findings.length} findings).
+              </p>
+            )}
 
             <div className="grid grid-cols-3 gap-2.5">
               <button

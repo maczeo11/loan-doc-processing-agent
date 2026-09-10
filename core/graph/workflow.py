@@ -43,8 +43,20 @@ class FallbackCompiledGraph:
     def invoke(self, initial_state: Dict[str, Any], config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         state = dict(initial_state)
 
-        # Standard linear pipeline sequence
-        node_order = ["triage", "extract", "rules", "retrieve", "synthesize"]
+        # Full linear pipeline sequence — mirrors the StateGraph edges above,
+        # INCLUDING classification, the grounding gate, and human review.
+        # Dropping any of these silently (as an older fallback did) would
+        # bypass the citation gate and the HITL checkpoint.
+        node_order = [
+            "triage",
+            "ocr_and_classify",
+            "extract_facts",
+            "evaluate_rules",
+            "retrieve_policy",
+            "synthesize_summary",
+            "validate_grounding",
+            "human_review",
+        ]
         for node_name in node_order:
             if node_name in self.nodes:
                 fn = self.nodes[node_name]
@@ -75,6 +87,23 @@ def build_application_graph(checkpointer=None, enable_interrupt: bool = True):
     """
     if LANGGRAPH_AVAILABLE:
         workflow = StateGraph(LoanApplicationState)
+    else:
+        # No langgraph installed: run the same node sequence synchronously.
+        # The fallback preserves classification, grounding, and human review —
+        # interrupt semantics are unavailable, so human_review runs inline.
+        return FallbackCompiledGraph(
+            nodes={
+                "triage": triage_node,
+                "ocr_and_classify": ocr_and_classify_node,
+                "extract_facts": extract_facts_node,
+                "evaluate_rules": evaluate_rules_node,
+                "retrieve_policy": retrieve_policy_node,
+                "synthesize_summary": synthesize_summary_node,
+                "validate_grounding": validate_grounding_node,
+                "human_review": human_review_node,
+            },
+            edges=[],
+        )
 
     # 1. Add processing nodes
     workflow.add_node("triage", triage_node)

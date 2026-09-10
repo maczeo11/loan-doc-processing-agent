@@ -22,9 +22,15 @@ export const ReviewActionModal: React.FC<ReviewActionModalProps> = ({
 }) => {
   const { user } = useAuth();
   const [notes, setNotes] = useState('');
+  const [confirmText, setConfirmText] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   if (!isOpen || !decision) return null;
+
+  // Dossier-identifier challenge: the exact APP-XXXXX must be retyped.
+  // Non-empty match required — an empty field must never unlock sign-off.
+  const confirmMatches =
+    confirmText.trim() !== '' && confirmText.trim() === applicationId;
 
   const getDecisionMeta = () => {
     switch (decision) {
@@ -126,6 +132,20 @@ export const ReviewActionModal: React.FC<ReviewActionModalProps> = ({
             <Shield className="w-3 h-3 text-stone-400" />
             <span>HITL Protocol: Resumes LangGraph thread & records immutable audit event.</span>
           </div>
+
+          {/* Dossier-identifier challenge (Two-Step Dual-Sign) */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-stone-700">
+              Type dossier ID <span className="font-mono font-bold">{applicationId}</span> to unlock sign-off
+            </label>
+            <input
+              value={confirmText}
+              onChange={(e) => setConfirmText(e.target.value)}
+              placeholder="APP-XXXXX"
+              autoComplete="off"
+              className="w-full bg-white border border-[#E3DDD3] rounded-md p-2.5 text-xs font-mono text-stone-900 placeholder-stone-400 focus:outline-none focus:border-stone-800 transition-colors shadow-xs"
+            />
+          </div>
         </div>
 
         {/* Modal Footer */}
@@ -141,7 +161,7 @@ export const ReviewActionModal: React.FC<ReviewActionModalProps> = ({
           <button
             type="button"
             onClick={handleConfirm}
-            disabled={isSubmitting}
+            disabled={isSubmitting || !confirmMatches}
             className={`px-4 py-1.5 rounded text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm ${meta.btnBg} disabled:opacity-50`}
           >
             {isSubmitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}

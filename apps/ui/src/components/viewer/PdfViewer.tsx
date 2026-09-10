@@ -40,6 +40,7 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({
 
   const {
     activeEvidence,
+    activeRuleId,
     targetPageToNavigate,
     clearTargetPage,
     clearActiveEvidence,
@@ -194,6 +195,7 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({
               {/* Bounding Box Highlights Layer */}
               <BoundingBoxOverlay
                 activeEvidence={activeEvidence}
+                activeRuleId={activeRuleId}
                 canvasWidth={canvasDimensions.width}
                 canvasHeight={canvasDimensions.height}
                 currentDocId={docId}

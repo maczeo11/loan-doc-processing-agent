@@ -12,12 +12,14 @@ interface EvidenceBoxProps {
   evidence: EvidenceRef;
   bounds: PixelBounds;
   isSelected?: boolean;
+  tag?: string | null;
 }
 
 export const EvidenceBox: React.FC<EvidenceBoxProps> = ({
   evidence,
   bounds,
   isSelected = true,
+  tag,
 }) => {
   const [isHovered, setIsHovered] = useState<boolean>(false);
 
@@ -45,7 +47,7 @@ export const EvidenceBox: React.FC<EvidenceBoxProps> = ({
       {/* Small Evidence Pill Header */}
       <div className="absolute -top-3.5 left-0 flex items-center gap-1">
         <span className="text-[9px] font-bold tracking-wider uppercase px-1 py-0.2 rounded-xs bg-amber-600 text-white shadow-xs">
-          EVIDENCE
+          {tag || 'EVIDENCE'}
         </span>
       </div>
 

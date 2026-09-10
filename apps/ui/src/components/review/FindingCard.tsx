@@ -9,7 +9,7 @@ interface FindingCardProps {
   finding: Finding;
   isFocused: boolean;
   onSelectFinding: () => void;
-  onSelectEvidence: (ev: EvidenceRef) => void;
+  onSelectEvidence: (ev: EvidenceRef, ruleId?: string) => void;
   activeEvidenceKey: string | null;
 }
 
@@ -68,7 +68,7 @@ export const FindingCard: React.FC<FindingCardProps> = ({
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
-                    onSelectEvidence(ev);
+                    onSelectEvidence(ev, finding.rule_id);
                   }}
                   className={`text-left p-2 rounded border text-[11px] transition-all flex items-start justify-between gap-2 ${
                     isActive

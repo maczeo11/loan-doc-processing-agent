@@ -3,8 +3,9 @@ import type { EvidenceRef } from '../types/contracts';
 
 interface EvidenceNavigationContextType {
   activeEvidence: EvidenceRef | null;
+  activeRuleId: string | null;
   targetPageToNavigate: number | null;
-  navigateToEvidence: (evidence: EvidenceRef) => void;
+  navigateToEvidence: (evidence: EvidenceRef, ruleId?: string) => void;
   clearActiveEvidence: () => void;
   clearTargetPage: () => void;
 }
@@ -16,11 +17,13 @@ export const EvidenceNavigationProvider: React.FC<{
   onSelectDocument?: (docId: string) => void;
 }> = ({ children, onSelectDocument }) => {
   const [activeEvidence, setActiveEvidence] = useState<EvidenceRef | null>(null);
+  const [activeRuleId, setActiveRuleId] = useState<string | null>(null);
   const [targetPageToNavigate, setTargetPageToNavigate] = useState<number | null>(null);
 
   const navigateToEvidence = useCallback(
-    (evidence: EvidenceRef) => {
+    (evidence: EvidenceRef, ruleId?: string) => {
       setActiveEvidence(evidence);
+      setActiveRuleId(ruleId ?? null);
       setTargetPageToNavigate(evidence.page_number);
       if (onSelectDocument) {
         onSelectDocument(evidence.document_id);
@@ -31,6 +34,7 @@ export const EvidenceNavigationProvider: React.FC<{
 
   const clearActiveEvidence = useCallback(() => {
     setActiveEvidence(null);
+    setActiveRuleId(null);
   }, []);
 
   const clearTargetPage = useCallback(() => {
@@ -41,6 +45,7 @@ export const EvidenceNavigationProvider: React.FC<{
     <EvidenceNavigationContext.Provider
       value={{
         activeEvidence,
+        activeRuleId,
         targetPageToNavigate,
         navigateToEvidence,
         clearActiveEvidence,

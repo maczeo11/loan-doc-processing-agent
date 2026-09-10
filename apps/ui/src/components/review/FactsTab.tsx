@@ -50,7 +50,7 @@ export const FactsTab: React.FC<FactsTabProps> = ({ application, onSelectEvidenc
             <span className="text-[10px] text-stone-500 block mb-1 uppercase font-mono font-semibold">
               Stated Payslip Net Salary
             </span>
-            <span className="text-sm font-mono font-bold text-stone-900 block">
+            <span className="text-sm font-mono font-bold text-stone-900 block tabular-nums">
               {formatCurrency(statedNet)}
             </span>
             {payslip?.net_salary?.source && (
@@ -70,7 +70,7 @@ export const FactsTab: React.FC<FactsTabProps> = ({ application, onSelectEvidenc
               Verified Bank Deposit
             </span>
             <span
-              className={`text-sm font-mono font-bold block ${
+              className={`text-sm font-mono font-bold block tabular-nums ${
                 isVarianceAcceptable ? 'text-[#14532D]' : 'text-[#991B1B]'
               }`}
             >
@@ -113,7 +113,7 @@ export const FactsTab: React.FC<FactsTabProps> = ({ application, onSelectEvidenc
 
           <div className="flex justify-between items-center text-stone-700">
             <span className="text-stone-500">Closing Balance:</span>
-            <span className="font-mono font-semibold text-stone-900">
+            <span className="font-mono font-semibold text-stone-900 tabular-nums">
               {formatCurrency(bank?.closing_balance?.amount)}
             </span>
           </div>
@@ -153,14 +153,14 @@ export const FactsTab: React.FC<FactsTabProps> = ({ application, onSelectEvidenc
 
           <div className="flex justify-between items-center text-stone-700">
             <span className="text-stone-500">Gross Total Income:</span>
-            <span className="font-mono font-bold text-[#14532D]">
+            <span className="font-mono font-bold text-[#14532D] tabular-nums">
               {formatCurrency(tax?.gross_total_income?.amount)}
             </span>
           </div>
 
           <div className="flex justify-between items-center text-stone-700">
             <span className="text-stone-500">Total Tax Paid:</span>
-            <span className="font-mono font-medium text-stone-900">
+            <span className="font-mono font-medium text-stone-900 tabular-nums">
               {formatCurrency(tax?.total_tax_paid?.amount)}
             </span>
           </div>

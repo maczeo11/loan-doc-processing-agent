@@ -43,6 +43,8 @@ function toLoanApplication(state: LoanApplicationState): LoanApplication {
     } as DossierDocument;
   });
 
+  const history = state.status_history || [];
+
   return {
     id: state.application_id,
     applicant_name: state.applicant?.full_name || 'Applicant',
@@ -50,7 +52,8 @@ function toLoanApplication(state: LoanApplicationState): LoanApplication {
     loan_amount: 2500000, // Demo seed value: ₹ 25,00,000
     currency: 'INR',
     status: state.status,
-    created_at: state.status_history?.[0]?.timestamp || new Date().toISOString(),
+    created_at: history[0]?.timestamp || new Date().toISOString(),
+    updated_at: history.length > 0 ? history[history.length - 1].timestamp : undefined,
     documents,
     findings: state.findings || [],
     payslip_facts: state.payslip || undefined,
@@ -121,8 +124,8 @@ function AppInner({
     setSelectedAppId(appId);
   };
 
-  const handleSelectEvidence = (ev: EvidenceRef) => {
-    navigateToEvidence(ev);
+  const handleSelectEvidence = (ev: EvidenceRef, ruleId?: string) => {
+    navigateToEvidence(ev, ruleId);
   };
 
   const handleTriggerAction = (decision: ReviewDecision) => {

@@ -13,7 +13,7 @@ interface RightInspectorPaneProps {
   activeEvidenceKey: string | null;
   focusedFindingIndex: number;
   onSelectFindingIndex: (idx: number) => void;
-  onSelectEvidence: (ev: EvidenceRef) => void;
+  onSelectEvidence: (ev: EvidenceRef, ruleId?: string) => void;
   onTriggerAction: (decision: ReviewDecision) => void;
   width: number;
 }
@@ -32,7 +32,10 @@ export const RightInspectorPane: React.FC<RightInspectorPaneProps> = ({
   const [activeTab, setActiveTab] = useState<TabType>('findings');
 
   const flagCount = application.findings.filter((f) => f.verdict === 'flag').length;
+  const passCount = application.findings.filter((f) => f.verdict === 'pass').length;
+  const unknownCount = application.findings.filter((f) => f.verdict === 'unknown').length;
   const isActionDisabled = application.status === 'REVIEWED';
+  const readyToSign = flagCount === 0 && unknownCount === 0 && application.findings.length > 0;
 
   return (
     <aside
@@ -101,6 +104,29 @@ export const RightInspectorPane: React.FC<RightInspectorPaneProps> = ({
       <div className="flex-1 overflow-y-auto p-3.5 bg-white">
         {activeTab === 'findings' && (
           <div className="space-y-3">
+            {/* Decision summary: answers "can I sign this?" in seconds */}
+            <div className="p-3 rounded-sm bg-[#FBF9F5] border border-[#E3DDD3]">
+              <div className="flex items-center gap-2 text-xs font-mono font-bold">
+                <span className="text-[#14532D]">{passCount} pass</span>
+                <span className="text-stone-300">·</span>
+                <span className={flagCount > 0 ? 'text-[#991B1B]' : 'text-stone-500'}>{flagCount} flag</span>
+                <span className="text-stone-300">·</span>
+                <span className={unknownCount > 0 ? 'text-[#92400E]' : 'text-stone-500'}>{unknownCount} unknown</span>
+              </div>
+              <p className="text-[11px] text-stone-600 mt-1 leading-relaxed">
+                {application.status === 'REVIEWED'
+                  ? `Decision recorded${application.reviewer_decision ? `: ${application.reviewer_decision}` : ''}. Thread sealed.`
+                  : readyToSign
+                    ? 'All checks verified. Ready for underwriter sign-off below.'
+                    : 'Resolve flagged items or request information before signing.'}
+              </p>
+              {application.updated_at && (
+                <p className="text-[10px] text-stone-400 font-mono mt-1">
+                  State as of {new Date(application.updated_at).toLocaleString()}
+                </p>
+              )}
+            </div>
+
             <div className="flex items-center justify-between pb-2 border-b border-[#E3DDD3]">
               <span className="text-xs font-serif font-bold text-stone-800">
                 Deterministic Audit Invariants ({application.findings.length})

@@ -23,6 +23,7 @@ from core.contracts.jobs import JobRef
 from core.contracts.state import LoanApplicationState
 from core.contracts.facts import PayslipFacts, BankStatementFacts, TaxReturnFacts, ApplicantFact
 from core.graph.workflow import build_application_graph
+from worker.persistence import persist_pipeline_result
 
 logger = logging.getLogger("finscan.worker")
 
@@ -88,6 +89,7 @@ class ApplicationWorker:
         heartbeat_interval_seconds: float = 10.0,
         heartbeat_extension_seconds: int = 30,
         graph=None,
+        db_url: Optional[str] = None,
     ):
         self.queue = queue_adapter
         self.storage: StoragePort = storage_adapter or LocalFileSystemStorage()
@@ -97,6 +99,8 @@ class ApplicationWorker:
         self.heartbeat_extension_seconds = heartbeat_extension_seconds
         self.running = False
         self.graph = graph if graph is not None else build_application_graph(checkpointer=checkpointer, enable_interrupt=True)
+        # Opt-in Postgres write-back (None keeps fake-queue unit tests hermetic).
+        self.db_url = db_url
 
     def start(self, poll_interval_seconds: float = 2.0) -> None:
         """Main consumer polling loop."""
@@ -226,7 +230,26 @@ class ApplicationWorker:
                 final_state = self.graph.invoke(initial_state, config=config)
                 current_status = final_state.get("status", "UNKNOWN")
 
-                # 4. Acknowledge-Last: State committed before message is deleted
+                # 4. Write-back: commit pipeline outcome to PostgreSQL BEFORE ack.
+                # On persistence failure the delivery is failed retryably and
+                # NEVER acknowledged (acknowledge-last guarantee preserved).
+                if self.db_url:
+                    try:
+                        persist_pipeline_result(
+                            db_url=self.db_url,
+                            job_id=job_ref.job_id,
+                            application_id=job_ref.application_id,
+                            final_state=final_state,
+                        )
+                    except Exception as persist_err:
+                        logger.error(
+                            f"Write-back failed for job {job_ref.job_id}: {persist_err}",
+                            exc_info=True,
+                        )
+                        self.queue.fail(handle, retryable=True)
+                        return None
+
+                # 5. Acknowledge-Last: State committed before message is deleted
                 logger.info(
                     f"Job {job_ref.job_id} pipeline completed with status: {current_status}. "
                     f"Committing state and acknowledging message..."

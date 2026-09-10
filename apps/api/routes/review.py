@@ -9,6 +9,8 @@ Endpoints:
 """
 
 from typing import Optional, List, Dict, Any, Literal
+import asyncio
+import os
 import uuid
 import logging
 from fastapi import APIRouter, Depends, HTTPException, status, Request
@@ -194,15 +196,82 @@ async def cancel_job(
 
 
 @router.post("/applications/{id}/questions", response_model=QuestionResponse)
-async def ask_question(id: str, payload: QuestionRequest):
+async def ask_question(id: str, payload: QuestionRequest, session: AsyncSession = Depends(get_db)):
     """
-    RAG-grounded question answering over the application documents and credit policy.
+    RAG-grounded question answering over the credit policy corpus.
+
+    Deterministic by design (Prime Invariant): the answer only quotes
+    retrieved policy passages with chunk citations. No LLM generation,
+    so no hallucinated numbers can reach the underwriter.
     """
-    # Sai Mokshith to implement hybrid retrieval + grounding validation
-    return QuestionResponse(
-        answer="Grounding answer placeholder.",
-        citations=[]
+    from sqlalchemy import select as _select
+
+    from apps.api.db.models import ApplicationModel as _ApplicationModel
+
+    result = await session.execute(
+        _select(_ApplicationModel).where(_ApplicationModel.id == id)
     )
+    if result.scalar_one_or_none() is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Application '{id}' not found",
+        )
+
+    question = (payload.question or "").strip()
+    if not question:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Question cannot be empty",
+        )
+
+    try:
+        from core.rag.indexer import IndexManager
+        from core.rag.retriever import HybridRetriever
+
+        policy_dir = _resolve_policy_dir()
+        manager = IndexManager()
+        manager.load_policy_corpus(policy_dir=policy_dir)
+        retriever = HybridRetriever(index_manager=manager, policy_dir=policy_dir)
+        hits = retriever.retrieve_policy(question, top_k=5)
+    except Exception as err:
+        logger.warning(f"Policy retrieval unavailable for question on '{id}': {err}")
+        hits = []
+
+    if not hits:
+        return QuestionResponse(
+            answer="No relevant policy passages found for this question. I abstain rather than guess.",
+            citations=[],
+        )
+
+    lines = [f"Top {len(hits)} policy passages relevant to: {question}"]
+    citations: List[Dict[str, Any]] = []
+    for i, hit in enumerate(hits, start=1):
+        text = str(hit.get("text", "")).strip()
+        excerpt = text[:400] + ("..." if len(text) > 400 else "")
+        lines.append(f"{i}. [{hit.get('chunk_id')}] {excerpt}")
+        citations.append(
+            {
+                "chunk_id": hit.get("chunk_id"),
+                "doc_id": hit.get("doc_id"),
+                "page_number": hit.get("page_number"),
+                "score": hit.get("score"),
+                "excerpt": excerpt,
+            }
+        )
+    return QuestionResponse(answer="\n".join(lines), citations=citations)
+
+
+def _resolve_policy_dir() -> str:
+    """Locates the policy corpus: env override, else repo policies/, else ./policies."""
+    env_dir = os.getenv("FINSCAN_POLICY_DIR")
+    if env_dir and os.path.isdir(env_dir):
+        return env_dir
+    here = os.path.dirname(os.path.abspath(__file__))
+    repo_root = os.path.dirname(os.path.dirname(os.path.dirname(here)))
+    repo_policies = os.path.join(repo_root, "policies")
+    if os.path.isdir(repo_policies):
+        return repo_policies
+    return "policies"
 
 
 @router.post("/applications/{id}/review")
@@ -297,8 +366,35 @@ async def submit_review(
     # 4. Atomic commit
     await session.commit()
 
+    # 5. Best-effort LangGraph checkpoint resume: advances the paused
+    # StateGraph thread through human_review_node so the durable checkpoint
+    # mirrors the DB decision. Never fails the API response — the DB commit
+    # above is the source of truth for the UI.
+    try:
+        from core.graph.checkpoint import SqliteSaver
+        from core.graph.workflow import resume_application_review
+
+        checkpoint_path = os.getenv("CHECKPOINT_DB_PATH", "data/storage/checkpoints.sqlite3")
+
+        def _resume() -> None:
+            resume_application_review(
+                thread_id=id,
+                decision=payload.decision,  # type: ignore[arg-type]
+                notes=payload.notes,
+                corrections=payload.corrections,
+                checkpointer=SqliteSaver(db_path=checkpoint_path),
+            )
+
+        await asyncio.to_thread(_resume)
+    except Exception as resume_err:  # noqa: BLE001 - resume is advisory only
+        logger.warning(f"Graph resume skipped for application '{id}': {resume_err}")
+
     return {
         "application_id": id,
         "decision": payload.decision,
         "status": to_status,
+        "reviewer_id": payload.reviewer_id,
+        "notes": payload.notes,
+        "from_status": from_status,
+        "to_status": to_status,
     }

@@ -31,7 +31,14 @@ def main():
 
     checkpoint_db = os.getenv("CHECKPOINT_DB_PATH", "data/storage/checkpoints.sqlite3")
     checkpointer = SqliteSaver(db_path=checkpoint_db)
-    worker = ApplicationWorker(queue_adapter=queue_adapter, checkpointer=checkpointer)
+    # Postgres write-back: persists LangGraph outcomes to JobModel/ApplicationModel
+    # before ack. Falls back to None (compute-only) if DATABASE_URL is unset,
+    # keeping local fake-queue runs working.
+    worker = ApplicationWorker(
+        queue_adapter=queue_adapter,
+        checkpointer=checkpointer,
+        db_url=os.getenv("DATABASE_URL"),
+    )
 
     try:
         worker.start()

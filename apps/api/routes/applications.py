@@ -117,6 +117,41 @@ async def create_application(
     )
 
 
+class ApplicationSummary(BaseModel):
+    application_id: str
+    applicant_name: str
+    loan_amount: float
+    status: str
+    created_at: Optional[str] = None
+
+
+@router.get("", response_model=list[ApplicationSummary])
+async def list_applications(
+    limit: int = 20,
+    session: AsyncSession = Depends(get_db),
+):
+    """
+    List recent applications, newest first. Powers the reviewer desk
+    dossier switcher (UI polls details per selection, never this list).
+    """
+    capped = max(1, min(limit, 100))
+    result = await session.execute(
+        select(ApplicationModel)
+        .order_by(ApplicationModel.created_at.desc())
+        .limit(capped)
+    )
+    return [
+        ApplicationSummary(
+            application_id=app.id,
+            applicant_name=app.applicant_name,
+            loan_amount=app.loan_amount,
+            status=app.status,
+            created_at=app.created_at.isoformat() if app.created_at else None,
+        )
+        for app in result.scalars().all()
+    ]
+
+
 @router.get("/{id}")
 async def get_application(
     id: str,

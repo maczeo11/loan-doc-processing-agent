@@ -175,6 +175,10 @@ async def get_application(
     state = dict(app_model.state_json or {})
     state["application_id"] = app_model.id
     state["status"] = app_model.status
+    # Authoritative header fields live in columns, not state_json —
+    # the desk needs the real applicant name and loan amount.
+    state["applicant_name"] = app_model.applicant_name
+    state["loan_amount"] = app_model.loan_amount
     return state
 
 

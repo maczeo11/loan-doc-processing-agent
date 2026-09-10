@@ -3,12 +3,13 @@ import {
   FileText,
   CreditCard,
   Landmark,
-  CheckCircle2,
   ShieldAlert,
   Upload,
   Layers,
   ChevronLeft,
   ChevronRight,
+  Play,
+  Loader2,
 } from 'lucide-react';
 import { LoanApplication, DossierDocument } from '../../types/application';
 import { MaskedValue } from '../common/MaskedValue';
@@ -18,6 +19,10 @@ interface LeftDossierPaneProps {
   application: LoanApplication;
   activeDocId: string;
   onSelectDocId: (id: string) => void;
+  onOpenUpload: () => void;
+  onRunPipeline: () => void;
+  canRunPipeline: boolean;
+  isProcessing: boolean;
   width: number;
 }
 
@@ -25,6 +30,10 @@ export const LeftDossierPane: React.FC<LeftDossierPaneProps> = ({
   application,
   activeDocId,
   onSelectDocId,
+  onOpenUpload,
+  onRunPipeline,
+  canRunPipeline,
+  isProcessing,
   width,
 }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -162,23 +171,11 @@ export const LeftDossierPane: React.FC<LeftDossierPaneProps> = ({
                     >
                       {doc.name}
                     </p>
-                    {doc.verified && (
-                      <CheckCircle2 className="w-3.5 h-3.5 text-theme-pass flex-shrink-0" />
-                    )}
                   </div>
 
                   <div className="mt-1.5 flex items-center gap-1.5 text-[10px] text-theme-muted font-mono">
                     <span className="px-1.5 py-0.5 rounded-xs bg-theme-panel border border-theme-border">
-                      {doc.page_count} {doc.page_count === 1 ? 'page' : 'pages'}
-                    </span>
-                    <span
-                      className={`px-1.5 py-0.5 rounded-xs border font-semibold ${
-                        doc.ocr_route === 'native'
-                          ? 'bg-theme-pass-bg border-theme-pass-border text-theme-pass'
-                          : 'bg-theme-unknown-bg border-theme-unknown-border text-theme-unknown'
-                      }`}
-                    >
-                      {doc.ocr_route === 'native' ? 'Native Layer' : 'PaddleOCR'}
+                      {doc.document_type.replace(/_/g, ' ')}
                     </span>
                   </div>
                 </div>
@@ -188,19 +185,33 @@ export const LeftDossierPane: React.FC<LeftDossierPaneProps> = ({
         })}
       </div>
 
-      {/* Bottom: Supplemental Document Upload Button */}
-      <div className="p-3 border-t border-theme-border bg-theme-card">
+      {/* Bottom: real dossier actions (backend-backed, no placeholders) */}
+      <div className="p-3 border-t border-theme-border bg-theme-card space-y-2">
         <button
           type="button"
-          onClick={() =>
-            alert(
-              'Document upload handler: In production, invokes POST /applications/{id}/documents to append supplemental dossier files.'
-            )
-          }
+          onClick={onOpenUpload}
           className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xs border border-theme-border bg-theme-panel hover:bg-theme-panel-hover text-theme-primary text-xs font-mono font-semibold transition-colors shadow-2xs cursor-pointer"
         >
           <Upload className="w-3.5 h-3.5 text-theme-muted" />
           <span>Upload File</span>
+        </button>
+        <button
+          type="button"
+          onClick={onRunPipeline}
+          disabled={!canRunPipeline || isProcessing}
+          title={
+            canRunPipeline
+              ? 'Queue dossier for processing (POST /applications/{id}/process)'
+              : 'Pipeline runs from UPLOADED dossiers with at least one document'
+          }
+          className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xs bg-[#14532D] hover:bg-[#166534] text-white text-xs font-mono font-bold transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {isProcessing ? (
+            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+          ) : (
+            <Play className="w-3.5 h-3.5" />
+          )}
+          <span>{isProcessing ? 'Queueing…' : 'Run Pipeline'}</span>
         </button>
       </div>
     </aside>

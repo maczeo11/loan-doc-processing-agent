@@ -9,17 +9,28 @@ import { UnderwriterRole } from '../../types/auth';
 
 interface HeaderProps {
   selectedAppId: string;
+  availableApps: Array<{
+    application_id: string;
+    applicant_name: string;
+    status: string;
+  }>;
   onSelectAppId: (id: string) => void;
+  onNewDossier: () => void;
   status: ApplicationStatus;
-  createdAt: string;
+  /** Review-SLA anchor: READY_FOR_REVIEW transition time. Null when not reviewable. */
+  slaAnchor?: string | null;
+  showSla?: boolean;
   onOpenShortcuts: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
   selectedAppId,
+  availableApps,
   onSelectAppId,
+  onNewDossier,
   status,
-  createdAt,
+  slaAnchor,
+  showSla = false,
   onOpenShortcuts,
 }) => {
   const { user, switchPersona } = useAuth();
@@ -50,7 +61,7 @@ export const Header: React.FC<HeaderProps> = ({
 
         <div className="h-6 w-px bg-theme-border" />
 
-        {/* Application Selector */}
+        {/* Application Selector (live backend roster — never hardcoded) */}
         <div className="flex items-center gap-2">
           <span className="text-xs text-theme-muted font-medium">Dossier:</span>
           <select
@@ -58,17 +69,30 @@ export const Header: React.FC<HeaderProps> = ({
             onChange={(e) => onSelectAppId(e.target.value)}
             className="bg-theme-card border border-theme-border rounded-xs px-3 py-1.5 text-xs font-mono font-semibold text-theme-primary focus:outline-none focus:border-theme-brand transition-colors cursor-pointer shadow-2xs"
           >
-            <option value="APP-25195">APP-25195 (Clean Baseline • Ananya Sharma)</option>
-            <option value="APP-68210">APP-68210 (Salary Mismatch • Rajesh Verma)</option>
-            <option value="APP-10492">APP-10492 (Identity Discrepancy • Pooja Iyer)</option>
+            {availableApps.length === 0 && (
+              <option value="">No dossiers — create one</option>
+            )}
+            {availableApps.map((app) => (
+              <option key={app.application_id} value={app.application_id}>
+                {app.application_id} ({app.status} • {app.applicant_name})
+              </option>
+            ))}
           </select>
+          <button
+            type="button"
+            onClick={onNewDossier}
+            className="px-2.5 py-1.5 rounded-xs border border-theme-border bg-theme-card hover:bg-theme-panel-hover text-theme-primary text-xs font-mono font-bold transition-colors"
+            title="Create a new application dossier"
+          >
+            + New
+          </button>
         </div>
       </div>
 
-      {/* Center: Live Status & SLA Timer */}
+      {/* Center: Live Status & Review SLA (anchored at READY, shown only when reviewable) */}
       <div className="flex items-center gap-4">
         <StatusPill status={status} />
-        <SlaTimer createdAt={createdAt} />
+        {showSla && slaAnchor && <SlaTimer createdAt={slaAnchor} />}
       </div>
 
       {/* Right: Theme Engine Selector, Auth Persona & Shortcuts */}

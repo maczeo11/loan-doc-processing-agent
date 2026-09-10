@@ -40,7 +40,15 @@ export const api = {
   },
 
   /**
-   * Retrieve application state (currently a stub on backend returning { application_id, status })
+   * List recent applications (newest first). Drives the dossier switcher.
+   */
+  async listApplications(): Promise<Array<{ application_id: string; applicant_name: string; loan_amount: number; status: string; created_at?: string }>> {
+    const res = await fetch(`${BASE_URL}/applications`);
+    return handleResponse(res);
+  },
+
+  /**
+   * Retrieve authoritative application state, facts, findings, review status.
    */
   async getApplication(id: string): Promise<Partial<LoanApplicationState>> {
     const res = await fetch(`${BASE_URL}/applications/${encodeURIComponent(id)}`);

@@ -58,9 +58,11 @@ export interface DossierDocument {
   id: string;
   name: string;
   document_type: string;
-  page_count: number;
-  ocr_route: 'native' | 'paddle' | 'textract';
-  verified: boolean;
+  // Below are populated only when the backend provides them.
+  // Never synthesize: no fake page counts, OCR routes, or verified ticks.
+  page_count?: number;
+  ocr_route?: 'native' | 'paddle' | 'textract';
+  verified?: boolean;
   signed_url?: string;
   download_url?: string;
 }

@@ -12,24 +12,9 @@ interface PolicyQaTabProps {
 export const PolicyQaTab: React.FC<PolicyQaTabProps> = ({ applicationId }) => {
   const [question, setQuestion] = useState('');
   const [loading, setLoading] = useState(false);
-  const [history, setHistory] = useState<PolicyQaResponse[]>([
-    {
-      question: 'What is the salary reconciliation tolerance and DTI ceiling under policy?',
-      answer:
-        'Under FinScan Retail Underwriting Policy v2026.1 (Section 4.2), net monthly income must be verified against at least 3 consecutive salary credits with a maximum permissible variance of ±5.0%. Debt-to-Income (DTI) ratio must not exceed 50.0% for Tier-1 applicants.',
-      // Illustrative seed shown before any live retrieval — NOT a grounded answer.
-      is_grounded: false,
-      citations: [
-        {
-          chunk_id: 'POL-RET-2026-S4',
-          policy_name: 'Retail Lending Credit Policy v2026.1',
-          section: 'Section 4.2 — Income Verification & DTI Ceiling',
-          text: 'Net salary reconciliation variance tolerance is bounded at ±5.0%. Total proposed loan EMI plus existing obligations shall not exceed 50% of verified monthly disposable income.',
-          score: 0.94,
-        },
-      ],
-    },
-  ]);
+  // No seeded answers: an empty policy Q&A shows an empty state, never
+  // a fabricated grounded response.
+  const [history, setHistory] = useState<PolicyQaResponse[]>([]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -97,6 +82,15 @@ export const PolicyQaTab: React.FC<PolicyQaTabProps> = ({ applicationId }) => {
 
       {/* Q&A Stream */}
       <div className="space-y-3">
+        {history.length === 0 && !loading && (
+          <div className="p-4 rounded-xs bg-theme-panel border border-theme-border text-center space-y-1.5">
+            <p className="text-xs font-bold text-theme-primary font-mono">No policy questions yet</p>
+            <p className="text-[11px] text-theme-secondary">
+              Ask about DTI limits, salary tolerance, or KYC rules — answers cite
+              retrieved policy passages only.
+            </p>
+          </div>
+        )}
         {history.map((item, idx) => (
           <div
             key={idx}

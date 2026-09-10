@@ -5,10 +5,11 @@ import { RightInspectorPane } from './components/layout/RightInspectorPane';
 import { PdfViewer } from './components/viewer/PdfViewer';
 import { KeyboardShortcutsModal } from './components/common/KeyboardShortcutsModal';
 import { ReviewActionModal } from './components/review/ReviewActionModal';
-import { DEMO_DOSSIER_APP_25195, getDemoDossier } from './data/mockDossier';
+import { DocumentUploadModal } from './components/navigation/DocumentUploadModal';
+import { CreateDossierModal } from './components/navigation/CreateDossierModal';
 import { getDocumentTitle } from './utils/documentHelper';
 import { EvidenceNavigationProvider, useEvidenceNavigation } from './context/EvidenceNavigationContext';
-import { AuthProvider } from './context/AuthContext';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import type { LoanApplicationState } from './types/contracts';
 import type { LoanApplication, DossierDocument } from './types/application';
@@ -17,11 +18,18 @@ import type { ReviewDecision } from './types/api';
 import { getEvidenceKey } from './utils/coordinates';
 import { api } from './services/api';
 
-// Demo reviewer identity until AuthContext is wired to the review call.
-// Backend requires reviewer_id; production must use verified JWT claims.
-const DEMO_REVIEWER_ID = 'underwriter@finscan.ai';
+// Backend requires reviewer_id; the active persona profile supplies it
+// (verified JWT claims remain the production item).
+const FALLBACK_REVIEWER_ID = 'underwriter@finscan.ai';
 // Poll only while the pipeline is still running (spec: >=2s interval).
 const POLL_INTERVAL_MS = 2500;
+
+export interface DossierListItem {
+  application_id: string;
+  applicant_name: string;
+  loan_amount: number;
+  status: string;
+}
 
 /**
  * Adapter: convert LoanApplicationState (backend contract) → LoanApplication (UI component model).
@@ -45,19 +53,24 @@ function toLoanApplication(state: LoanApplicationState): LoanApplication {
       id,
       name: getDocumentTitle(id, docType),
       document_type: mappedType,
-      page_count: mappedType === 'APPLICATION_FORM' ? 2 : mappedType === 'BANK_STATEMENT' ? 3 : 1,
-      ocr_route: id === 'doc-pan-card' ? 'paddle' : 'native',
-      verified: true,
+      // page_count / ocr_route / verified are intentionally absent:
+      // the backend does not provide them and we never synthesize them.
     } as DossierDocument;
   });
 
   const history = state.status_history || [];
+  // Header facts come from authoritative columns (see GET /applications/{id}),
+  // exposed on the state payload as applicant_name / loan_amount.
+  const headerBag = state as LoanApplicationState & {
+    applicant_name?: string;
+    loan_amount?: number;
+  };
 
   return {
     id: state.application_id,
-    applicant_name: state.applicant?.full_name || 'Applicant',
+    applicant_name: headerBag.applicant_name || state.applicant?.full_name || '—',
     pan_masked: state.applicant?.pan_number || '—',
-    loan_amount: 2500000, // Demo seed value: ₹ 25,00,000
+    loan_amount: typeof headerBag.loan_amount === 'number' ? headerBag.loan_amount : 0,
     currency: 'INR',
     status: state.status,
     created_at: history[0]?.timestamp || new Date().toISOString(),
@@ -84,17 +97,24 @@ function AppInner({
   selectedDocId: string;
   onSelectDoc: (docId: string) => void;
 }) {
-  const [selectedAppId, setSelectedAppId] = useState<string>('APP-25195');
-  const [dossierState, setDossierState] = useState<LoanApplicationState>(DEMO_DOSSIER_APP_25195);
-  const [_isLoading, setIsLoading] = useState<boolean>(false);
+  // No selection and no dossier until the backend answers — the desk never
+  // invents records. Empty DB => intentional empty state, not demo data.
+  const [selectedAppId, setSelectedAppId] = useState<string>('');
+  const [dossierState, setDossierState] = useState<LoanApplicationState | null>(null);
+  const [apps, setApps] = useState<DossierListItem[]>([]);
+  const [appsLoading, setAppsLoading] = useState<boolean>(true);
+  const [appsError, setAppsError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [notification, setNotification] = useState<string | null>(null);
-  // Live mode flips on the moment the backend answers; otherwise demo data.
-  const [liveMode, setLiveMode] = useState<boolean>(false);
 
-  // Modal state
+  // Modal + pipeline action state
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [reviewDecision, setReviewDecision] = useState<ReviewDecision | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [uploadOpen, setUploadOpen] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   // Finding focus + inspection tracking
   const [focusedFindingIndex, setFocusedFindingIndex] = useState<number>(0);
@@ -113,29 +133,58 @@ function AppInner({
   }, []);
 
   // Convert state to LoanApplication for Swiss components
-  const application = useMemo(() => toLoanApplication(dossierState), [dossierState]);
+  const application = useMemo(
+    () => (dossierState ? toLoanApplication(dossierState) : null),
+    [dossierState]
+  );
+
+  // Review SLA anchors at the moment the pipeline became reviewable —
+  // never at creation (processing time is not the reviewer's debt).
+  const slaAnchor = useMemo(() => {
+    const history = dossierState?.status_history || [];
+    const ready = [...history]
+      .reverse()
+      .find((t) => t.to_status === 'READY_FOR_REVIEW');
+    return ready ? ready.timestamp : null;
+  }, [dossierState]);
+
+  const loadApps = useCallback(async (selectFirst = false) => {
+    setAppsLoading(true);
+    setAppsError(null);
+    try {
+      const list = await api.listApplications();
+      setApps(list || []);
+      if (selectFirst && list && list.length > 0) {
+        setSelectedAppId((prev) => prev || list[0].application_id);
+      }
+    } catch (err) {
+      setAppsError(err instanceof Error ? err.message : 'Failed to reach API');
+      setApps([]);
+    } finally {
+      setAppsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadApps(true);
+  }, [loadApps]);
 
   const fetchApplicationData = useCallback(async (quiet = false) => {
-    if (!quiet) setIsLoading(true);
+    if (!selectedAppId) return;
+    if (!quiet) {
+      setIsLoading(true);
+      setLoadError(null);
+    }
     try {
       const live = await api.getApplication(selectedAppId);
       setDossierState(live as LoanApplicationState);
-      setLiveMode(true);
+      setLoadError(null);
       const ids = (live as LoanApplicationState).document_ids || [];
       if (ids.length > 0) onSelectDoc(ids[0]);
-      if (!quiet) setNotification(`Live dossier ${selectedAppId} loaded from API`);
+      if (!quiet) setNotification(null);
     } catch (err) {
-      // Backend unreachable or unknown app: demo archetype keeps the desk usable.
-      setLiveMode(false);
-      const dossier = getDemoDossier(selectedAppId);
-      setDossierState(dossier);
-      if (dossier.document_ids && dossier.document_ids.length > 0) {
-        onSelectDoc(dossier.document_ids[0]);
-      }
       if (!quiet) {
-        setNotification(
-          `Backend unavailable (${err instanceof Error ? err.message : 'unknown error'}). Loaded demo dossier for ${selectedAppId}`
-        );
+        setLoadError(err instanceof Error ? err.message : 'Failed to fetch application');
       }
     } finally {
       if (!quiet) setIsLoading(false);
@@ -148,12 +197,13 @@ function AppInner({
 
   // Single status poll while the pipeline runs (one GET per tick: <=30/min).
   useEffect(() => {
+    if (!dossierState) return;
     if (dossierState.status !== 'QUEUED' && dossierState.status !== 'PROCESSING') return;
     const timer = setInterval(() => {
       fetchApplicationData(true);
     }, POLL_INTERVAL_MS);
     return () => clearInterval(timer);
-  }, [dossierState.status, fetchApplicationData]);
+  }, [dossierState, dossierState?.status, fetchApplicationData]);
 
   const handleSelectDoc = (docId: string) => {
     onSelectDoc(docId);
@@ -173,7 +223,7 @@ function AppInner({
 
   const handleSelectFindingIndex = (idx: number) => {
     setFocusedFindingIndex(idx);
-    const finding = dossierState.findings?.[idx];
+    const finding = dossierState?.findings?.[idx];
     if (finding && finding.supporting_evidence.length > 0) {
       markInspected(finding.supporting_evidence[0]);
     }
@@ -183,33 +233,59 @@ function AppInner({
     setReviewDecision(decision);
   };
 
+  const handleCreateDossier = async (values: { applicant_name: string; loan_amount: number; loan_purpose?: string }) => {
+    const resp = await api.createApplication({
+      applicant_name: values.applicant_name,
+      loan_amount: values.loan_amount,
+      loan_purpose: values.loan_purpose,
+    });
+    setCreateOpen(false);
+    await loadApps();
+    setSelectedAppId(resp.application_id);
+    setNotification(`Dossier ${resp.application_id} created — upload documents to begin.`);
+  };
+
+  const handleUploadDocument = async (file: File, docTypeHint?: string) => {
+    await api.uploadDocument(selectedAppId, file, docTypeHint);
+    await fetchApplicationData(true);
+  };
+
+  const handleRunPipeline = async () => {
+    setIsProcessing(true);
+    try {
+      const resp = await api.processApplication(selectedAppId);
+      setNotification(`Pipeline queued: ${resp.job_id}. Status polls every 2.5s.`);
+      await fetchApplicationData(true);
+    } catch (err) {
+      setNotification(err instanceof Error ? err.message : 'Failed to queue pipeline');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const { user } = useAuth();
+  const reviewerId = user?.email || FALLBACK_REVIEWER_ID;
+
   const handleSubmitReview = async (notes: string) => {
     setIsSubmitting(true);
     try {
-      if (liveMode && reviewDecision) {
-        const resp = await api.submitReview(selectedAppId, {
-          decision: reviewDecision,
-          reviewer_id: DEMO_REVIEWER_ID,
-          notes,
-        });
-        const liveStatus = (resp as { status?: LoanApplicationState['status'] }).status;
-        setDossierState((prev) => ({
+      if (!reviewDecision) return;
+      const resp = await api.submitReview(selectedAppId, {
+        decision: reviewDecision,
+        reviewer_id: reviewerId,
+        notes,
+      });
+      const liveStatus = (resp as { status?: LoanApplicationState['status'] }).status;
+      setDossierState((prev) => {
+        if (!prev) return prev;
+        return {
           ...prev,
           status: liveStatus ?? prev.status,
           reviewer_decision: reviewDecision,
           reviewer_notes: notes,
-        }));
-        setNotification(`Review submitted: ${reviewDecision} (${resp.application_id})`);
-      } else {
-        // Demo mode: backend has no such app; record locally only.
-        setDossierState((prev) => ({
-          ...prev,
-          status: reviewDecision === 'NEEDS_INFO' ? 'NEEDS_INFORMATION' : 'REVIEWED',
-          reviewer_decision: reviewDecision,
-          reviewer_notes: notes,
-        }));
-        setNotification(`Review submitted locally (demo mode): ${reviewDecision}`);
-      }
+        };
+      });
+      setNotification(`Review submitted: ${reviewDecision} (${resp.application_id})`);
       setReviewDecision(null);
     } catch (err) {
       setNotification(err instanceof Error ? err.message : 'Error submitting review');
@@ -224,10 +300,10 @@ function AppInner({
       const target = e.target as HTMLElement;
       if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') return;
 
-      const findings = dossierState.findings || [];
+      const findings = dossierState?.findings || [];
       // Sign-off hotkeys mirror the inspector gate: READY_FOR_REVIEW + findings.
       const canSign =
-        dossierState.status === 'READY_FOR_REVIEW' && findings.length > 0;
+        dossierState?.status === 'READY_FOR_REVIEW' && findings.length > 0;
       switch (e.key) {
         case '?':
           setShortcutsOpen((prev) => !prev);
@@ -251,13 +327,13 @@ function AppInner({
           break;
         }
         case ']': {
-          const docIds = dossierState.document_ids || [];
+          const docIds = dossierState?.document_ids || [];
           const curIdx = docIds.indexOf(selectedDocId);
           if (curIdx < docIds.length - 1) onSelectDoc(docIds[curIdx + 1]);
           break;
         }
         case '[': {
-          const docIds = dossierState.document_ids || [];
+          const docIds = dossierState?.document_ids || [];
           const curIdx = docIds.indexOf(selectedDocId);
           if (curIdx > 0) onSelectDoc(docIds[curIdx - 1]);
           break;
@@ -287,17 +363,100 @@ function AppInner({
 
   const currentDocTitle = getDocumentTitle(
     selectedDocId,
-    dossierState.classified_types?.[selectedDocId]
+    dossierState?.classified_types?.[selectedDocId]
   );
+
+  // ---- Render states: loading / backend error / empty / ready ----
+  if (appsLoading) {
+    return (
+      <div className="h-screen w-screen flex items-center justify-center bg-theme-app text-theme-secondary text-sm font-mono">
+        Connecting to underwriting API…
+      </div>
+    );
+  }
+
+  if (appsError) {
+    return (
+      <div className="h-screen w-screen flex items-center justify-center bg-theme-app">
+        <div className="max-w-md p-6 rounded border border-theme-border bg-theme-card text-center space-y-3">
+          <p className="text-sm font-bold text-theme-primary font-mono">Backend unreachable</p>
+          <p className="text-xs text-theme-secondary">{appsError}</p>
+          <p className="text-xs text-theme-muted">Start the API, then retry. No demo data is shown.</p>
+          <button
+            type="button"
+            onClick={() => loadApps(true)}
+            className="px-4 py-2 rounded bg-theme-brand text-white text-xs font-mono font-bold"
+          >
+            Retry connection
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (apps.length === 0) {
+    return (
+      <div className="h-screen w-screen flex items-center justify-center bg-theme-app">
+        <div className="max-w-md p-6 rounded border border-theme-border bg-theme-card text-center space-y-3">
+          <p className="text-sm font-bold text-theme-primary font-mono">No applications yet</p>
+          <p className="text-xs text-theme-secondary">
+            Create your first dossier to start the underwriting workflow.
+          </p>
+          <button
+            type="button"
+            onClick={() => setCreateOpen(true)}
+            className="px-4 py-2 rounded bg-theme-brand text-white text-xs font-mono font-bold"
+          >
+            + New dossier
+          </button>
+        </div>
+        <CreateDossierModal
+          isOpen={createOpen}
+          onClose={() => setCreateOpen(false)}
+          onCreate={handleCreateDossier}
+        />
+      </div>
+    );
+  }
+
+  if (!application) {
+    if (loadError) {
+      return (
+        <div className="h-screen w-screen flex items-center justify-center bg-theme-app">
+          <div className="max-w-md p-6 rounded border border-theme-border bg-theme-card text-center space-y-3">
+            <p className="text-sm font-bold text-theme-primary font-mono">Could not load dossier</p>
+            <p className="text-xs text-theme-secondary">{loadError}</p>
+            <button
+              type="button"
+              onClick={() => fetchApplicationData()}
+              className="px-4 py-2 rounded bg-theme-brand text-white text-xs font-mono font-bold"
+            >
+              Retry
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return (
+      <div className="h-screen w-screen flex items-center justify-center bg-theme-app text-theme-secondary text-sm font-mono">
+        {isLoading ? 'Loading dossier…' : 'Select a dossier to begin.'}
+      </div>
+    );
+  }
+
+  const showSla = application.status === 'READY_FOR_REVIEW';
 
   return (
     <div className="h-screen w-screen flex flex-col bg-theme-app text-theme-primary font-sans overflow-hidden transition-colors duration-200">
       {/* Swiss Banking Header */}
       <Header
         selectedAppId={selectedAppId}
+        availableApps={apps}
         onSelectAppId={handleSelectAppId}
+        onNewDossier={() => setCreateOpen(true)}
         status={application.status}
-        createdAt={application.created_at}
+        slaAnchor={slaAnchor}
+        showSla={showSla}
         onOpenShortcuts={() => setShortcutsOpen(true)}
       />
 
@@ -321,6 +480,10 @@ function AppInner({
           application={application}
           activeDocId={selectedDocId}
           onSelectDocId={handleSelectDoc}
+          onOpenUpload={() => setUploadOpen(true)}
+          onRunPipeline={handleRunPipeline}
+          canRunPipeline={application.status === 'UPLOADED' && application.documents.length > 0}
+          isProcessing={isProcessing}
           width={280}
         />
 
@@ -329,12 +492,8 @@ function AppInner({
           <PdfViewer
             docId={selectedDocId}
             docTitle={currentDocTitle}
-            pdfSource={
-              liveMode
-                ? `/applications/${encodeURIComponent(selectedAppId)}/documents/${encodeURIComponent(selectedDocId)}`
-                : null
-            }
-            isDemoMode={!liveMode}
+            pdfSource={`/applications/${encodeURIComponent(selectedAppId)}/documents/${encodeURIComponent(selectedDocId)}`}
+            isDemoMode={false}
           />
         </div>
 
@@ -365,6 +524,21 @@ function AppInner({
         onClose={() => setReviewDecision(null)}
         onSubmit={handleSubmitReview}
         isSubmitting={isSubmitting}
+      />
+
+      {/* Dossier document upload */}
+      <DocumentUploadModal
+        isOpen={uploadOpen}
+        onClose={() => setUploadOpen(false)}
+        onUpload={handleUploadDocument}
+        applicationId={selectedAppId}
+      />
+
+      {/* New dossier */}
+      <CreateDossierModal
+        isOpen={createOpen}
+        onClose={() => setCreateOpen(false)}
+        onCreate={handleCreateDossier}
       />
     </div>
   );

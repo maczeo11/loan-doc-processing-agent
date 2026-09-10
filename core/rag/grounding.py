@@ -6,11 +6,15 @@ Invariants & Guarantees from AGENTS.md:
 - Deterministic citation validation: every claim in CAM must cite authorized chunk IDs.
 - Zero Hallucinated Decisions: unsupported claims are dropped; summary abstains if evidence missing.
 - Prompt Injection Defense: untrusted document text is sanitized against adversarial override attempts.
+- LLM Narrative Firewall: text from LLMPort.generate_summary must reproduce only
+  pre-computed finding numbers, cite only authorized chunks, and never issue a
+  lending disposition (approve/reject). Violations fail closed.
 """
 
 import logging
 import re
-from typing import Any, Dict, List, Set, Tuple
+from decimal import Decimal, InvalidOperation
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 logger = logging.getLogger("finscan.rag.grounding")
 
@@ -139,6 +143,109 @@ def sanitize_summary_text(
         sanitized_lines.append("\n> ⚠️ [ABSTENTION: One or more claims were dropped due to lack of verified citation grounding.]")
 
     return "\n".join(sanitized_lines)
+
+
+# Autonomous disposition language an LLM narrator must never emit.
+# (Findings use pass/flag/unknown; approve/reject belongs to the human reviewer.)
+DISPOSITION_PATTERNS = [
+    re.compile(r"\b(approve[sd]?|approving|approval\s+(granted|is\s+therefore))\b", re.IGNORECASE),
+    re.compile(r"\b(reject[sed]?|rejecting|rejection)\b", re.IGNORECASE),
+    re.compile(r"\b(sanction[sed]?|sanctioning)\b", re.IGNORECASE),
+    re.compile(r"\b(loan\s+(is\s+)?(approved|rejected|sanctioned|denied|declined|granted))\b", re.IGNORECASE),
+    re.compile(r"\b(credit\s+decision\s+is\s+(favourable|favorable|positive|negative))\b", re.IGNORECASE),
+]
+
+# Monetary figures: optional INR/₹/Rs prefix, grouped digits, optional decimals.
+MONEY_PATTERN = re.compile(
+    r"(?:₹|INR|Rs\.?)?\s*(\d{1,3}(?:,\d{2,3})+(?:\.\d{1,2})?|\d+\.\d{1,2})"
+)
+
+# Verdict-badge tokens the deterministic memo legitimately emits.
+LEGIT_BADGE_PREFIXES = ("PASS", "FLAG", "UNKNOWN", "ABSTENTION")
+
+
+def _normalize_money(raw: str) -> Optional[Decimal]:
+    """Normalizes a matched money string to Decimal for exact comparison."""
+    try:
+        return Decimal(raw.replace(",", ""))
+    except (InvalidOperation, ValueError, AttributeError):
+        return None
+
+
+def _money_in_text(text: str) -> Set[Decimal]:
+    """Extracts the set of monetary figures appearing in free text."""
+    found: Set[Decimal] = set()
+    for match in MONEY_PATTERN.finditer(text or ""):
+        amount = _normalize_money(match.group(1))
+        if amount is not None:
+            found.add(amount)
+    return found
+
+
+def _finding_numbers(findings: List[Any]) -> Set[Decimal]:
+    """Collects every monetary figure from deterministic finding reasons."""
+    numbers: Set[Decimal] = set()
+    for finding in findings:
+        reason = ""
+        if isinstance(finding, dict):
+            reason = str(finding.get("reason", ""))
+        else:
+            reason = str(getattr(finding, "reason", ""))
+        numbers |= _money_in_text(reason)
+    return numbers
+
+
+def validate_llm_narrative(
+    narrative: str,
+    findings: List[Any],
+    authorized_chunk_ids: List[str],
+) -> Dict[str, Any]:
+    """
+    Firewalls LLM-generated memo narration (LLMPort.generate_summary output).
+
+    The LLM may phrase and explain, but deterministically verified constraints hold:
+      1. No autonomous disposition language (approve/reject/sanction...).
+      2. Every monetary figure must already appear in the deterministic findings.
+      3. Every [bracket citation] must be an authorized chunk ID (badge tokens exempt).
+      4. No prompt-injection patterns may be present.
+
+    Returns {"grounded": bool, "issues": [str, ...]}. Fails closed: empty
+    narrative, missing findings, or any violation grounds=False.
+    """
+    issues: List[str] = []
+
+    if not narrative or not narrative.strip():
+        return {"grounded": False, "issues": ["empty narrative: nothing to verify"]}
+
+    if not findings:
+        issues.append("no deterministic findings supplied: narrative has no numeric anchor")
+
+    for pattern in DISPOSITION_PATTERNS:
+        match = pattern.search(narrative)
+        if match:
+            issues.append(
+                f"autonomous disposition language forbidden: '{match.group(0).strip()}'"
+            )
+
+    allowed_numbers = _finding_numbers(findings or [])
+    for amount in sorted(_money_in_text(narrative)):
+        if amount not in allowed_numbers:
+            issues.append(f"ungrounded monetary figure not in findings: {amount:,.2f}")
+
+    authorized_set = _expand_authorized_ids(authorized_chunk_ids or [])
+    for citation in re.findall(r"\[([a-zA-Z0-9_\-]+)\]", narrative):
+        if citation.upper().startswith(LEGIT_BADGE_PREFIXES):
+            continue
+        if citation not in authorized_set:
+            issues.append(f"unauthorized citation in narrative: [{citation}]")
+
+    injected, matches = detect_prompt_injection(narrative)
+    if injected:
+        issues.append(f"prompt-injection pattern in narrative: {matches[0]}")
+
+    if issues:
+        logger.warning(f"LLM narrative failed grounding: {issues[0]}")
+    return {"grounded": not issues, "issues": issues}
 
 
 def detect_prompt_injection(text: str) -> Tuple[bool, List[str]]:

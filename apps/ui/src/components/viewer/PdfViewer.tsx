@@ -1,4 +1,4 @@
-﻿import React, { useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { AlertTriangle, FileX, Loader2, CheckCircle, X } from 'lucide-react';
 import { usePdfDocument } from './usePdfDocument';
 import { ViewerToolbar } from './ViewerToolbar';
@@ -40,15 +40,13 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({
 
   const {
     activeEvidence,
+    activeRuleId,
     targetPageToNavigate,
     clearTargetPage,
     clearActiveEvidence,
   } = useEvidenceNavigation();
 
   // Navigate to target page when requested by evidence citation.
-  // NOTE: numPages may still reflect the previous document right after a
-  // document switch — keep the target pending until the new document loads
-  // instead of clearing it, otherwise the highlight is silently lost.
   useEffect(() => {
     if (
       targetPageToNavigate === null ||
@@ -83,7 +81,7 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({
     activeEvidence.page_number === currentPage;
 
   return (
-    <main className="w-full h-full flex flex-col bg-[#F5F2EB] overflow-hidden">
+    <main className="w-full h-full flex flex-col bg-theme-desk overflow-hidden transition-colors duration-200">
       {/* Top Toolbar */}
       <ViewerToolbar
         docTitle={docTitle}
@@ -100,25 +98,26 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({
         onFitWidth={fitWidth}
       />
 
-      {/* Active Evidence Notification Bar (Compact Banking Style) */}
+      {/* Active Evidence Notification Bar */}
       {hasActiveEvidenceOnCurrentPage && (
-        <div className="bg-amber-50/95 border-b border-amber-200 px-4 py-1.5 flex items-center justify-between text-xs text-amber-900 shadow-2xs shrink-0 backdrop-blur-xs">
+        <div className="bg-amber-500/15 border-b border-amber-500/40 px-4 py-1.5 flex items-center justify-between text-xs text-amber-700 dark:text-amber-300 shadow-2xs shrink-0 backdrop-blur-xs">
           <div className="flex items-center gap-2 truncate">
-            <CheckCircle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-            <span className="font-bold text-[11px] uppercase tracking-wider bg-amber-200 text-amber-900 px-1.5 py-0.2 rounded-xs">
+            <CheckCircle className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
+            <span className="font-bold text-[11px] uppercase tracking-wider bg-amber-500/30 text-amber-800 dark:text-amber-200 px-1.5 py-0.2 rounded-xs font-mono">
               Verified Evidence
             </span>
-            <span className="italic font-medium truncate">
-              "{activeEvidence.quoted_span}"
+            <span className="italic font-medium truncate font-mono">
+              &ldquo;{activeEvidence.quoted_span}&rdquo;
             </span>
-            <span className="text-[10px] text-amber-700 font-mono hidden sm:inline">
-              ({Math.round((activeEvidence.confidence ?? 1) * 100)}% conf | {activeEvidence.extraction_method || 'pymupdf_native'})
+            <span className="text-[10px] text-amber-700 dark:text-amber-400 font-mono hidden sm:inline">
+              ({Math.round((activeEvidence.confidence ?? 1) * 100)}% conf |{' '}
+              {activeEvidence.extraction_method || 'pymupdf_native'})
             </span>
           </div>
           <button
             type="button"
             onClick={clearActiveEvidence}
-            className="text-amber-700 hover:text-amber-950 p-1 rounded hover:bg-amber-100 shrink-0 ml-2"
+            className="text-amber-700 dark:text-amber-300 hover:text-amber-950 dark:hover:text-white p-1 rounded hover:bg-amber-500/20 shrink-0 ml-2 cursor-pointer"
             title="Clear active evidence highlight"
           >
             <X className="w-3.5 h-3.5" />
@@ -127,55 +126,64 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({
       )}
 
       {/* Main Viewport */}
-      <div className="flex-1 overflow-auto p-6 flex justify-center items-start bg-[#F5F2EB]">
+      <div className="flex-1 overflow-auto p-6 flex justify-center items-start bg-theme-desk transition-colors duration-200">
         {isLoading ? (
           <div className="flex flex-col items-center justify-center p-16 text-center">
-            <Loader2 className="w-8 h-8 text-stone-500 animate-spin mb-3" />
-            <p className="text-xs font-serif font-bold text-stone-800">Loading document with PDF.js...</p>
-            <p className="text-[11px] text-stone-500 mt-0.5 font-mono">Parsing document structure</p>
+            <Loader2 className="w-8 h-8 text-theme-muted animate-spin mb-3" />
+            <p className="text-xs font-serif font-bold text-theme-primary">
+              Loading document with PDF.js...
+            </p>
+            <p className="text-[11px] text-theme-muted mt-0.5 font-mono">
+              Parsing document structure & text layer
+            </p>
           </div>
         ) : error ? (
-          <div className="bg-white rounded-sm shadow-md border border-[#FECACA] p-8 text-center max-w-md my-auto">
-            <div className="w-12 h-12 rounded-full bg-[#FEF2F2] border border-[#FECACA] flex items-center justify-center text-[#991B1B] mx-auto mb-3">
+          <div className="bg-theme-card rounded-xs shadow-md border border-theme-flag-border p-8 text-center max-w-md my-auto">
+            <div className="w-12 h-12 rounded-full bg-theme-flag-bg border border-theme-flag-border flex items-center justify-center text-theme-flag mx-auto mb-3">
               <AlertTriangle className="w-6 h-6" />
             </div>
-            <h3 className="text-sm font-serif font-bold text-stone-900 mb-1">Failed to Render PDF</h3>
-            <p className="text-xs text-[#991B1B] bg-[#FEF2F2] p-2 rounded-sm border border-[#FECACA] font-mono mb-3 break-all">
+            <h3 className="text-sm font-serif font-bold text-theme-primary mb-1">
+              Failed to Render PDF
+            </h3>
+            <p className="text-xs text-theme-flag bg-theme-flag-bg p-2 rounded-xs border border-theme-flag-border font-mono mb-3 break-all">
               {error}
             </p>
-            <p className="text-[11px] text-stone-500">
+            <p className="text-[11px] text-theme-muted">
               The PDF could not be processed by the browser canvas renderer. Verify document integrity or source data.
             </p>
           </div>
         ) : sourceType === 'unavailable' ? (
-          <div className="bg-white rounded-sm shadow-md border border-[#E3DDD3] p-8 text-center max-w-md my-auto">
-            <div className="w-12 h-12 rounded-full bg-[#F8F6F1] border border-[#E3DDD3] flex items-center justify-center text-stone-400 mx-auto mb-3">
+          <div className="bg-theme-card rounded-xs shadow-md border border-theme-border p-8 text-center max-w-md my-auto">
+            <div className="w-12 h-12 rounded-full bg-theme-panel border border-theme-border flex items-center justify-center text-theme-muted mx-auto mb-3">
               <FileX className="w-6 h-6" />
             </div>
-            <h3 className="text-sm font-serif font-bold text-stone-900 mb-1">Document Source Unavailable</h3>
-            <p className="text-xs text-stone-600 mb-3">
-              The live backend does not currently expose a GET document download endpoint. Toggle to <strong className="text-stone-900">Demo Dossier</strong> to view synthetic client-rendered documents.
+            <h3 className="text-sm font-serif font-bold text-theme-primary mb-1">
+              Document Source Unavailable
+            </h3>
+            <p className="text-xs text-theme-secondary mb-3">
+              The live backend does not currently expose a GET document download endpoint. Toggle to{' '}
+              <strong className="text-theme-primary">Demo Dossier</strong> to view synthetic client-rendered documents.
             </p>
-            <div className="bg-[#F8F6F1] border border-[#E3DDD3] rounded-sm p-2 text-[11px] text-stone-700 font-mono">
+            <div className="bg-theme-panel border border-theme-border rounded-xs p-2 text-[11px] text-theme-primary font-mono">
               Document ID: {docId}
             </div>
           </div>
         ) : (
-          <div className="flex flex-col items-center relative">
+          <div className="flex flex-col items-center relative shadow-xl">
             {/* Watermark header banner */}
             <div
               style={{ width: `${canvasDimensions.width}px` }}
-              className="bg-amber-50 border border-amber-200 rounded-t-lg px-4 py-1 text-center shadow-xs transition-all"
+              className="bg-amber-500/15 border border-amber-500/30 rounded-t px-4 py-1 text-center shadow-xs transition-all backdrop-blur-xs"
             >
-              <span className="text-[10px] font-bold tracking-wider text-amber-800 uppercase">
+              <span className="text-[10px] font-bold font-mono tracking-wider text-amber-700 dark:text-amber-300 uppercase">
                 SYNTHETIC DEMO — NOT VALID (FinScan AI)
               </span>
             </div>
 
             {/* Rendering Indicator */}
             {isRendering && (
-              <div className="absolute top-10 right-4 z-30 bg-stone-900/80 text-white text-[10px] font-mono px-2.5 py-1 rounded-full flex items-center gap-1.5 shadow">
-                <Loader2 className="w-3 h-3 animate-spin text-amber-200" />
+              <div className="absolute top-10 right-4 z-30 bg-slate-900/85 text-white text-[10px] font-mono px-2.5 py-1 rounded-full flex items-center gap-1.5 shadow">
+                <Loader2 className="w-3 h-3 animate-spin text-amber-300" />
                 <span>Rendering canvas...</span>
               </div>
             )}
@@ -186,7 +194,7 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({
                 width: `${canvasDimensions.width}px`,
                 height: `${canvasDimensions.height}px`,
               }}
-              className="bg-white rounded-b-sm shadow-lg border border-t-0 border-[#D5CFC5] relative overflow-hidden transition-all"
+              className="bg-white rounded-b-sm shadow-2xl border border-t-0 border-theme-border relative overflow-hidden transition-all"
             >
               {/* HTML5 Canvas rendered by PDF.js */}
               <canvas ref={canvasRef} className="block w-full h-full" />
@@ -194,6 +202,7 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({
               {/* Bounding Box Highlights Layer */}
               <BoundingBoxOverlay
                 activeEvidence={activeEvidence}
+                activeRuleId={activeRuleId}
                 canvasWidth={canvasDimensions.width}
                 canvasHeight={canvasDimensions.height}
                 currentDocId={docId}

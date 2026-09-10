@@ -9,7 +9,7 @@ interface FindingCardProps {
   finding: Finding;
   isFocused: boolean;
   onSelectFinding: () => void;
-  onSelectEvidence: (ev: EvidenceRef) => void;
+  onSelectEvidence: (ev: EvidenceRef, ruleId?: string) => void;
   activeEvidenceKey: string | null;
 }
 
@@ -23,17 +23,17 @@ export const FindingCard: React.FC<FindingCardProps> = ({
   return (
     <div
       onClick={onSelectFinding}
-      className={`p-3.5 rounded border transition-all cursor-pointer ${
+      className={`p-3.5 rounded-xs border transition-all cursor-pointer ${
         isFocused
-          ? 'bg-[#FDFBF7] border-stone-800 shadow-sm ring-1 ring-stone-700/20'
-          : 'bg-white hover:bg-[#FDFBF7] border-[#E3DDD3] hover:border-stone-400'
+          ? 'bg-theme-card border-theme-brand shadow-sm ring-1 ring-theme-brand/30'
+          : 'bg-theme-card hover:bg-theme-panel border-theme-border hover:border-theme-border-card'
       }`}
     >
       {/* Header: Rule ID & Verdict */}
       <div className="flex items-center justify-between gap-2 mb-1.5">
         <div className="flex items-center gap-1.5">
-          <Shield className="w-3.5 h-3.5 text-stone-700" />
-          <span className="font-mono text-xs font-semibold text-stone-800">
+          <Shield className="w-3.5 h-3.5 text-theme-brand" />
+          <span className="font-mono text-xs font-semibold text-theme-primary">
             {finding.rule_id}
           </span>
         </div>
@@ -41,21 +41,21 @@ export const FindingCard: React.FC<FindingCardProps> = ({
       </div>
 
       {/* Rule Name */}
-      <h4 className="text-xs font-serif font-bold text-stone-900 tracking-tight mb-1.5">
+      <h4 className="text-xs font-serif font-bold text-theme-primary tracking-tight mb-1.5">
         {finding.rule_name}
       </h4>
 
       {/* Verification Explanation */}
-      <p className="text-xs text-stone-700 leading-relaxed mb-3">
+      <p className="text-xs text-theme-secondary leading-relaxed mb-3">
         {sanitizePiiInText(finding.reason)}
       </p>
 
       {/* Supporting Evidence Citations */}
       {finding.supporting_evidence.length > 0 ? (
-        <div className="space-y-1.5 pt-2 border-t border-[#E3DDD3]">
-          <div className="text-[10px] uppercase tracking-wider font-semibold text-stone-500 flex items-center justify-between">
+        <div className="space-y-1.5 pt-2 border-t border-theme-border">
+          <div className="text-[10px] uppercase tracking-wider font-semibold text-theme-muted flex items-center justify-between">
             <span>Verified Provenance ({finding.supporting_evidence.length})</span>
-            <span className="text-[9px] text-stone-500 font-mono">Click to Jump</span>
+            <span className="text-[9px] text-theme-muted font-mono">Click to Jump</span>
           </div>
 
           <div className="flex flex-col gap-1.5">
@@ -68,24 +68,24 @@ export const FindingCard: React.FC<FindingCardProps> = ({
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
-                    onSelectEvidence(ev);
+                    onSelectEvidence(ev, finding.rule_id);
                   }}
-                  className={`text-left p-2 rounded border text-[11px] transition-all flex items-start justify-between gap-2 ${
+                  className={`text-left p-2 rounded-xs border text-[11px] transition-all flex items-start justify-between gap-2 ${
                     isActive
-                      ? 'bg-[#FDF8EE] border-[#B45309] text-stone-900 shadow-sm'
-                      : 'bg-[#FBF9F5] hover:bg-white border-[#E3DDD3] hover:border-stone-400 text-stone-800'
+                      ? 'bg-amber-500/15 border-amber-500/50 text-theme-primary shadow-xs ring-1 ring-amber-500/30'
+                      : 'bg-theme-panel hover:bg-theme-card border-theme-border hover:border-theme-border-card text-theme-secondary'
                   }`}
                   title="Click to jump and highlight on PDF canvas"
                 >
                   <div className="min-w-0 flex-1">
-                    <span className="font-mono font-semibold text-[#92400E] mr-1.5">
+                    <span className="font-mono font-semibold text-amber-600 dark:text-amber-400 mr-1.5">
                       [{ev.document_type} • P.{ev.page_number}]
                     </span>
-                    <span className="font-mono truncate block text-stone-800 mt-0.5 font-medium">
+                    <span className="font-mono truncate block text-theme-primary mt-0.5 font-medium">
                       &ldquo;{sanitizePiiInText(ev.quoted_span)}&rdquo;
                     </span>
                   </div>
-                  <ExternalLink className="w-3 h-3 text-stone-400 hover:text-stone-800 flex-shrink-0 mt-0.5" />
+                  <ExternalLink className="w-3 h-3 text-theme-muted hover:text-theme-primary flex-shrink-0 mt-0.5" />
                 </button>
               );
             })}
@@ -98,9 +98,9 @@ export const FindingCard: React.FC<FindingCardProps> = ({
       )}
 
       {/* Policy Footer */}
-      <div className="mt-2.5 pt-2 border-t border-[#E3DDD3] flex items-center justify-between text-[10px] text-stone-500 font-mono">
+      <div className="mt-2.5 pt-2 border-t border-theme-border flex items-center justify-between text-[10px] text-theme-muted font-mono">
         <span>Policy v{finding.policy_version}</span>
-        <span className="text-stone-600 font-medium">Deterministic Rule</span>
+        <span className="text-theme-secondary font-medium">Deterministic Rule</span>
       </div>
     </div>
   );

@@ -617,3 +617,44 @@ COPY --from=ui-build /app/apps/ui/dist /app/apps/ui/dist
 3. **Evidence Overlay:** Uses CSS transforms for smooth positioning
 4. **Memoization:** React.useMemo for expensive coordinate calculations
 5. **Debounced Resize:** Pane resizes are debounced to prevent layout thrashing
+
+---
+
+## Human-in-the-Loop Consensus & Two-Step Dual-Sign Confirmation
+
+To enforce **The Prime Invariant** (*A human approves. No autonomous underwriting.*), the UI implements a strict **Two-Step Dual-Sign Confirmation Protocol** in [`ReviewActionModal.tsx`](file:///c:/Users/bhanu/mycodes/cognizant-hackathon/apps/ui/src/components/review/ReviewActionModal.tsx):
+
+### Friction Protocol Against Accidental Loan Dispositions
+Underwriters reviewing dozens of applications per day face motor fatigue and accidental click risks. A simple misclick must never approve or deny a loan application.
+
+1. **Step 1 — Intent Selection:**
+   - Underwriter presses tactile buttons (`[A] Approve`, `[R] Reject`, `[N] Need Info`) or hotkeys.
+   - The modal mounts, displaying:
+     - Clear consequence banner (e.g. *Records APPROVED by Senior Underwriter in the immutable audit trail. State transitions to REVIEWED and the thread is sealed.*)
+     - Impact analysis on application lifecycle state.
+2. **Step 2 — Mandatory Audit Rationale:**
+   - For `REJECTED` and `NEEDS_INFO` dispositions, an underwriter audit rationale ($\ge 5$ characters) is mandatory. Without substantive legal/risk justification, the action cannot proceed.
+3. **Step 3 — Dual-Sign Identifier Challenge:**
+   - The underwriter must explicitly type the exact dossier identifier (e.g. `APP-25195`) into the confirmation challenge field.
+   - The `Confirm & Authorize` action button is strictly disabled until the typed string matches the application ID.
+   - Once confirmed, the review decision and rationale are atomically posted to the backend API (`POST /review/{id}/decision`) and sealed.
+
+---
+
+## Financial Design System & Theme Engine
+
+The UI provides a live, 3-in-1 institutional theme switcher powered by [`ThemeContext.tsx`](file:///c:/Users/bhanu/mycodes/cognizant-hackathon/apps/ui/src/context/ThemeContext.tsx) with persistent `localStorage`:
+
+1. **Archival Swiss Ledger (Default):**
+   - Palette: Warm parchment desk (`#F8F6F1`, `#F5F2EB`), British racing green (`#14532D`), Bordeaux claret (`#991B1B`), and tobacco amber (`#92400E`).
+   - Typography: Editorial serif display headers (`Newsreader` / `Georgia`) paired with JetBrains Mono.
+   - Purpose: Evokes the trust, rigor, and heritage of Swiss private banking and formal credit audit desks.
+2. **Modern FinTech Slate:**
+   - Palette: Cool slate (`#F8FAFC`), deep navy headers (`#0F172A`), and indigo/cobalt accents (`#4F46E5`).
+   - Purpose: Modern enterprise fintech aesthetic modeled after Ramp, Linear, and Stripe Terminal.
+3. **Obsidian Command Cockpit:**
+   - Palette: Deep obsidian slate (`#0B0F19`, `#111827`), glowing neon emerald (`#10B981`), radiant rose (`#F43F5E`), and electric amber.
+   - Purpose: High-contrast dark mode for low-light underwriting sessions and multi-monitor workstations.
+
+All themes strictly adhere to `font-feature-settings: 'tnum' 1` (`tabular-nums`) to ensure flawless vertical digit alignment across all financial comparisons.
+

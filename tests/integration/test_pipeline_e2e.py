@@ -186,12 +186,13 @@ def test_end_to_end_pipeline_approval_flow(tmp_path):
 
     # B. Deterministic rules executed and verified
     findings = paused_state["findings"]
-    assert len(findings) == 4
+    assert len(findings) == 5
     rule_verdicts = {f.rule_id: f.verdict for f in findings}
     assert rule_verdicts["RULE-COMP-01"] == "pass"
     assert rule_verdicts["RULE-INC-01"] == "pass"
     assert rule_verdicts["RULE-TAX-01"] == "pass"
     assert rule_verdicts["RULE-ID-01"] == "pass"
+    assert rule_verdicts["RULE-BANK-01"] in ("pass", "unknown")
 
     # C. CAM memo synthesized & grounding verified
     assert "Credit Appraisal Memo" in paused_state["summary_markdown"]
@@ -205,7 +206,7 @@ def test_end_to_end_pipeline_approval_flow(tmp_path):
     final_state = resume_application_review(
         thread_id=app_id,
         decision="APPROVED",
-        notes="All 4 deterministic rules verified and payroll deposits match payslip.",
+        notes="All 5 deterministic rules verified and payroll deposits match payslip.",
         checkpointer=api_checkpointer,
     )
 

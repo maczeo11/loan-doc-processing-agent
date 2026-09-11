@@ -99,14 +99,15 @@ def test_graph_execution_happy_path():
 
     assert result["status"] == "READY_FOR_REVIEW"
     assert result["review_paused"] is True
-    assert len(result["findings"]) >= 4
+    assert len(result["findings"]) == 5
 
-    # Verify all deterministic rules fired
+    # Verify all 5 deterministic rules fired
     rule_ids = [f.rule_id for f in result["findings"]]
     assert "RULE-COMP-01" in rule_ids
     assert "RULE-INC-01" in rule_ids
     assert "RULE-TAX-01" in rule_ids
     assert "RULE-ID-01" in rule_ids
+    assert "RULE-BANK-01" in rule_ids
 
     # Verify summary and grounding
     assert result["summary_markdown"] is not None

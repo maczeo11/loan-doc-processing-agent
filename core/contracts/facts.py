@@ -42,7 +42,10 @@ class BankStatementFacts(BaseModel):
     account_number_masked: str
     salary_credits: List[MoneyFact] = Field(default_factory=list)
     average_salary_credit: Optional[MoneyFact] = None
+    opening_balance: Optional[MoneyFact] = None
     closing_balance: Optional[MoneyFact] = None
+    total_credits: Optional[MoneyFact] = None
+    total_debits: Optional[MoneyFact] = None
     bounced_transactions: int = 0
 
 

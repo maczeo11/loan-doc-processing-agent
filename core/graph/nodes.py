@@ -22,6 +22,7 @@ from core.rules.completeness import evaluate_completeness
 from core.rules.salary_audit import audit_salary_vs_bank
 from core.rules.tax_audit import audit_tax_vs_income
 from core.rules.identity import audit_identity_consistency
+from core.rules.bank_arithmetic import validate_bank_statement_arithmetic
 from core.extraction.native_parser import extract_all_pages_content
 from core.extraction.extractors.payslip import PayslipExtractor
 from core.extraction.extractors.bank_statement import BankStatementExtractor
@@ -383,6 +384,23 @@ def evaluate_rules_node(state: LoanApplicationState) -> Dict[str, Any]:
     itr_pan = tax_return.pan_number if tax_return else None
     id_finding = audit_identity_consistency(applicant, payslip_emp_name, bank_holder_name, tax_pan=itr_pan)
     findings.append(id_finding)
+
+    # 5. Bank Statement Arithmetic Validation (RULE-BANK-01)
+    open_bal = getattr(bank, "opening_balance", None) if bank else None
+    close_bal = getattr(bank, "closing_balance", None) if bank else None
+    tot_credits = getattr(bank, "total_credits", None) if bank else None
+    tot_debits = getattr(bank, "total_debits", None) if bank else None
+    credits_seq = getattr(bank, "salary_credits", None) if bank else None
+
+    bank_finding = validate_bank_statement_arithmetic(
+        opening_balance=open_bal,
+        closing_balance=close_bal,
+        credits=tot_credits or credits_seq,
+        debits=tot_debits,
+        tolerance=0.05,
+    )
+    findings.append(bank_finding)
+
     logger.info(f"Rules evaluation completed: generated {len(findings)} findings.")
 
     return {
@@ -428,6 +446,15 @@ def retrieve_policy_node(state: LoanApplicationState) -> Dict[str, Any]:
     has_comp_flag = any(
         _finding_field(f, "rule_id") == "RULE-COMP-01" and _finding_field(f, "verdict") == "flag" for f in findings
     )
+    has_tax_flag = any(
+        _finding_field(f, "rule_id") == "RULE-TAX-01" and _finding_field(f, "verdict") == "flag" for f in findings
+    )
+    has_id_flag = any(
+        _finding_field(f, "rule_id") == "RULE-ID-01" and _finding_field(f, "verdict") == "flag" for f in findings
+    )
+    has_bank_flag = any(
+        _finding_field(f, "rule_id") == "RULE-BANK-01" and _finding_field(f, "verdict") == "flag" for f in findings
+    )
 
     # 1. Live hybrid retrieval over the isolated policy index (best effort)
     queries = [
@@ -438,6 +465,13 @@ def retrieve_policy_node(state: LoanApplicationState) -> Dict[str, Any]:
         queries.append("payslip net salary bank statement salary credit reconciliation tolerance percent")
     if has_comp_flag:
         queries.append("mandatory documentation checklist application form consecutive payslips")
+    if has_tax_flag:
+        queries.append("income tax return ITR gross total income reconciliation discrepancy")
+    if has_id_flag:
+        queries.append("identity KYC PAN verification fuzzy name match guidelines")
+    if has_bank_flag:
+        queries.append("bank statement balance arithmetic opening closing balance credits debits")
+
     try:
         from core.rag.indexer import IndexManager
         from core.rag.retriever import HybridRetriever

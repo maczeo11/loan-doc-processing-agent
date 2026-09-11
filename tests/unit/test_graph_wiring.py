@@ -181,13 +181,14 @@ def test_node3_rules_evaluation_with_extracted_facts(sample_dossier_pdfs):
     rules_output = evaluate_rules_node(state)
 
     findings = rules_output["findings"]
-    assert len(findings) == 4
+    assert len(findings) == 5
 
     rule_ids = {f.rule_id for f in findings}
     assert "RULE-COMP-01" in rule_ids
     assert "RULE-INC-01" in rule_ids
     assert "RULE-TAX-01" in rule_ids
     assert "RULE-ID-01" in rule_ids
+    assert "RULE-BANK-01" in rule_ids
 
     # Salary matches (70k net vs 70k credits) -> pass
     salary_finding = next(f for f in findings if f.rule_id == "RULE-INC-01")

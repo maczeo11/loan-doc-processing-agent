@@ -7,18 +7,22 @@ __pycache__/
 env/
 venv/
 .venv/
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
+# These Python build dirs are anchored to the repo root on purpose.
+# Unanchored, a bare `lib/` matches a directory named "lib" at ANY depth - it
+# was silently excluding real source at apps/ui/src/lib/ (Firebase client
+# init), which then had to be force-added to be tracked at all.
+/build/
+/develop-eggs/
+/dist/
+/downloads/
+/eggs/
+/.eggs/
+/lib/
+/lib64/
+/parts/
+/sdist/
+/var/
+/wheels/
 *.egg-info/
 .installed.cfg
 *.egg

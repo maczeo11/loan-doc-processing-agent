@@ -40,7 +40,12 @@ export const EvidenceBox: React.FC<EvidenceBoxProps> = ({
       }}
       className={`absolute z-20 transition-all pointer-events-auto cursor-pointer rounded-xs ${
         isSelected
-          ? 'bg-theme-unknown-bg border-2 border-theme-unknown ring-2 ring-theme-unknown/40 shadow-sm'
+          ? // bg-theme-unknown-bg (an opaque fill, not a tint) used to sit here
+            // and painted a solid rectangle directly over the underlying PDF
+            // text - completely hiding the very evidence the box points at.
+            // A translucent wash (matching the unselected state's pattern
+            // below) keeps the highlight visible while the text stays legible.
+            'bg-theme-unknown/15 border-2 border-theme-unknown ring-2 ring-theme-unknown/40 shadow-sm'
           : 'bg-theme-brand/10 border border-theme-brand hover:bg-theme-brand/20'
       }`}
       onMouseEnter={() => setIsHovered(true)}

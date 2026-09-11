@@ -1,88 +1,67 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useState } from 'react';
 import { ShieldCheck } from 'lucide-react';
+
+/** Official Google "G" mark, inline so no extra asset/network fetch is needed. */
+const GoogleIcon: React.FC = () => (
+  <svg width="16" height="16" viewBox="0 0 18 18" aria-hidden="true">
+    <path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.9c1.7-1.57 2.68-3.87 2.68-6.62z" />
+    <path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.9-2.26c-.8.54-1.83.86-3.06.86-2.35 0-4.34-1.59-5.05-3.72H.96v2.33A9 9 0 0 0 9 18z" />
+    <path fill="#FBBC05" d="M3.95 10.7A5.4 5.4 0 0 1 3.67 9c0-.59.1-1.17.28-1.7V4.97H.96A9 9 0 0 0 0 9c0 1.45.35 2.83.96 4.03l2.99-2.33z" />
+    <path fill="#EA4335" d="M9 3.58c1.32 0 2.51.46 3.44 1.35l2.58-2.58C13.46.89 11.43 0 9 0A9 9 0 0 0 .96 4.97l2.99 2.33C4.66 5.17 6.65 3.58 9 3.58z" />
+  </svg>
+);
+import {
+  signInWithPopup,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+} from 'firebase/auth';
+import { auth, googleProvider } from '../../lib/firebase';
 import { useAuth } from '../../context/AuthContext';
 import { UNDERWRITER_PERSONAS, initialsFor } from '../../services/auth';
 
-declare global {
-  interface Window {
-    google?: {
-      accounts: {
-        id: {
-          initialize: (opts: { client_id: string; callback: (resp: { credential: string }) => void; auto_select?: boolean; cancel_on_tap_outside?: boolean }) => void;
-          renderButton: (el: HTMLElement, opts: Record<string, unknown>) => void;
-          prompt: () => void;
-        };
-      };
-    };
-  }
-}
-
-function loadGisScript(): Promise<void> {
-  if (typeof document === 'undefined') return Promise.resolve();
-  if (document.querySelector('script[data-gis="1"]')) return Promise.resolve();
-  return new Promise((resolve, reject) => {
-    const s = document.createElement('script');
-    s.src = 'https://accounts.google.com/gsi/client';
-    s.async = true;
-    s.defer = true;
-    s.dataset.gis = '1';
-    s.onload = () => resolve();
-    s.onerror = () => reject(new Error('Failed to load Google Identity Services'));
-    document.head.appendChild(s);
-  });
-}
-
 /**
  * Real loan-app start: explicit sign-in gate.
- * Google mode: GIS button -> POST /auth/google (allowlisted only).
+ * Firebase mode: Google popup or email/password, both via Firebase Auth ->
+ * exchange the resulting Firebase ID token with the backend (allowlisted only).
  * Mock mode: 1-click personas for offline/viva.
  */
 export const LoginPage: React.FC<{ onLoggedIn?: () => void }> = ({ onLoggedIn }) => {
   const { mode, login, loginWithGoogle, isLoading } = useAuth();
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const btnRef = useRef<HTMLDivElement | null>(null);
-  const clientId = (import.meta.env.VITE_GOOGLE_CLIENT_ID as string) || '';
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [isSignUp, setIsSignUp] = useState(false);
 
-  useEffect(() => {
-    if (mode !== 'google' || !clientId) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        await loadGisScript();
-        if (cancelled || !window.google || !btnRef.current) return;
-        window.google.accounts.id.initialize({
-          client_id: clientId,
-          callback: async (resp) => {
-            setBusy(true);
-            setError(null);
-            try {
-              await loginWithGoogle(resp.credential);
-              onLoggedIn?.();
-            } catch (e) {
-              setError(e instanceof Error ? e.message : 'Google sign-in failed');
-            } finally {
-              setBusy(false);
-            }
-          },
-          auto_select: false,
-          cancel_on_tap_outside: true,
-        });
-        btnRef.current.innerHTML = '';
-        window.google.accounts.id.renderButton(btnRef.current, {
-          theme: 'outline',
-          size: 'large',
-          text: 'signin_with',
-          shape: 'rectangular',
-        });
-      } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : 'Google script failed to load');
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [mode, clientId, loginWithGoogle, onLoggedIn]);
+  const finishWithFirebaseUser = async (getIdToken: () => Promise<string>) => {
+    setBusy(true);
+    setError(null);
+    try {
+      const idToken = await getIdToken();
+      await loginWithGoogle(idToken);
+      onLoggedIn?.();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Sign-in failed');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleGooglePopup = () =>
+    finishWithFirebaseUser(async () => {
+      const result = await signInWithPopup(auth, googleProvider);
+      return result.user.getIdToken();
+    });
+
+  const handleEmailPassword = (e: React.FormEvent) => {
+    e.preventDefault();
+    finishWithFirebaseUser(async () => {
+      const result = isSignUp
+        ? await createUserWithEmailAndPassword(auth, email, password)
+        : await signInWithEmailAndPassword(auth, email, password);
+      return result.user.getIdToken();
+    });
+  };
 
   const handleMock = async (personaId: string) => {
     setBusy(true);
@@ -115,16 +94,60 @@ export const LoginPage: React.FC<{ onLoggedIn?: () => void }> = ({ onLoggedIn })
 
         {mode === 'google' ? (
           <div className="space-y-4">
-            {!clientId && (
-              <div className="text-xs bg-theme-flag-bg border border-theme-flag-border text-theme-flag rounded-xs p-2.5">
-                Missing <code>VITE_GOOGLE_CLIENT_ID</code>. Set it in <code>apps/ui/.env</code> to enable Google sign-in.
-              </div>
-            )}
-            <div ref={btnRef} className="flex justify-center min-h-[44px]" />
+            <button
+              type="button"
+              disabled={busy || isLoading}
+              onClick={handleGooglePopup}
+              className="w-full flex items-center justify-center gap-2.5 px-3 py-2.5 rounded-xs border border-theme-border bg-white hover:bg-theme-panel transition-colors disabled:opacity-50 text-xs font-semibold text-gray-700 shadow-2xs"
+            >
+              <GoogleIcon />
+              Sign in with Google
+            </button>
+
+            <div className="flex items-center gap-2 text-[10px] text-theme-muted uppercase tracking-wider">
+              <div className="flex-1 h-px bg-theme-border" />
+              or
+              <div className="flex-1 h-px bg-theme-border" />
+            </div>
+
+            <form onSubmit={handleEmailPassword} className="space-y-2.5">
+              <input
+                type="email"
+                required
+                placeholder="Email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full px-3 py-2 text-xs rounded-xs bg-theme-panel border border-theme-border text-theme-primary placeholder:text-theme-muted focus:outline-none focus:border-theme-brand"
+              />
+              <input
+                type="password"
+                required
+                minLength={6}
+                placeholder="Password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full px-3 py-2 text-xs rounded-xs bg-theme-panel border border-theme-border text-theme-primary placeholder:text-theme-muted focus:outline-none focus:border-theme-brand"
+              />
+              <button
+                type="submit"
+                disabled={busy || isLoading}
+                className="w-full px-3 py-2.5 rounded-xs bg-theme-brand text-white text-xs font-semibold disabled:opacity-50"
+              >
+                {isSignUp ? 'Create account' : 'Sign in'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsSignUp((v) => !v)}
+                className="w-full text-[11px] text-theme-muted hover:text-theme-primary text-center"
+              >
+                {isSignUp ? 'Already have an account? Sign in' : "Don't have an account? Create one"}
+              </button>
+            </form>
+
             {(isLoading || busy) && <p className="text-xs text-theme-muted text-center">Verifying with server…</p>}
             {error && <div className="text-xs bg-theme-flag-bg border border-theme-flag-border text-theme-flag rounded-xs p-2.5 break-words">{error}</div>}
             <div className="text-[11px] text-theme-muted text-center">
-              Only allowlisted Google accounts can sign in. Contact admin with your @work email if denied.
+              Only allowlisted accounts can sign in. Contact admin with your @work email if denied.
             </div>
           </div>
         ) : (

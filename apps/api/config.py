@@ -48,8 +48,22 @@ class Settings(BaseSettings):
 
     # Auth (Google allowlisted; mock for local/viva)
     AUTH_MODE: Literal["mock", "google", "required"] = "mock"
+    # Whether this deployment is actually served over HTTPS. The session
+    # cookie's Secure flag must match reality: a Secure cookie set over plain
+    # HTTP is silently dropped by every browser, breaking login right after
+    # it "succeeds" (the very next authenticated request comes back 401).
+    # Previously inferred from ENVIRONMENT=="production", which broke this
+    # exact deployment (production, but HTTP-only, no domain/TLS yet).
+    # Flip to true once real TLS (Caddy auto-HTTPS with a real domain) is live.
+    TLS_ENABLED: bool = False
     GOOGLE_CLIENT_ID: str = ""
     GOOGLE_CLIENT_IDS: str = ""
+    # Firebase Auth (apps/api/auth/firebase_verify.py): when set, /auth/google
+    # verifies incoming tokens as Firebase ID tokens instead of plain Google
+    # ID tokens - covers both Google-via-Firebase and email/password sign-in,
+    # since Firebase issues the same token shape for either. No service
+    # account/private key needed - see that module's docstring.
+    FIREBASE_PROJECT_ID: str = ""
     JWT_SECRET: str = "dev-only-insecure-secret-change-me"
     JWT_ALGORITHM: str = "HS256"
     SESSION_TTL_HOURS: int = 12
@@ -58,6 +72,11 @@ class Settings(BaseSettings):
 
     # OpenCode API
     OPENCODE_API_KEY: str = ""
+
+    # Experimental: read-only tool-calling agent for the underwriter Q&A endpoint
+    # (apps/api/agent.py). Off by default; the endpoint falls back to the
+    # existing single-shot LLM path on any failure regardless of this flag.
+    AGENTIC_QA_ENABLED: bool = False
 
     # Rate limits & spend guards
     MAX_ACTIVE_JOBS_PER_USER: int = 2

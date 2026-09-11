@@ -19,6 +19,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 import redis.asyncio as aioredis
 
+from apps.api.config import settings
+
 from apps.api.db.models import ApplicationModel, JobModel, AuditEventModel, utc_now
 from apps.api.db.session import get_db
 from apps.api.middleware.rate_limit import get_redis_client, rate_limit_polling
@@ -267,6 +269,21 @@ async def ask_question(id: str, payload: QuestionRequest, session: AsyncSession 
             answer="No relevant policy passages found for this question. I abstain rather than guess.",
             citations=[],
         )
+
+    # Experimental: read-only tool-calling agent (apps/api/agent.py), off by
+    # default. On success it returns a grounding-firewalled answer already
+    # built from its own tool-call citations; on None (disabled, no LLM
+    # backend, or any failure) we fall through to the existing logic below
+    # untouched - this branch never changes default behavior.
+    if settings.AGENTIC_QA_ENABLED:
+        from apps.api.agent import answer_question_agentic
+
+        agentic_result = answer_question_agentic(question, retriever)
+        if agentic_result is not None:
+            return QuestionResponse(
+                answer=agentic_result["answer"],
+                citations=agentic_result["citations"],
+            )
 
     citations: List[Dict[str, Any]] = []
     for hit in hits:

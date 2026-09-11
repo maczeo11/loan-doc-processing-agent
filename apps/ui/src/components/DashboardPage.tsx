@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Plus, RefreshCw, FolderOpen, ShieldCheck, AlertTriangle } from 'lucide-react';
+import { Plus, RefreshCw, FolderOpen, ShieldCheck, AlertTriangle, LogOut } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { StatusPill } from './common/StatusPill';
 import { formatCurrency } from '../utils/pii';
@@ -66,7 +66,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
   isLoading,
   backendError,
 }) => {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const [query, setQuery] = useState('');
 
   const q = query.trim().toLowerCase();
@@ -120,6 +120,21 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
             >
               <Plus className="w-3.5 h-3.5" /> New Application
             </button>
+            {/* This is the landing view after sign-in - before opening any
+                dossier, Header.tsx (which has the only other logout button)
+                never mounts. Without this, a freshly-logged-in user has no
+                way to sign out at all until they open a specific dossier. */}
+            {user && (
+              <button
+                type="button"
+                onClick={() => logout()}
+                className="flex items-center gap-1.5 px-2.5 py-2 rounded-xs bg-theme-card hover:bg-theme-flag-bg text-theme-secondary hover:text-theme-flag border border-theme-border hover:border-theme-flag-border text-xs font-mono font-semibold transition-colors"
+                title="Sign out"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Logout</span>
+              </button>
+            )}
           </div>
         </div>
 

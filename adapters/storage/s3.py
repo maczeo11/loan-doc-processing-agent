@@ -40,6 +40,34 @@ class S3Storage(StoragePort):
         self.region = region
         self._client = s3_client
 
+    def _clean_key(self, key: str) -> str:
+        """
+        Strips a leading 's3://<bucket>/' (or bare 's3://') prefix before use.
+
+        put() returns a full 's3://{bucket}/{key}' URI (mirrors local_fs.py's
+        'file://' URI return, so put()'s output is always valid get() input
+        for either adapter) - but get()/exists()/delete() previously only did
+        key.lstrip("/"), which is a no-op on a string starting with 's3:', so
+        every read-back after a put() literally requested a key containing
+        's3://bucket/...' as part of the S3 object key itself. That key never
+        existed, so every single document fetch failed with NoSuchKey - this
+        silently broke OCR/extraction for every uploaded document in this
+        deployment (worker logs showed 100% NoSuchKey on every job).
+        local_fs.py's _resolve_path() already does the equivalent for
+        'file://' - this mirrors that fix for the S3 adapter.
+        """
+        if key.startswith("s3://"):
+            rest = key[5:]
+            prefix = f"{self.bucket_name}/"
+            if rest.startswith(prefix):
+                rest = rest[len(prefix):]
+            else:
+                # s3://<other-bucket>/<key> - still strip the scheme so at
+                # least a same-bucket-relative key isn't double-prefixed.
+                _, _, rest = rest.partition("/")
+            return rest.lstrip("/")
+        return key.lstrip("/")
+
     @property
     def client(self):
         """Lazily initializes boto3 S3 client."""
@@ -99,7 +127,7 @@ class S3Storage(StoragePort):
 
     def get(self, key: str) -> bytes:
         """Retrieves raw bytes from S3 object."""
-        clean_key = key.lstrip("/")
+        clean_key = self._clean_key(key)
         try:
             response = self.client.get_object(Bucket=self.bucket_name, Key=clean_key)
             return response["Body"].read()
@@ -220,7 +248,7 @@ class S3Storage(StoragePort):
 
     def exists(self, key: str) -> bool:
         """Checks if object exists in S3 bucket."""
-        clean_key = key.lstrip("/")
+        clean_key = self._clean_key(key)
         try:
             self.client.head_object(Bucket=self.bucket_name, Key=clean_key)
             return True
@@ -229,7 +257,7 @@ class S3Storage(StoragePort):
 
     def delete(self, key: str) -> bool:
         """Deletes object from S3 bucket."""
-        clean_key = key.lstrip("/")
+        clean_key = self._clean_key(key)
         try:
             self.client.delete_object(Bucket=self.bucket_name, Key=clean_key)
             logger.info(f"Deleted s3://{self.bucket_name}/{clean_key}")

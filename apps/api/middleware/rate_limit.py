@@ -4,7 +4,8 @@ Redis sliding-window rate limiting and client identity middleware for FinScan AI
 Core Rules:
 - Enforce MAX_SUBMISSIONS_PER_MIN for document uploads.
 - Enforce MAX_STATUS_POLLS_PER_MIN for job status polling.
-- Identity: X-User-Id header, falling back to client IP in local development.
+- Identity: verified session (Google/Firebase auth) when AUTH_MODE != "mock";
+  X-User-Id header / client IP fallback in mock mode only.
 - Key namespacing and sha256 hashing for tenant isolation.
 - Atomic sliding-window evaluation via Redis WATCH / MULTI / EXEC.
 - Fail-closed in production with HTTP 503 Service Unavailable on Redis outage.
@@ -116,30 +117,46 @@ def resolve_user_identity(request: Request) -> str:
     Resolves client identity for rate limiting and spend guard controls.
 
     Strategy:
-    - Extracts non-empty X-User-Id header when supplied.
-    - In development/local mode, falls back to request.client.host if X-User-Id is absent.
-    - In production/cloud mode, strictly requires a non-empty X-User-Id header; raises HTTP 400 Bad Request
-      if absent or empty, explaining that the demo identity header is required until JWT/OIDC integration exists.
-      Never uses a shared 'anonymous' identity in production to prevent noisy-neighbor lockouts.
+    - AUTH_MODE != "mock" (real JWT/OIDC auth is live - Google/Firebase):
+      uses the verified session identity (apps.api.auth.deps.current_user_email),
+      same as every other authenticated route. Every route this is called from
+      already sits behind the AUTHENTICATED dependency in main.py, so a valid
+      session is guaranteed to exist by the time this runs.
+    - AUTH_MODE == "mock": falls back to the old X-User-Id header / client IP
+      demo mechanism, unchanged, so local/offline/viva flows keep working.
 
-    TEMPORARY NOTE:
-    This header-based identity strategy is a development / buildathon demo mechanism.
-    Production deployments must replace this with verified JWT/OIDC claims
-    (e.g., Cognito, Keycloak, or Auth0) extracted from Authorization tokens.
+    Previously this always required a client-supplied 'X-User-Id' header in
+    production and 400'd without it - a raw client header is trivially
+    spoofable anyway, and real auth now exists, so identity comes from the
+    verified session instead.
     """
-    user_id = request.headers.get("x-user-id")
-    if user_id and user_id.strip():
-        raw_id = user_id.strip()
-    elif settings.ENVIRONMENT in ("local", "development"):
-        raw_id = request.client.host if request.client else "127.0.0.1"
+    if settings.AUTH_MODE != "mock":
+        from apps.api.auth.deps import current_user_email
+
+        email = current_user_email(request, fallback="")
+        if email:
+            raw_id = email
+        elif settings.ENVIRONMENT in ("local", "development"):
+            raw_id = request.client.host if request.client else "127.0.0.1"
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No authenticated identity available for this request.",
+            )
     else:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=(
-                "Missing required 'X-User-Id' header. "
-                "Demo identity header is required in production until JWT/OIDC integration exists."
-            ),
-        )
+        user_id = request.headers.get("x-user-id")
+        if user_id and user_id.strip():
+            raw_id = user_id.strip()
+        elif settings.ENVIRONMENT in ("local", "development"):
+            raw_id = request.client.host if request.client else "127.0.0.1"
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    "Missing required 'X-User-Id' header. "
+                    "Demo identity header is required in mock-mode production until JWT/OIDC integration exists."
+                ),
+            )
 
     # Safely hash identity to prevent key injection and special character collisions
     identity_hash = hashlib.sha256(raw_id.encode("utf-8")).hexdigest()[:16]

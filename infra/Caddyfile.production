@@ -5,9 +5,18 @@
 {
     email {$ACME_EMAIL:admin@example.com}
     admin off
+    # No real domain is configured yet (DOMAIN_NAME defaults to "localhost",
+    # accessed via the EC2 IP) - Caddy's automatic HTTPS otherwise issues an
+    # internal-CA cert for "localhost" and redirects all HTTP traffic to it,
+    # which every client rejects (wrong hostname, untrusted CA) - this took
+    # the whole site down the first time Caddy's container got recreated.
+    # Remove this line (and the http:// prefix below) once a real domain +
+    # DNS is in place (see docs/improvement_roadmap.md) so Let's Encrypt
+    # auto-HTTPS takes over.
+    auto_https off
 }
 
-{$DOMAIN_NAME:localhost} {
+http://{$DOMAIN_NAME:localhost} {
     encode gzip zstd
 
     # Security headers

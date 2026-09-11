@@ -6,10 +6,18 @@ Orchestrates the sequential loan document processing pipeline with:
 - Deterministic branching (triage failure routing)
 - Strict typed LoanApplicationState transitions
 - Human-in-the-loop interrupt() checkpoint before human underwriter review
+
+langgraph is a hard dependency (see pyproject.toml / requirements.txt). It is
+imported unconditionally so a broken install fails loudly here rather than
+degrading into a partial pipeline that skips the grounding gate.
 """
 
-from typing import Literal, Optional, Dict, Any, List, Callable
+from typing import Literal, Optional
+
+from langgraph.graph import StateGraph, END
+
 from core.contracts.state import LoanApplicationState
+from core.graph.checkpoint import SqliteSaver
 from core.graph.nodes import (
     triage_node,
     ocr_and_classify_node,
@@ -20,51 +28,6 @@ from core.graph.nodes import (
     validate_grounding_node,
     human_review_node,
 )
-
-try:
-    from langgraph.graph import StateGraph, END
-    LANGGRAPH_AVAILABLE = True
-except ImportError:
-    LANGGRAPH_AVAILABLE = False
-    StateGraph = None
-    END = "__end__"
-
-
-class FallbackCompiledGraph:
-    """
-    Lightweight, synchronous graph runner matching LangGraph StateGraph invoke() semantics.
-    Used when langgraph package is not present in local environment.
-    """
-
-    def __init__(self, nodes: Dict[str, Callable], edges: List[tuple]):
-        self.nodes = nodes
-        self.edges = edges
-
-    def invoke(self, initial_state: Dict[str, Any], config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        state = dict(initial_state)
-
-        # Full linear pipeline sequence — mirrors the StateGraph edges above,
-        # INCLUDING classification, the grounding gate, and human review.
-        # Dropping any of these silently (as an older fallback did) would
-        # bypass the citation gate and the HITL checkpoint.
-        node_order = [
-            "triage",
-            "ocr_and_classify",
-            "extract_facts",
-            "evaluate_rules",
-            "retrieve_policy",
-            "synthesize_summary",
-            "validate_grounding",
-            "human_review",
-        ]
-        for node_name in node_order:
-            if node_name in self.nodes:
-                fn = self.nodes[node_name]
-                node_output = fn(state)
-                if isinstance(node_output, dict):
-                    state.update(node_output)
-
-        return state
 
 
 def route_after_triage(state: LoanApplicationState) -> Literal["ocr_and_classify", "__end__"]:
@@ -85,25 +48,7 @@ def build_application_graph(checkpointer=None, enable_interrupt: bool = True):
         checkpointer: Optional persistence checkpointer (e.g. PostgresSaver or MemorySaver).
         enable_interrupt: If True and checkpointer is provided, pauses before human_review.
     """
-    if LANGGRAPH_AVAILABLE:
-        workflow = StateGraph(LoanApplicationState)
-    else:
-        # No langgraph installed: run the same node sequence synchronously.
-        # The fallback preserves classification, grounding, and human review —
-        # interrupt semantics are unavailable, so human_review runs inline.
-        return FallbackCompiledGraph(
-            nodes={
-                "triage": triage_node,
-                "ocr_and_classify": ocr_and_classify_node,
-                "extract_facts": extract_facts_node,
-                "evaluate_rules": evaluate_rules_node,
-                "retrieve_policy": retrieve_policy_node,
-                "synthesize_summary": synthesize_summary_node,
-                "validate_grounding": validate_grounding_node,
-                "human_review": human_review_node,
-            },
-            edges=[],
-        )
+    workflow = StateGraph(LoanApplicationState)
 
     # 1. Add processing nodes
     workflow.add_node("triage", triage_node)
@@ -144,15 +89,10 @@ def build_application_graph(checkpointer=None, enable_interrupt: bool = True):
     )
 
 
-# Backward compatibility alias
-build_loan_processing_graph = build_application_graph
-
-
 def get_default_checkpointer(db_path: str = "data/storage/checkpoints.sqlite3"):
     """
     Returns the production-grade durable SQLite checkpointer.
     """
-    from core.graph.checkpoint import SqliteSaver
     return SqliteSaver(db_path=db_path)
 
 

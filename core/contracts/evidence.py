@@ -22,5 +22,5 @@ class EvidenceRef(BaseModel):
     page_number: int = Field(..., ge=1, description="1-indexed page number")
     quoted_span: str = Field(..., description="Exact quoted text extracted from page")
     bounding_box: Optional[BoundingBox] = Field(None, description="Coordinates on rendered page")
-    extraction_method: str = Field("pymupdf_native", description="'pymupdf_native' | 'paddleocr_cpu'")
+    extraction_method: str = Field("pymupdf_native", description="'pymupdf_native' | 'tesseract_cpu' | 'paddleocr_cpu' | 'textract_managed'")
     confidence: float = Field(1.0, ge=0.0, le=1.0, description="Extraction confidence score")

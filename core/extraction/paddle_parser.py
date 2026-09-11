@@ -68,7 +68,44 @@ def extract_scanned_text_with_ocr(
 
         ocr_engine = get_paddle_ocr_engine()
         if ocr_engine is None:
-            return []
+            # Fallback to PyMuPDF built-in OCR (Tesseract CPU engine).
+            # Label honestly: this is NOT PaddleOCR.
+            try:
+                ocr_tp = page.get_textpage_ocr(dpi=dpi)
+                page_dict = page.get_text("dict", textpage=ocr_tp)
+                evidence_items: List[EvidenceRef] = []
+                for block in page_dict.get("blocks", []):
+                    if "lines" not in block:
+                        continue
+                    for line in block.get("lines", []):
+                        for span in line.get("spans", []):
+                            span_text = span.get("text", "").strip()
+                            if not span_text:
+                                continue
+                            bbox_coords = span.get("bbox", (0.0, 0.0, 0.0, 0.0))
+                            bbox = validate_and_clamp_bbox(
+                                x0=bbox_coords[0],
+                                y0=bbox_coords[1],
+                                x1=bbox_coords[2],
+                                y1=bbox_coords[3],
+                                page_width=page_width,
+                                page_height=page_height,
+                            )
+                            evidence_items.append(
+                                EvidenceRef(
+                                    document_id=document_id,
+                                    document_type=document_type,
+                                    page_number=page_number,
+                                    quoted_span=span_text,
+                                    bounding_box=bbox,
+                                    extraction_method="tesseract_cpu",
+                                    confidence=0.85,
+                                )
+                            )
+                return evidence_items
+            except Exception as e:
+                logger.warning(f"PyMuPDF OCR (Tesseract CPU) fallback failed: {e}")
+                return []
 
         # Render PDF page to image pixmap
         pix = page.get_pixmap(dpi=dpi)

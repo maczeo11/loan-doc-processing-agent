@@ -1,10 +1,20 @@
-FROM python:3.11-slim
+# ── Stage 1: Build React SPA ──────────────────────────────────────────
+FROM node:20-slim AS ui-builder
+WORKDIR /ui
+COPY apps/ui/package.json apps/ui/package-lock.json ./
+RUN npm ci --production=false
+COPY apps/ui/ .
+RUN npm run build
 
+# ── Stage 2: Python API ──────────────────────────────────────────────
+FROM python:3.11-slim
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     curl \
+    tesseract-ocr \
+    tesseract-ocr-eng \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt pyproject.toml ./
@@ -12,6 +22,9 @@ RUN pip install --no-cache-dir --default-timeout=1000 --retries 5 -r requirement
 RUN pip install --no-cache-dir -e .
 
 COPY . .
+
+# Copy pre-built React SPA into the path FastAPI expects (apps/ui/dist)
+COPY --from=ui-builder /ui/dist /app/apps/ui/dist
 
 EXPOSE 8000
 

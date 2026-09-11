@@ -38,18 +38,24 @@ class LeaseHeartbeat:
         self,
         queue: QueuePort,
         lease_handle: str,
-        interval_seconds: float = 10.0,
-        extension_seconds: int = 30,
+        interval_seconds: float = 30.0,
+        extension_seconds: int = 90,
+        max_runtime_seconds: float = 900.0,
     ):
         self.queue = queue
         self.lease_handle = lease_handle
         self.interval_seconds = interval_seconds
         self.extension_seconds = extension_seconds
+        self.max_runtime_seconds = max_runtime_seconds
         self._stop_event = threading.Event()
         self._thread: Optional[threading.Thread] = None
+        self._started_at: float = 0.0
 
     def start(self) -> None:
         self._stop_event.clear()
+        import time as _time
+
+        self._started_at = _time.monotonic()
         self._thread = threading.Thread(target=self._run, daemon=True, name="LeaseHeartbeatThread")
         self._thread.start()
 
@@ -59,7 +65,17 @@ class LeaseHeartbeat:
             self._thread.join(timeout=2.0)
 
     def _run(self) -> None:
+        import time as _time
+
         while not self._stop_event.wait(self.interval_seconds):
+            # Bounded lease: stop extending after max_runtime so poison-slow jobs
+            # redrive to DLQ instead of holding the worker forever (20-min stall fix).
+            if self._started_at and (_time.monotonic() - self._started_at) > self.max_runtime_seconds:
+                logger.error(
+                    f"Heartbeat deadline exceeded ({self.max_runtime_seconds}s) for handle {self.lease_handle[:16]}...; "
+                    "stopping extensions so job can redrive/DLQ."
+                )
+                return
             try:
                 logger.debug(f"Heartbeat: extending lease for handle {self.lease_handle[:16]}... by {self.extension_seconds}s")
                 self.queue.extend_lease(self.lease_handle, self.extension_seconds)
@@ -86,8 +102,8 @@ class ApplicationWorker:
         storage_adapter: Optional[StoragePort] = None,
         checkpointer=None,
         max_delivery_attempts: int = 3,
-        heartbeat_interval_seconds: float = 10.0,
-        heartbeat_extension_seconds: int = 30,
+        heartbeat_interval_seconds: float = 30.0,
+        heartbeat_extension_seconds: int = 90,
         graph=None,
         db_url: Optional[str] = None,
     ):

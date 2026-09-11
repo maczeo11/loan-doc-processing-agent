@@ -151,6 +151,10 @@ class DocumentModel(Base):
         back_populates="documents",
     )
 
+    __table_args__ = (
+        Index("ix_documents_sha256", "sha256"),
+    )
+
 
 class JobModel(Base):
     """
@@ -292,4 +296,29 @@ class SpendLedgerModel(Base):
         nullable=False,
         default=utc_now,
         index=True,
+    )
+
+
+class UserModel(Base):
+    """
+    Allowlisted underwriter identities (Google). `authorized` is source of truth;
+    first login seeds from AUTHORIZED_EMAILS/AUTHORIZED_DOMAINS, admin flips govern after.
+    """
+    __tablename__ = "users"
+
+    email: Mapped[str] = mapped_column(String(255), primary_key=True)
+    name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    picture_url: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
+    role: Mapped[str] = mapped_column(String(32), nullable=False, default="SENIOR_UNDERWRITER")
+    authorized: Mapped[bool] = mapped_column(nullable=False, default=False)
+    google_sub: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, unique=True, index=True)
+    last_login_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utc_now, onupdate=utc_now)
+
+    __table_args__ = (
+        CheckConstraint(
+            "role IN ('SENIOR_UNDERWRITER','RISK_ANALYST','COMPLIANCE_OFFICER')",
+            name="ck_users_role",
+        ),
     )

@@ -8,12 +8,15 @@ Invariants & Guarantees:
 - Supports both filesystem paths and raw PDF byte buffers.
 """
 
+import logging
 from typing import List, Dict, Any, Optional, Union
 try:
     import fitz  # PyMuPDF
 except ImportError:
     fitz = None
 from core.contracts.evidence import EvidenceRef, BoundingBox
+
+logger = logging.getLogger(__name__)
 
 
 def validate_and_clamp_bbox(
@@ -81,6 +84,25 @@ def extract_native_text_with_coordinates(
 
         evidence_items: List[EvidenceRef] = []
         page_dict = page.get_text("dict")
+        extraction_method = "pymupdf_native"
+
+        # Pure native only: no hidden OCR side-effect here.
+        # Scanned/image pages return [] so the router can escalate to
+        # Tesseract CPU -> PaddleOCR -> Textract (DetectDocumentText, capped).
+        has_native_spans = False
+        for b in page_dict.get("blocks", []):
+            for line in b.get("lines", []):
+                for s in line.get("spans", []):
+                    if s.get("text", "").strip():
+                        has_native_spans = True
+                        break
+                if has_native_spans:
+                    break
+            if has_native_spans:
+                break
+
+        if not has_native_spans:
+            return []
 
         for block in page_dict.get("blocks", []):
             if "lines" not in block:
@@ -109,8 +131,8 @@ def extract_native_text_with_coordinates(
                             page_number=page_number,
                             quoted_span=span_text,
                             bounding_box=bbox,
-                            extraction_method="pymupdf_native",
-                            confidence=1.0,
+                            extraction_method=extraction_method,
+                            confidence=0.95 if extraction_method == "paddleocr_cpu" else 1.0,
                         )
                     )
 
@@ -150,6 +172,10 @@ def extract_page_content(
 
         raw_text = page.get_text("text") or ""
         words_raw = page.get_text("words") or []
+
+        # Pure native probe: no OCR side-effect. Router decides escalation.
+        # (Previously this did a hidden get_textpage_ocr when <20 chars,
+        # which inflated char_count and forced every scan to "native".)
 
         words_formatted = []
         for w in words_raw:
@@ -197,6 +223,7 @@ def find_phrase_evidence(
     """
     Locates a target phrase or number on a specific page and builds a consolidated EvidenceRef.
     Merges matching rectangles if the phrase spans multiple boxes on the line.
+    Falls back to OCR if phrase is not found in native layer.
     """
     if not query or not query.strip():
         return None
@@ -210,6 +237,19 @@ def find_phrase_evidence(
 
         page = doc[page_number - 1]
         matches = page.search_for(query.strip())
+        method = "pymupdf_native"
+
+        if not matches:
+            # Try searching with OCR textpage (Tesseract CPU via MuPDF)
+            try:
+                ocr_tp = page.get_textpage_ocr(dpi=200)
+                ocr_matches = page.search_for(query.strip(), textpage=ocr_tp)
+                if ocr_matches:
+                    matches = ocr_matches
+                    method = "tesseract_cpu"
+            except Exception as e:
+                logger.debug(f"OCR textpage search_for failed: {e}")
+
         if not matches:
             return None
 
@@ -236,9 +276,39 @@ def find_phrase_evidence(
             page_number=page_number,
             quoted_span=query.strip(),
             bounding_box=bbox,
-            extraction_method="pymupdf_native",
-            confidence=confidence,
+            extraction_method=method,
+            confidence=0.85 if method == "tesseract_cpu" else confidence,
         )
+    finally:
+        doc.close()
+
+
+def get_page_image_coverage(pdf_input: Union[str, bytes], page_number: int) -> float:
+    """
+    Fraction (0.0-1.0) of page area covered by raster images.
+    Used by router to prefer OCR for image-heavy pages even when a small
+    native layer exists (e.g. stamp + scan). Pure probe, no OCR.
+    """
+    if fitz is None:
+        return 0.0
+    doc = open_pdf_document(pdf_input)
+    try:
+        if page_number > len(doc):
+            return 0.0
+        page = doc[page_number - 1]
+        rect = page.rect
+        page_area = float(rect.width * rect.height) or 1.0
+        img_area = 0.0
+        try:
+            for img in page.get_images(full=True):
+                try:
+                    bbox = page.get_image_bbox(img)
+                    img_area += float(bbox.width * bbox.height)
+                except Exception:
+                    continue
+        except Exception:
+            return 0.0
+        return max(0.0, min(1.0, img_area / page_area))
     finally:
         doc.close()
 
@@ -247,6 +317,7 @@ def extract_all_pages_content(pdf_input: Union[str, bytes]) -> List[Dict[str, An
     """
     Extracts structured page content and layout dictionaries for all pages in a document.
     Convenience method used by fact extractors and node pipelines.
+    Pure native (no OCR side-effect); router escalates per page as needed.
     """
     doc = open_pdf_document(pdf_input)
     try:

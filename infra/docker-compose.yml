@@ -45,6 +45,9 @@ services:
       context: ..
       dockerfile: infra/Dockerfile.api
     container_name: finscan-api
+    env_file:
+      - path: ../.env
+        required: false
     depends_on:
       db:
         condition: service_healthy
@@ -55,11 +58,18 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://postgres:postgrespassword@db:5432/finscan
       REDIS_URL: redis://redis:6379/0
-      QUEUE_BACKEND: postgres
-      STORAGE_BACKEND: local
+      QUEUE_BACKEND: ${QUEUE_BACKEND:-postgres}
+      STORAGE_BACKEND: ${STORAGE_BACKEND:-local}
       STORAGE_BASE_DIR: /app/data/storage
+      S3_BUCKET: ${S3_BUCKET:-}
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      SQS_QUEUE_URL: ${SQS_QUEUE_URL:-}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      OPENCODE_API_KEY: ${OPENCODE_API_KEY:-}
+      LLM_MODEL: ${LLM_MODEL:-openai/gpt-oss-20b}
+      LLM_BACKEND: ${LLM_BACKEND:-opencode}
       API_PORT: 8000
-      ENVIRONMENT: local
+      ENVIRONMENT: ${ENVIRONMENT:-local}
     volumes:
       - dossiers_storage:/app/data/storage
     expose:
@@ -81,8 +91,10 @@ services:
         condition: service_completed_successfully
     environment:
       DATABASE_URL: postgresql+asyncpg://postgres:postgrespassword@db:5432/finscan
-      QUEUE_BACKEND: postgres
-      ENVIRONMENT: local
+      QUEUE_BACKEND: ${QUEUE_BACKEND:-postgres}
+      SQS_QUEUE_URL: ${SQS_QUEUE_URL:-}
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      ENVIRONMENT: ${ENVIRONMENT:-local}
     restart: unless-stopped
 
   worker:
@@ -90,6 +102,9 @@ services:
       context: ..
       dockerfile: infra/Dockerfile.worker
     container_name: finscan-worker
+    env_file:
+      - path: ../.env
+        required: false
     depends_on:
       db:
         condition: service_healthy
@@ -98,13 +113,19 @@ services:
       migrate:
         condition: service_completed_successfully
     environment:
-      DATABASE_URL: postgresql://postgres:postgrespassword@db:5432/finscan
+      DATABASE_URL: postgresql+asyncpg://postgres:postgrespassword@db:5432/finscan
       REDIS_URL: redis://redis:6379/0
-      QUEUE_BACKEND: postgres
-      STORAGE_BACKEND: local
+      QUEUE_BACKEND: ${QUEUE_BACKEND:-postgres}
+      STORAGE_BACKEND: ${STORAGE_BACKEND:-local}
       STORAGE_BASE_DIR: /app/data/storage
+      S3_BUCKET: ${S3_BUCKET:-}
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      SQS_QUEUE_URL: ${SQS_QUEUE_URL:-}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      LLM_MODEL: ${LLM_MODEL:-openai/gpt-oss-20b}
+      LLM_BACKEND: ${LLM_BACKEND:-opencode}
       CHECKPOINT_DB_PATH: /app/data/storage/checkpoints.sqlite3
-      ENVIRONMENT: local
+      ENVIRONMENT: ${ENVIRONMENT:-local}
     volumes:
       - dossiers_storage:/app/data/storage
     restart: unless-stopped
@@ -117,8 +138,12 @@ services:
         condition: service_started
     ports:
       - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN_NAME: ${DOMAIN_NAME:-localhost}
+      ACME_EMAIL: ${ACME_EMAIL:-admin@example.com}
     volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./Caddyfile.production:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
     restart: unless-stopped

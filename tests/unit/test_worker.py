@@ -218,9 +218,12 @@ def test_worker_consumer_loop_start_and_graceful_stop():
     worker_thread.start()
 
     # Wait for deliveries to be processed
-    time.sleep(0.4)
+    for _ in range(30):
+        if len(queue.acked) >= 2:
+            break
+        time.sleep(0.1)
     worker.stop()
-    worker_thread.join(timeout=1.0)
+    worker_thread.join(timeout=2.0)
 
     # Both jobs should be processed and acked
     assert len(queue.acked) == 2

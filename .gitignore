@@ -72,3 +72,9 @@ mlruns/
 docs/hld/
 .agents/
 
+# Local study / viva-prep notes (never commit)
+study_mt/
+
+
+# Local end-to-end demo scratch: generated PDFs, throwaway harness output
+demo_live/

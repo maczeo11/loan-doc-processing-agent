@@ -18,6 +18,7 @@ from httpx import AsyncClient, ASGITransport
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 
+from apps.api.auth.deps import _mock_user
 from apps.api.main import app
 from apps.api.db.models import Base, ApplicationModel, JobModel, AuditEventModel, utc_now
 from apps.api.db.session import get_db
@@ -26,6 +27,13 @@ from apps.api.middleware.spend_guard import reserve_active_job_slot
 from core.contracts.state import LoanApplicationState
 from core.graph.checkpoint import SqliteSaver
 from core.graph.workflow import build_application_graph
+
+# SECURITY INVARIANT (apps/api/routes/review.py): the audit actor and persisted
+# reviewer_id are the *verified* identity from the session, never the caller-supplied
+# body field, which is spoofable. Tests below still POST a "reviewer_id" to prove the
+# route accepts and then ignores it. Sourced from the auth module so this tracks the
+# real identity rather than restating a literal.
+VERIFIED_ACTOR = _mock_user().email
 
 
 @pytest_asyncio.fixture
@@ -115,9 +123,9 @@ async def test_review_approved_transition(review_test_env):
         )).scalar_one()
 
         assert app_db.status == "REVIEWED"
-        assert app_db.reviewer_id == "REV-CHRIS"
+        assert app_db.reviewer_id == VERIFIED_ACTOR
         assert app_db.state_json["status"] == "REVIEWED"
-        assert app_db.state_json["reviewer_id"] == "REV-CHRIS"
+        assert app_db.state_json["reviewer_id"] == VERIFIED_ACTOR
         assert app_db.state_json["reviewer_decision"] == "APPROVED"
         assert app_db.state_json["reviewer_notes"] == "Income and identity verified. Risk acceptable."
         assert app_db.state_json["corrections_applied"] == [{"field": "income", "from": 80000, "to": 85000}]
@@ -136,7 +144,7 @@ async def test_review_approved_transition(review_test_env):
         assert len(audits) == 1
         assert audits[0].from_status == "READY_FOR_REVIEW"
         assert audits[0].to_status == "REVIEWED"
-        assert audits[0].actor == "REV-CHRIS"
+        assert audits[0].actor == VERIFIED_ACTOR
         assert audits[0].decision == "APPROVED"
         assert audits[0].notes == "Income and identity verified. Risk acceptable."
         assert audits[0].corrections == {"corrections": [{"field": "income", "from": 80000, "to": 85000}]}
@@ -181,7 +189,7 @@ async def test_review_rejected_transition(review_test_env):
             select(ApplicationModel).where(ApplicationModel.id == app_id)
         )).scalar_one()
         assert app_db.status == "REVIEWED"
-        assert app_db.reviewer_id == "REV-TAYLOR"
+        assert app_db.reviewer_id == VERIFIED_ACTOR
         assert app_db.state_json["reviewer_decision"] == "REJECTED"
 
 
@@ -224,7 +232,7 @@ async def test_review_needs_info_transition(review_test_env):
             select(ApplicationModel).where(ApplicationModel.id == app_id)
         )).scalar_one()
         assert app_db.status == "NEEDS_INFORMATION"
-        assert app_db.reviewer_id == "REV-JORDAN"
+        assert app_db.reviewer_id == VERIFIED_ACTOR
         assert app_db.state_json["status"] == "NEEDS_INFORMATION"
         assert app_db.state_json["reviewer_decision"] == "NEEDS_INFO"
 
@@ -316,7 +324,7 @@ async def test_audit_event_contents_are_append_only(review_test_env):
         assert len(audits) == 2
         assert audits[0].actor == "pipeline_worker"
         assert audits[0].to_status == "READY_FOR_REVIEW"
-        assert audits[1].actor == "REV-LEAD"
+        assert audits[1].actor == VERIFIED_ACTOR
         assert audits[1].to_status == "REVIEWED"
 
 
@@ -610,9 +618,9 @@ async def test_review_approve_transitions_to_reviewed_and_commits_audit(review_t
         )).scalar_one()
 
         assert app_db.status == "REVIEWED"
-        assert app_db.reviewer_id == "REV-CHRIS"
+        assert app_db.reviewer_id == VERIFIED_ACTOR
         assert app_db.state_json["status"] == "REVIEWED"
-        assert app_db.state_json["reviewer_id"] == "REV-CHRIS"
+        assert app_db.state_json["reviewer_id"] == VERIFIED_ACTOR
         assert app_db.state_json["reviewer_decision"] == "APPROVED"
         assert app_db.state_json["reviewer_notes"] == "Income and identity verified. Risk acceptable."
         assert app_db.state_json["corrections_applied"] == [{"field": "income", "from": 80000, "to": 85000}]
@@ -631,7 +639,7 @@ async def test_review_approve_transitions_to_reviewed_and_commits_audit(review_t
         assert len(audits) == 1
         assert audits[0].from_status == "READY_FOR_REVIEW"
         assert audits[0].to_status == "REVIEWED"
-        assert audits[0].actor == "REV-CHRIS"
+        assert audits[0].actor == VERIFIED_ACTOR
         assert audits[0].decision == "APPROVED"
         assert audits[0].notes == "Income and identity verified. Risk acceptable."
         assert audits[0].corrections == {"corrections": [{"field": "income", "from": 80000, "to": 85000}]}
@@ -675,7 +683,7 @@ async def test_review_approved_transition_with_notes(review_test_env):
     assert data["application_id"] == app_id
     assert data["status"] == "REVIEWED"
     assert data["decision"] == "APPROVED"
-    assert data["reviewer_id"] == "UW-OFFICER-77"
+    assert data["reviewer_id"] == VERIFIED_ACTOR
     assert data["notes"] == "Verified payroll credits and tax filings."
 
     # Verify ApplicationModel in database
@@ -685,7 +693,7 @@ async def test_review_approved_transition_with_notes(review_test_env):
         )).scalar_one()
 
         assert db_app.status == "REVIEWED"
-        assert db_app.reviewer_id == "UW-OFFICER-77"
+        assert db_app.reviewer_id == VERIFIED_ACTOR
         assert db_app.state_json["status"] == "REVIEWED"
         assert db_app.state_json["reviewer_decision"] == "APPROVED"
         assert db_app.state_json["review_paused"] is False
@@ -699,7 +707,7 @@ async def test_review_approved_transition_with_notes(review_test_env):
         event = audit_events[0]
         assert event.from_status == "READY_FOR_REVIEW"
         assert event.to_status == "REVIEWED"
-        assert event.actor == "UW-OFFICER-77"
+        assert event.actor == VERIFIED_ACTOR
         assert event.decision == "APPROVED"
         assert event.notes == "Verified payroll credits and tax filings."
 
@@ -739,7 +747,7 @@ async def test_review_reject_transitions_to_reviewed(review_test_env):
             select(ApplicationModel).where(ApplicationModel.id == app_id)
         )).scalar_one()
         assert app_db.status == "REVIEWED"
-        assert app_db.reviewer_id == "REV-TAYLOR"
+        assert app_db.reviewer_id == VERIFIED_ACTOR
         assert app_db.state_json["reviewer_decision"] == "REJECTED"
 
 
@@ -778,7 +786,7 @@ async def test_review_needs_info_transitions_to_needs_information(review_test_en
             select(ApplicationModel).where(ApplicationModel.id == app_id)
         )).scalar_one()
         assert app_db.status == "NEEDS_INFORMATION"
-        assert app_db.reviewer_id == "UW-OFFICER-09"
+        assert app_db.reviewer_id == VERIFIED_ACTOR
         assert app_db.state_json["reviewer_decision"] == "NEEDS_INFO"
 
 
@@ -884,7 +892,7 @@ async def test_review_resumes_sqlite_checkpointer(review_test_env, tmp_path, mon
             select(ApplicationModel).where(ApplicationModel.id == app_id)
         )).scalar_one()
         assert db_app.status == "REVIEWED"
-        assert db_app.reviewer_id == "UW-CHIEF-01"
+        assert db_app.reviewer_id == VERIFIED_ACTOR
         assert db_app.state_json["status"] == "REVIEWED"
         assert db_app.state_json["reviewer_decision"] == "APPROVED"
 
@@ -927,6 +935,55 @@ async def test_review_needs_info_records_reviewer_and_notes(review_test_env):
             select(ApplicationModel).where(ApplicationModel.id == app_id)
         )).scalar_one()
         assert app_db.status == "NEEDS_INFORMATION"
-        assert app_db.reviewer_id == "REV-JORDAN"
+        assert app_db.reviewer_id == VERIFIED_ACTOR
         assert app_db.state_json["status"] == "NEEDS_INFORMATION"
         assert app_db.state_json["reviewer_decision"] == "NEEDS_INFO"
+
+
+@pytest.mark.asyncio
+async def test_body_reviewer_id_cannot_spoof_the_audit_actor(review_test_env):
+    """
+    SECURITY: a caller-supplied reviewer_id must never reach the audit trail.
+
+    Anyone able to POST a review could otherwise attribute a lending decision to
+    another underwriter. The route stamps the verified session identity instead
+    (AGENTS.md §5.3, audit immutability).
+    """
+    session_factory, client, _ = review_test_env
+
+    app_id = f"APP-{uuid.uuid4().hex[:8].upper()}"
+    async with session_factory() as session:
+        session.add(ApplicationModel(
+            id=app_id,
+            applicant_name="Alice Smith",
+            loan_amount=250000.0,
+            status="READY_FOR_REVIEW",
+            state_json=_build_ready_for_review_state(app_id),
+            created_at=utc_now(),
+            updated_at=utc_now(),
+        ))
+        await session.commit()
+
+    spoofed = "SOMEONE-ELSE-ENTIRELY"
+    res = await client.post(
+        f"/applications/{app_id}/review",
+        json={"decision": "APPROVED", "reviewer_id": spoofed, "notes": "Approved.", "corrections": []},
+    )
+    assert res.status_code == 200
+
+    # The spoofed value may be accepted by the schema, but must appear nowhere authoritative.
+    assert res.json()["reviewer_id"] == VERIFIED_ACTOR
+    async with session_factory() as session:
+        app_db = (await session.execute(
+            select(ApplicationModel).where(ApplicationModel.id == app_id)
+        )).scalar_one()
+        assert app_db.reviewer_id == VERIFIED_ACTOR
+        assert app_db.state_json["reviewer_id"] == VERIFIED_ACTOR
+
+        audits = (await session.execute(
+            select(AuditEventModel).where(AuditEventModel.application_id == app_id)
+        )).scalars().all()
+        assert audits, "review must append an audit event"
+        for event in audits:
+            assert event.actor == VERIFIED_ACTOR
+            assert spoofed not in (event.actor or "")

@@ -55,9 +55,9 @@ def test_inspect_page_route_native(sample_pdf_dossier):
 
 
 def test_inspect_page_route_sparse_or_scanned(sample_pdf_dossier):
-    """Page 2 with zero native text routes to paddleocr_cpu."""
+    """Page 2 with zero native text routes to CPU OCR (tesseract_cpu)."""
     decision = inspect_page_route(sample_pdf_dossier, page_number=2, min_char_threshold=50)
-    assert decision["route"] == "paddleocr_cpu"
+    assert decision["route"] == "tesseract_cpu"
     assert decision["char_count"] < 50
 
 

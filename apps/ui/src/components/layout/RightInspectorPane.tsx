@@ -93,22 +93,26 @@ export const RightInspectorPane: React.FC<RightInspectorPaneProps> = ({
       style={{ width: `${width}px` }}
       className="h-full flex-none flex flex-col border-l border-theme-border bg-theme-panel select-none overflow-hidden transition-colors duration-200"
     >
-      {/* Tab Navigation Header. Scrolls horizontally rather than overflowing:
-          five tabs do not fit a 390px pane at full label width. */}
-      <div className="h-11 min-h-[44px] border-b border-theme-border bg-theme-header px-2 flex items-center overflow-x-auto">
-        <div className="flex items-center gap-1 shrink-0">
+      {/* Tab Navigation Header.
+          Labels are deliberately short: with five tabs, full labels ("Audit
+          Findings", "Facts Ledger", "Policy RAG") overflowed the 390px pane and
+          pushed Policy and Audit off-screen with no visible scroll affordance,
+          so two tabs were unreachable at 1280px. Short labels fit; overflow-x
+          stays as a safety net for narrower panes. */}
+      <div className="h-11 min-h-[44px] border-b border-theme-border bg-theme-header px-1.5 flex items-center overflow-x-auto">
+        <div className="flex items-center gap-0.5 shrink-0">
           <button
             onClick={() => setActiveTab('findings')}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xs text-xs font-mono font-bold transition-all ${
+            className={`flex items-center gap-1 px-1.5 py-1.5 rounded-xs text-[11px] font-mono font-bold transition-all whitespace-nowrap ${
               activeTab === 'findings'
                 ? 'bg-theme-card text-theme-primary border border-theme-border shadow-xs'
                 : 'text-theme-muted hover:text-theme-primary hover:bg-theme-panel'
             }`}
           >
             <ShieldCheck className="w-3.5 h-3.5 text-theme-brand" />
-            <span>Audit Findings</span>
+            <span>Findings</span>
             {flagCount > 0 && (
-              <span className="ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-theme-flag-bg text-theme-flag border border-theme-flag-border">
+              <span className="ml-0.5 px-1 py-0.5 rounded-full text-[10px] font-mono font-bold bg-theme-flag-bg text-theme-flag border border-theme-flag-border">
                 {flagCount}
               </span>
             )}
@@ -116,43 +120,43 @@ export const RightInspectorPane: React.FC<RightInspectorPaneProps> = ({
 
           <button
             onClick={() => setActiveTab('facts')}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xs text-xs font-mono font-bold transition-all ${
+            className={`flex items-center gap-1 px-1.5 py-1.5 rounded-xs text-[11px] font-mono font-bold transition-all whitespace-nowrap ${
               activeTab === 'facts'
                 ? 'bg-theme-card text-theme-primary border border-theme-border shadow-xs'
                 : 'text-theme-muted hover:text-theme-primary hover:bg-theme-panel'
             }`}
           >
             <Table className="w-3.5 h-3.5 text-theme-secondary" />
-            <span>Facts Ledger</span>
+            <span>Facts</span>
           </button>
 
           <button
             onClick={() => setActiveTab('cam')}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xs text-xs font-mono font-bold transition-all ${
+            className={`flex items-center gap-1 px-1.5 py-1.5 rounded-xs text-[11px] font-mono font-bold transition-all whitespace-nowrap ${
               activeTab === 'cam'
                 ? 'bg-theme-card text-theme-primary border border-theme-border shadow-xs'
                 : 'text-theme-muted hover:text-theme-primary hover:bg-theme-panel'
             }`}
           >
             <FileText className="w-3.5 h-3.5 text-theme-secondary" />
-            <span>CAM Memo</span>
+            <span>CAM</span>
           </button>
 
           <button
             onClick={() => setActiveTab('policy')}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xs text-xs font-mono font-bold transition-all ${
+            className={`flex items-center gap-1 px-1.5 py-1.5 rounded-xs text-[11px] font-mono font-bold transition-all whitespace-nowrap ${
               activeTab === 'policy'
                 ? 'bg-theme-card text-theme-primary border border-theme-border shadow-xs'
                 : 'text-theme-muted hover:text-theme-primary hover:bg-theme-panel'
             }`}
           >
             <BookOpen className="w-3.5 h-3.5 text-theme-secondary" />
-            <span>Policy RAG</span>
+            <span>Policy</span>
           </button>
 
           <button
             onClick={() => setActiveTab('audit')}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xs text-xs font-mono font-bold transition-all ${
+            className={`flex items-center gap-1 px-1.5 py-1.5 rounded-xs text-[11px] font-mono font-bold transition-all whitespace-nowrap ${
               activeTab === 'audit'
                 ? 'bg-theme-card text-theme-primary border border-theme-border shadow-xs'
                 : 'text-theme-muted hover:text-theme-primary hover:bg-theme-panel'

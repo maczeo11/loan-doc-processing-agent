@@ -40,8 +40,12 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <header className="h-14 min-h-[56px] bg-theme-header border-b border-theme-border px-3 sm:px-5 flex items-center justify-between gap-3 select-none z-30 shadow-xs transition-colors duration-200">
-      {/* Brand & Dossier Switcher */}
-      <div className="flex items-center gap-3 sm:gap-5 min-w-0 shrink-0">
+      {/* Brand & Dossier Switcher.
+          `shrink-0` here meant this group never yielded width, so the right-hand
+          cluster (shortcuts, user chip, logout) was pushed past the viewport
+          edge and clipped at every breakpoint. It shrinks now; the dossier
+          select truncates instead. */}
+      <div className="flex items-center gap-3 sm:gap-5 min-w-0 shrink">
         <div className="flex items-center gap-3 shrink-0">
           <div className="w-8 h-8 rounded-sm bg-theme-brand flex items-center justify-center text-white shadow-sm ring-1 ring-theme-border">
             <ShieldCheck className="w-5 h-5" />
@@ -117,7 +121,9 @@ export const Header: React.FC<HeaderProps> = ({
           the wider SLA readout waits for xl. */}
       <div className="hidden md:flex items-center gap-4 shrink-0">
         <StatusPill status={status} />
-        <div className="hidden xl:block">
+        {/* The SLA readout is wide; at xl (1280) it crowded the header on the
+            most common laptop width. It waits for 2xl now. */}
+        <div className="hidden 2xl:block">
           <SlaTimer
             createdAt={createdAt}
             stopped={SEALED_STATUSES.includes(status)}

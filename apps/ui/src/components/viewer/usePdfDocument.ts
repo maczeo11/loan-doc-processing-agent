@@ -56,6 +56,28 @@ export function usePdfDocument({ docId, pdfSource, isDemoMode }: UsePdfDocumentO
     setCurrentPage(1);
   }, [docId]);
 
+  /**
+   * Shrink-to-fit on first render only. Never enlarges: a page narrower than
+   * the pane stays at its natural size rather than being blown up.
+   */
+  const autoFitOnLoad = useCallback(async (doc: pdfjsLib.PDFDocumentProxy) => {
+    const container = containerRef.current;
+    if (!container) return;
+    try {
+      const page = await doc.getPage(1);
+      const unscaled = page.getViewport({ scale: 1 });
+      const available = container.clientWidth - 48;
+      if (available > 0 && unscaled.width > available) {
+        const pct = Math.round((available / unscaled.width) * 100);
+        setZoom(Math.max(50, Math.min(100, pct)));
+      } else {
+        setZoom(100);
+      }
+    } catch {
+      setZoom(100);
+    }
+  }, []);
+
   // Load PDF document
   useEffect(() => {
     let isCancelled = false;
@@ -118,6 +140,10 @@ export function usePdfDocument({ docId, pdfSource, isDemoMode }: UsePdfDocumentO
           setPdfDocument(doc);
           setNumPages(doc.numPages);
           setIsLoading(false);
+          // Open at a zoom the page actually fits in. A fixed 100% meant an
+          // A4 page (595pt) opened clipped on both sides in a narrow pane,
+          // leaving the reviewer to zoom out before they could read anything.
+          void autoFitOnLoad(doc);
         }
       } catch (err: unknown) {
         if (!isCancelled) {
@@ -133,7 +159,7 @@ export function usePdfDocument({ docId, pdfSource, isDemoMode }: UsePdfDocumentO
     return () => {
       isCancelled = true;
     };
-  }, [docId, pdfSource, isDemoMode]);
+  }, [docId, pdfSource, isDemoMode, autoFitOnLoad]);
 
   // Render current page onto canvas
   useEffect(() => {

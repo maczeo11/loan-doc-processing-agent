@@ -352,7 +352,11 @@ def build_appraisal_memo(
     lines.append("## 1. Executive Summary")
     lines.append("")
     lines.append(f"- **Application ID:** {app_id}")
-    lines.append(f"- **Lifecycle Status:** `{status}`")
+    # The memo is synthesized mid-pipeline, so `status` here is the in-flight
+    # value (typically PROCESSING) — never the status the reviewer sees when
+    # they open the dossier. Labelling it "Lifecycle Status" made an auditable
+    # document contradict the header above it; name the moment instead.
+    lines.append(f"- **Status at Memo Generation:** `{status}`")
     lines.append(f"- **Total Rules Evaluated:** {len(findings)}")
     lines.append(f"- **Audit Verdict Summary:** {pass_count} Passed | {flag_count} Flagged | {unknown_count} Unknown")
     lines.append(f"- **Documents Uploaded / Checked:** {len(doc_ids)} registered")

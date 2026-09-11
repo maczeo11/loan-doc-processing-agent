@@ -47,6 +47,20 @@ function renderMarkdown(markdown: string): React.ReactNode[] {
       );
     }
 
+    // The memo uses blockquotes for governance callouts; without this they
+    // rendered with a literal leading ">".
+    const quote = /^>\s?(.*)$/.exec(line);
+    if (quote) {
+      return (
+        <blockquote
+          key={idx}
+          className="border-l-2 border-theme-brand pl-3 my-2 text-theme-secondary"
+        >
+          {withBold(quote[1])}
+        </blockquote>
+      );
+    }
+
     const bullet = /^\s*[-*]\s+(.*)$/.exec(line);
     if (bullet) {
       return (

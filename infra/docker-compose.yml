@@ -126,6 +126,10 @@ services:
       LLM_BACKEND: ${LLM_BACKEND:-opencode}
       CHECKPOINT_DB_PATH: /app/data/storage/checkpoints.sqlite3
       ENVIRONMENT: ${ENVIRONMENT:-local}
+      # Managed OCR fallback (Route 3): DetectDocumentText only, hard-capped at
+      # 100 pages/runtime in core/extraction/router.py. Keep false locally
+      # (hermetic CI); set true in cloud .env to enforce Textract fallback.
+      FINSCAN_ENABLE_TEXTRACT: ${FINSCAN_ENABLE_TEXTRACT:-false}
     volumes:
       - dossiers_storage:/app/data/storage
     restart: unless-stopped

@@ -26,6 +26,16 @@
       ]
     },
     {
+      "Sid": "FinScanTextractAccess",
+      "Effect": "Allow",
+      "Action": [
+        "textract:DetectDocumentText"
+      ],
+      "Resource": [
+        "*"
+      ]
+    },
+    {
       "Sid": "FinScanSQSAccess",
       "Effect": "Allow",
       "Action": [

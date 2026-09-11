@@ -14,7 +14,7 @@ Invariants & Guarantees from AGENTS.md:
 import logging
 import os
 import time
-from typing import List, Dict, Any, Union
+from typing import List, Dict, Any, Optional, Union
 from core.contracts.evidence import EvidenceRef
 from core.extraction.native_parser import (
     extract_native_text_with_coordinates,
@@ -29,6 +29,43 @@ logger = logging.getLogger(__name__)
 # DetectDocumentText only ($0.0015/page). NEVER AnalyzeDocument/Forms/Tables here.
 MAX_TEXTRACT_PAGES = 100
 _TEXTRACT_PAGES_CONSUMED = 0
+
+# Escalation thresholds: a page stays on the native fast-path only when its
+# text layer clears BOTH minimums and the page is not image-heavy. Raise the
+# minimums to escalate MORE pages to OCR (easier escalation); lower them to
+# keep more pages native (faster, cheaper). Resolved from env at call time so
+# deployments can tune without code changes:
+#   FINSCAN_OCR_MIN_CHARS (default 100), FINSCAN_OCR_MIN_WORDS (default 10),
+#   FINSCAN_OCR_MAX_IMAGE_COVERAGE (default 0.5).
+DEFAULT_MIN_CHAR_THRESHOLD = 100
+DEFAULT_MIN_WORD_THRESHOLD = 10
+DEFAULT_MAX_IMAGE_COVERAGE = 0.5
+
+
+def _env_int(name: str, default: int) -> int:
+    try:
+        return int(os.getenv(name, str(default)).strip())
+    except (ValueError, AttributeError):
+        return default
+
+
+def _env_float(name: str, default: float) -> float:
+    try:
+        return float(os.getenv(name, str(default)).strip())
+    except (ValueError, AttributeError):
+        return default
+
+
+def _default_min_chars() -> int:
+    return _env_int("FINSCAN_OCR_MIN_CHARS", DEFAULT_MIN_CHAR_THRESHOLD)
+
+
+def _default_min_words() -> int:
+    return _env_int("FINSCAN_OCR_MIN_WORDS", DEFAULT_MIN_WORD_THRESHOLD)
+
+
+def _default_max_image_coverage() -> float:
+    return _env_float("FINSCAN_OCR_MAX_IMAGE_COVERAGE", DEFAULT_MAX_IMAGE_COVERAGE)
 
 
 def _textract_enabled() -> bool:
@@ -53,14 +90,20 @@ def reset_textract_usage_count():
 def inspect_page_route(
     pdf_input: Union[str, bytes],
     page_number: int,
-    min_char_threshold: int = 50,
-    min_word_threshold: int = 5,
+    min_char_threshold: Optional[int] = None,
+    min_word_threshold: Optional[int] = None,
+    max_image_coverage: Optional[float] = None,
 ) -> Dict[str, Any]:
     """
     Analyzes NATIVE-ONLY page properties to determine the optimal perception route.
     Pure probe: never runs OCR as a side-effect (that inflated char_count before).
     Returns metadata and selected route ('pymupdf_native' or 'tesseract_cpu').
+    Unset thresholds resolve from FINSCAN_OCR_MIN_CHARS / FINSCAN_OCR_MIN_WORDS /
+    FINSCAN_OCR_MAX_IMAGE_COVERAGE at call time.
     """
+    min_chars = _default_min_chars() if min_char_threshold is None else min_char_threshold
+    min_words = _default_min_words() if min_word_threshold is None else min_word_threshold
+    max_img = _default_max_image_coverage() if max_image_coverage is None else max_image_coverage
     layout = extract_page_content(pdf_input, page_number)
     char_count = layout.get("char_count", 0)
     word_count = layout.get("word_count", 0)
@@ -70,7 +113,7 @@ def inspect_page_route(
         image_coverage = 0.0
 
     # Image-heavy pages go to OCR even if a small native layer (stamp/header) exists.
-    if char_count >= min_char_threshold and word_count >= min_word_threshold and image_coverage < 0.5:
+    if char_count >= min_chars and word_count >= min_words and image_coverage < max_img:
         return {
             "page_number": page_number,
             "route": "pymupdf_native",
@@ -85,7 +128,7 @@ def inspect_page_route(
     return {
         "page_number": page_number,
         "route": "tesseract_cpu",
-        "reason": f"Scanned or sparse text ({char_count} chars < {min_char_threshold} threshold, img {image_coverage:.0%})",
+        "reason": f"Scanned or sparse text ({char_count} chars < {min_chars} threshold, img {image_coverage:.0%})",
         "char_count": char_count,
         "word_count": word_count,
         "image_coverage": round(image_coverage, 3),
@@ -99,8 +142,8 @@ def route_page_extraction(
     page_number: int,
     document_id: str = "DOC-UNKNOWN",
     document_type: str = "unknown",
-    min_char_threshold: int = 50,
-    min_word_threshold: int = 5,
+    min_char_threshold: Optional[int] = None,
+    min_word_threshold: Optional[int] = None,
     ocr_timeout_s: int = 60,
 ) -> List[EvidenceRef]:
     """

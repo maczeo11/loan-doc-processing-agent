@@ -23,7 +23,7 @@ from core.rules.salary_audit import audit_salary_vs_bank
 from core.rules.tax_audit import audit_tax_vs_income
 from core.rules.identity import audit_identity_consistency
 from core.rules.bank_arithmetic import validate_bank_statement_arithmetic
-from core.extraction.native_parser import extract_all_pages_content
+from core.extraction.router import route_page_extraction
 from core.extraction.extractors.payslip import PayslipExtractor
 from core.extraction.extractors.bank_statement import BankStatementExtractor
 from core.extraction.extractors.tax_return import TaxReturnExtractor
@@ -43,6 +43,72 @@ logger = logging.getLogger("finscan.graph.nodes")
 
 def _get_utc_timestamp() -> str:
     return datetime.datetime.now(datetime.timezone.utc).isoformat()
+
+
+# Per-document page cap (dossier cap enforced at API layer).
+MAX_PAGES_PER_DOCUMENT = 30
+
+
+def _extract_doc_texts_via_router(
+    pdf_input: Union[str, bytes], doc_id: str
+) -> tuple[List[str], str, int]:
+    """
+    Runs per-page OCR routing (PyMuPDF native -> Tesseract/PaddleOCR CPU ->
+    AWS Textract DetectDocumentText when FINSCAN_ENABLE_TEXTRACT=true) BEFORE
+    classification, per the AGENTS.md perception invariant.
+
+    Returns (page_texts, route_label, total_pages):
+    - page_texts: non-empty joined page strings for the classifier cache.
+    - route_label: "native" only when every page carried a usable native text
+      layer; "textract"/"paddle" when that engine produced text; else "ocr".
+    - total_pages: raw page count (pre-cap) for the reviewer dossier index.
+
+    Raises on unreadable PDF so callers fall through to UNKNOWN handling.
+    OCR text only feeds classification/extraction inputs - it never decides
+    verdicts (Prime Invariant untouched).
+    """
+    from core.extraction.native_parser import open_pdf_document
+
+    doc = open_pdf_document(pdf_input)
+    try:
+        total_pages = len(doc)
+    finally:
+        doc.close()
+
+    capped = min(total_pages, MAX_PAGES_PER_DOCUMENT)
+    page_texts: List[str] = []
+    methods: Set[str] = set()
+    native_pages = 0
+
+    for page_number in range(1, capped + 1):
+        try:
+            evidence = route_page_extraction(
+                pdf_input,
+                page_number,
+                document_id=doc_id,
+                document_type="unknown",
+            )
+        except Exception as exc:
+            logger.warning(f"OCR routing failed for {doc_id} p{page_number}: {exc}")
+            evidence = []
+        if not evidence:
+            continue
+        methods.add(evidence[0].extraction_method)
+        if all(e.extraction_method == "pymupdf_native" for e in evidence):
+            native_pages += 1
+        joined = "\n".join(e.quoted_span for e in evidence if (e.quoted_span or "").strip()).strip()
+        if joined:
+            page_texts.append(joined)
+
+    if capped and native_pages == capped:
+        route_label = "native"
+    elif "textract_managed" in methods:
+        route_label = "textract"
+    elif "paddleocr_cpu" in methods:
+        route_label = "paddle"
+    else:
+        route_label = "ocr"
+    return page_texts, route_label, total_pages
 
 
 def triage_node(state: LoanApplicationState) -> Dict[str, Any]:
@@ -137,15 +203,11 @@ def ocr_and_classify_node(state: LoanApplicationState) -> Dict[str, Any]:
                 try:
                     import time as _t
                     _t0 = _t.monotonic()
-                    pages = extract_all_pages_content(pdf_input)
-                    page_counts[doc_id] = len(pages)
-                    if len(pages) > 30:
-                        logger.warning(f"Truncating {doc_id} from {len(pages)} to 30 pages (dossier cap)")
-                        pages = pages[:30]
-                    page_texts = [p.get("text", "") for p in pages if p.get("text", "").strip()]
-                    # Every page carried a usable native text layer -> native route.
-                    # Any page without one had to be escalated to OCR downstream.
-                    ocr_routes[doc_id] = "native" if pages and len(page_texts) == len(pages) else "ocr"
+                    page_texts, route_label, total_pages = _extract_doc_texts_via_router(pdf_input, doc_id)
+                    if total_pages > MAX_PAGES_PER_DOCUMENT:
+                        logger.warning(f"Truncating {doc_id} from {total_pages} to {MAX_PAGES_PER_DOCUMENT} pages (dossier cap)")
+                    page_counts[doc_id] = total_pages
+                    ocr_routes[doc_id] = route_label
                     # Cache for Node 3 reuse (avoids second OCR pass).
                     doc_texts_map[doc_id] = page_texts
                     logger.info(f"Parsed {doc_id}: {len(page_texts)} text pages in {int((_t.monotonic() - _t0) * 1000)}ms")
@@ -197,8 +259,8 @@ def extract_facts_node(state: LoanApplicationState) -> Dict[str, Any]:
     """
     Node 3: Fact Extraction Node (aliased as extract_fields_node).
     Reuses `document_texts` cached by Node 2 when available (no second OCR pass);
-    only re-parses PDFs for docs missing from cache. Pure native probe here —
-    heavy OCR routing lives in router.route_page_extraction for scanned pages.
+    docs missing from cache are re-routed through router.route_page_extraction
+    (same native -> CPU OCR -> Textract path as Node 2, never native-only).
     """
     manifest: Dict[str, str] = state.get("document_manifest") or {}
     doc_ids: List[str] = state.get("document_ids") or list(manifest.keys())
@@ -243,7 +305,11 @@ def extract_facts_node(state: LoanApplicationState) -> Dict[str, Any]:
 
             if pdf_input:
                 try:
-                    pages = extract_all_pages_content(pdf_input)[:30]
+                    routed_texts, _, _ = _extract_doc_texts_via_router(pdf_input, doc_id)
+                    pages = [
+                        {"page_number": i + 1, "text": t}
+                        for i, t in enumerate(routed_texts)
+                    ]
                 except Exception as err:
                     logger.warning(f"Failed to parse pages for {doc_id}: {err}")
 

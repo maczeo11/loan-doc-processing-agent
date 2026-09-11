@@ -27,6 +27,7 @@ from core.extraction.extractors.payslip import PayslipExtractor
 from core.extraction.extractors.bank_statement import BankStatementExtractor
 from core.extraction.extractors.tax_return import TaxReturnExtractor
 from core.extraction.extractors.id_card import IdCardExtractor
+from core.reporting.memo_builder import build_appraisal_memo
 from core.rag.grounding import (
     detect_prompt_injection,
     filter_grounded_claims,
@@ -85,14 +86,16 @@ def triage_node(state: LoanApplicationState) -> Dict[str, Any]:
 
 def ocr_and_classify_node(state: LoanApplicationState) -> Dict[str, Any]:
     """
-    Node 2: Determines document types for each uploaded file (PyMuPDF / PaddleOCR -> Classifier).
+    Node 2: Determines document types for each uploaded file (router -> classifier).
+    Single parse per doc; page texts cached in `document_texts` so Node 3 reuses
+    them instead of re-running OCR (fixes 2x Tesseract cost / 20-min stall).
     Calls classifier_adapter with keyword-heuristic fallback on UNKNOWN or exception.
     """
     classified = dict(state.get("classified_types", {}) or {})
     manifest = state.get("document_manifest", {}) or {}
     doc_ids = state.get("document_ids", []) or list(manifest.keys())
     doc_bytes_map = state.get("document_bytes", {}) or {}
-    doc_texts_map = state.get("document_texts", {}) or {}
+    doc_texts_map = dict(state.get("document_texts", {}) or {})
 
     storage = LocalFileSystemStorage()
     all_ids = list(set(doc_ids + list(manifest.keys())))
@@ -103,7 +106,7 @@ def ocr_and_classify_node(state: LoanApplicationState) -> Dict[str, Any]:
 
         page_texts: List[str] = []
 
-        # 1. Check if document texts provided directly in state
+        # 1. Check if document texts provided directly in state (cache from prior run)
         if doc_id in doc_texts_map:
             val = doc_texts_map[doc_id]
             if isinstance(val, list):
@@ -112,6 +115,7 @@ def ocr_and_classify_node(state: LoanApplicationState) -> Dict[str, Any]:
                 page_texts = [val.strip()]
 
         # 2. If no text yet, extract from PDF bytes or storage/manifest
+        # Per-doc page cap: truncate beyond 30 pages (dossier cap enforced at API).
         if not page_texts:
             pdf_input: Optional[Union[str, bytes]] = None
             if doc_id in doc_bytes_map:
@@ -126,8 +130,16 @@ def ocr_and_classify_node(state: LoanApplicationState) -> Dict[str, Any]:
 
             if pdf_input:
                 try:
+                    import time as _t
+                    _t0 = _t.monotonic()
                     pages = extract_all_pages_content(pdf_input)
+                    if len(pages) > 30:
+                        logger.warning(f"Truncating {doc_id} from {len(pages)} to 30 pages (dossier cap)")
+                        pages = pages[:30]
                     page_texts = [p.get("text", "") for p in pages if p.get("text", "").strip()]
+                    # Cache for Node 3 reuse (avoids second OCR pass).
+                    doc_texts_map[doc_id] = page_texts
+                    logger.info(f"Parsed {doc_id}: {len(page_texts)} text pages in {int((_t.monotonic() - _t0) * 1000)}ms")
                 except Exception as err:
                     logger.debug(f"Failed to parse pages for {doc_id} in ocr_and_classify_node: {err}")
 
@@ -164,14 +176,15 @@ def ocr_and_classify_node(state: LoanApplicationState) -> Dict[str, Any]:
 
         classified[doc_id] = predicted
 
-    return {"classified_types": classified}
+    return {"classified_types": classified, "document_texts": doc_texts_map}
 
 
 def extract_facts_node(state: LoanApplicationState) -> Dict[str, Any]:
     """
     Node 3: Fact Extraction Node (aliased as extract_fields_node).
-    Reads document bytes or paths via storage/manifest, routes through native parser / OCR,
-    and executes domain fact extractors for Payslip, Bank Statement, Tax Return, and ID Card.
+    Reuses `document_texts` cached by Node 2 when available (no second OCR pass);
+    only re-parses PDFs for docs missing from cache. Pure native probe here —
+    heavy OCR routing lives in router.route_page_extraction for scanned pages.
     """
     manifest: Dict[str, str] = state.get("document_manifest") or {}
     doc_ids: List[str] = state.get("document_ids") or list(manifest.keys())
@@ -190,24 +203,35 @@ def extract_facts_node(state: LoanApplicationState) -> Dict[str, Any]:
     id_extractor = IdCardExtractor()
 
     for doc_id in doc_ids:
-        pdf_input: Optional[Union[str, bytes]] = None
-        if doc_id in doc_bytes_map:
-            pdf_input = doc_bytes_map[doc_id]
-        elif doc_id in manifest:
-            storage_key = manifest[doc_id]
-            try:
-                pdf_input = storage.get(storage_key)
-            except Exception as e:
-                logger.debug(f"Could not load bytes from storage key {storage_key}: {e}")
-                if os.path.exists(storage_key):
-                    pdf_input = storage_key
-
+        # Reuse Node 2 cache first: avoids second full OCR pass (major stall fix).
+        cached_texts = (state.get("document_texts") or {}).get(doc_id)
         pages: List[Dict[str, Any]] = []
-        if pdf_input:
-            try:
-                pages = extract_all_pages_content(pdf_input)
-            except Exception as err:
-                logger.warning(f"Failed to parse pages for {doc_id}: {err}")
+        if cached_texts:
+            vals = cached_texts if isinstance(cached_texts, list) else [cached_texts]
+            pages = [
+                {"page_number": i + 1, "text": str(t)}
+                for i, t in enumerate(vals)
+                if str(t).strip()
+            ][:30]
+
+        if not pages:
+            pdf_input: Optional[Union[str, bytes]] = None
+            if doc_id in doc_bytes_map:
+                pdf_input = doc_bytes_map[doc_id]
+            elif doc_id in manifest:
+                storage_key = manifest[doc_id]
+                try:
+                    pdf_input = storage.get(storage_key)
+                except Exception as e:
+                    logger.debug(f"Could not load bytes from storage key {storage_key}: {e}")
+                    if os.path.exists(storage_key):
+                        pdf_input = storage_key
+
+            if pdf_input:
+                try:
+                    pages = extract_all_pages_content(pdf_input)[:30]
+                except Exception as err:
+                    logger.warning(f"Failed to parse pages for {doc_id}: {err}")
 
         # Fallback page structure for test environments without PDFs
         doc_type = classified_types.get(doc_id, "unknown")
@@ -270,6 +294,9 @@ def extract_facts_node(state: LoanApplicationState) -> Dict[str, Any]:
         "bank_statement": bank_statement,
         "tax_return": tax_return,
         "classified_types": classified_types,
+        # Drop bulk bytes after extraction so later checkpoints (RAG/synthesis/
+        # grounding/human_review) stay small — fixes SQLite BLOB bloat on 10pp jobs.
+        "document_bytes": {},
     }
 
 
@@ -340,6 +367,8 @@ def evaluate_rules_node(state: LoanApplicationState) -> Dict[str, Any]:
         MoneyFact(
             amount=payslip.gross_salary.amount * 12,
             currency=payslip.gross_salary.currency,
+            period="annual",
+            basis="gross",
             source=payslip.gross_salary.source,
         )
         if payslip and payslip.gross_salary
@@ -351,7 +380,8 @@ def evaluate_rules_node(state: LoanApplicationState) -> Dict[str, Any]:
     # 4. Identity & KYC Consistency
     payslip_emp_name = payslip.employee_name if payslip else None
     bank_holder_name = bank.account_holder if bank else None
-    id_finding = audit_identity_consistency(applicant, payslip_emp_name, bank_holder_name)
+    itr_pan = tax_return.pan_number if tax_return else None
+    id_finding = audit_identity_consistency(applicant, payslip_emp_name, bank_holder_name, tax_pan=itr_pan)
     findings.append(id_finding)
     logger.info(f"Rules evaluation completed: generated {len(findings)} findings.")
 
@@ -443,38 +473,11 @@ def synthesize_summary_node(state: LoanApplicationState) -> Dict[str, Any]:
     Node 6: Synthesizes Credit Appraisal Memo (CAM) narrative with citations.
     Zero hallucinated numbers: Narrative only reflects deterministic findings.
     """
-    app_id = state.get("application_id", "APP-UNKNOWN")
-    applicant = state.get("applicant")
-    applicant_name = applicant.full_name if applicant else "Unknown Applicant"
-    findings = state.get("findings", [])
-    chunks = state.get("retrieved_chunk_ids", [])
-    missing_docs = state.get("missing_documents", [])
-
-    # Build memo narrative
-    summary_lines = [
-        f"### Credit Appraisal Memo — {app_id}",
-        f"**Applicant Name:** {applicant_name}",
-        "",
-        "#### Deterministic Verification Summary",
-    ]
-    for finding in findings:
-        status_badge = (
-            "✅ PASS" if finding.verdict == "pass" else ("⚠️ FLAG" if finding.verdict == "flag" else "❓ UNKNOWN")
-        )
-        summary_lines.append(f"- **{finding.rule_name}** ({finding.rule_id}) [{status_badge}]: {finding.reason}")
-
-    if missing_docs:
-        summary_lines.append("")
-        summary_lines.append(f"**Missing Mandatory Documents:** {', '.join(missing_docs)}")
-
-    summary_lines.append("")
-    summary_lines.append("#### Authoritative Policy Citations")
-    # Bracketed IDs are machine-parseable: validate_grounding_node extracts them
-    # and rejects any citation outside retrieved_chunk_ids.
-    summary_lines.append(f"Referenced guidelines: {', '.join(f'[{c}]' for c in chunks) if chunks else 'None'}")
-
+    # CAM assembly lives in core/reporting/memo_builder.py so the narrative format
+    # is owned in one place (AGENTS.md §9 P2 #4). Bracketed policy IDs it emits are
+    # parsed back out by validate_grounding_node below.
     return {
-        "summary_markdown": "\n".join(summary_lines),
+        "summary_markdown": build_appraisal_memo(state),
     }
 
 

@@ -28,7 +28,7 @@ class IdCardExtractor(BaseExtractor):
         # 1. Full Name & Source
         full_name, name_ev = find_text_match_with_evidence(
             pages,
-            r"(?:Full\s+Name|Name|Applicant\s+Name)\s*[:\-]\s*([A-Za-z .]+)",
+            r"(?:Full\s+Name|Name|Applicant\s+Name)\s*[:\-!|]?\s*([A-Za-z .]+)",
             doc_id,
             "id_card",
         )

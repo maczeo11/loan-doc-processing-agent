@@ -1,0 +1,47 @@
+{
+  "application_id": "APP-37956",
+  "applicant_name": "Vikram Malhotra",
+  "injected_anomaly": "SALARY_INFLATION",
+  "payslip": {
+    "employee_name": "Vikram Malhotra",
+    "employer_name": "Apex Global Solutions",
+    "gross_salary": 150000.0,
+    "net_salary": 132000.0,
+    "epf_deduction": 12000.0,
+    "tds_deduction": 6000.0
+  },
+  "bank_statement": {
+    "account_holder": "Vikram Malhotra",
+    "bank_name": "HDFC Bank Ltd",
+    "account_number": "501005533661",
+    "monthly_salary_credits": [
+      52500.0,
+      52500.0,
+      52500.0
+    ],
+    "average_balance": 23625.0,
+    "bounced_transactions": 0
+  },
+  "tax_return": {
+    "assessee_name": "Vikram Malhotra",
+    "pan_number": "ABCDE9435F",
+    "gross_total_income": 1800000.0,
+    "total_tax_paid": 216000.0
+  },
+  "kyc": {
+    "full_name": "Vikram Malhotra",
+    "pan_number": "ABCDE9435F",
+    "dob": "1994-06-15",
+    "aadhaar_masked": "XXXX-XXXX-2983"
+  },
+  "tabular_features": {
+    "no_of_dependents": 3,
+    "education": "Graduate",
+    "self_employed": "No",
+    "income_annum": 1800000.0,
+    "loan_amount": 6000000.0,
+    "loan_term": 20,
+    "cibil_score": 690,
+    "assets_total": 5000000.0
+  }
+}

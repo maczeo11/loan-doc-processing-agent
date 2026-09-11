@@ -226,13 +226,15 @@ def test_sqs_queue_fail_retryable():
     mock_boto = MagicMock()
     queue = SQSQueue(queue_url="https://sqs.us-east-1.amazonaws.com/123/finscan", sqs_client=mock_boto)
 
-    # Retryable failure resets VisibilityTimeout to 0
+    # Retryable failure backs the message off rather than redelivering immediately.
+    # VisibilityTimeout=0 would hot-loop a poison message through its 3 attempts
+    # in milliseconds, defeating the DLQ ceiling; 30s spaces the retries out.
     queue.fail("receipt-abc", retryable=True)
 
     mock_boto.change_message_visibility.assert_called_once_with(
         QueueUrl="https://sqs.us-east-1.amazonaws.com/123/finscan",
         ReceiptHandle="receipt-abc",
-        VisibilityTimeout=0,
+        VisibilityTimeout=30,
     )
 
 

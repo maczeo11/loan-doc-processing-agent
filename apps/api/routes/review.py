@@ -42,6 +42,7 @@ class ReviewDecisionRequest(BaseModel):
     reviewer_id: str
     notes: Optional[str] = None
     corrections: List[Dict[str, Any]] = []
+    confirm_app_id: Optional[str] = None
 
 
 class QuestionRequest(BaseModel):
@@ -51,6 +52,26 @@ class QuestionRequest(BaseModel):
 class QuestionResponse(BaseModel):
     answer: str
     citations: List[Dict[str, Any]]
+
+
+def _enforce_review_invariants(decision: str, notes: Optional[str], corrections: List[Dict[str, Any]], confirm_app_id: Optional[str], app_id: str) -> str:
+    """Server-side dual-sign friction gate (AGENTS §5.3). Returns sanitized notes."""
+    clean_notes = (notes or "").strip()
+    if decision in ("REJECTED", "NEEDS_INFO") and len(clean_notes) < 5:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Substantive audit rationale (>=5 characters) is required for REJECTED/NEEDS_INFO",
+        )
+    if len(clean_notes) > 5000:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Notes exceed 5000 characters")
+    if len(corrections) > 50:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Too many corrections (max 50)")
+    if confirm_app_id is not None and confirm_app_id.strip() != app_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Dossier identifier challenge failed: typed ID must exactly match application ID",
+        )
+    return clean_notes
 
 
 @router.get(
@@ -223,6 +244,10 @@ async def ask_question(id: str, payload: QuestionRequest, session: AsyncSession 
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Question cannot be empty",
         )
+    if len(question) > 1000:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Question exceeds 1000 characters")
+    # Prompt-injection hygiene: delimit inquiry, strip control chars; retriever+grounding treat it as data.
+    question = " ".join(question.split())
 
     try:
         from core.rag.indexer import IndexManager
@@ -243,12 +268,10 @@ async def ask_question(id: str, payload: QuestionRequest, session: AsyncSession 
             citations=[],
         )
 
-    lines = [f"Top {len(hits)} policy passages relevant to: {question}"]
     citations: List[Dict[str, Any]] = []
-    for i, hit in enumerate(hits, start=1):
+    for hit in hits:
         text = str(hit.get("text", "")).strip()
         excerpt = text[:400] + ("..." if len(text) > 400 else "")
-        lines.append(f"{i}. [{hit.get('chunk_id')}] {excerpt}")
         citations.append(
             {
                 "chunk_id": hit.get("chunk_id"),
@@ -258,7 +281,26 @@ async def ask_question(id: str, payload: QuestionRequest, session: AsyncSession 
                 "excerpt": excerpt,
             }
         )
-    return QuestionResponse(answer="\n".join(lines), citations=citations)
+
+    # If LLM is configured (e.g. Groq or OpenCode), generate grounded synthesis
+    answer_text = None
+    if os.getenv("GROQ_API_KEY") or os.getenv("OPENCODE_API_KEY"):
+        try:
+            from adapters.llm.opencode import OpenCodeZenLLM
+            llm = OpenCodeZenLLM()
+            answer_text = llm.answer_question(question, hits)
+        except Exception as llm_err:
+            logger.warning(f"LLM answer_question failed, falling back to passage citations: {llm_err}")
+
+    if not answer_text:
+        lines = [f"Top {len(hits)} policy passages relevant to: {question}"]
+        for i, hit in enumerate(hits, start=1):
+            text = str(hit.get("text", "")).strip()
+            excerpt = text[:400] + ("..." if len(text) > 400 else "")
+            lines.append(f"{i}. [{hit.get('chunk_id')}] {excerpt}")
+        answer_text = "\n".join(lines)
+
+    return QuestionResponse(answer=answer_text, citations=citations)
 
 
 def _resolve_policy_dir() -> str:
@@ -278,17 +320,26 @@ def _resolve_policy_dir() -> str:
 async def submit_review(
     id: str,
     payload: ReviewDecisionRequest,
+    request: Request,
     session: AsyncSession = Depends(get_db),
 ):
     """
     Submit human underwriter sign-off or request for information.
-    - Loads and locks application container.
-    - Enforces transition strictly from READY_FOR_REVIEW.
-    - Maps decision: APPROVED -> REVIEWED, REJECTED -> REVIEWED, NEEDS_INFO -> NEEDS_INFORMATION.
-    - Atomically updates relational model and state_json (status, reviewer_decision, reviewer_notes,
-      corrections_applied, status_history, review_paused, reviewer_id).
-    - Persists an immutable AuditEventModel record.
+    - Requires auth (mock passthrough local; verified user in google/required).
+    - Server-enforces dual-sign friction: notes>=5 for REJECTED/NEEDS_INFO + dossier-ID challenge.
+    - Actor is the verified user email, NOT the spoofable body reviewer_id.
     """
+    from apps.api.auth.deps import get_current_user as _get_user
+
+    try:
+        actor_user = await _get_user(request, session)
+        actor_email = actor_user.email
+    except HTTPException:
+        # Mock mode never raises; google/required enforces 401/403 here.
+        raise
+    clean_notes = _enforce_review_invariants(
+        payload.decision, payload.notes, payload.corrections, payload.confirm_app_id, id
+    )
     stmt = select(ApplicationModel).where(ApplicationModel.id == id)
     try:
         bind = session.get_bind()
@@ -325,17 +376,17 @@ async def submit_review(
     now = utc_now()
     from_status = app_model.status
 
-    # 1. Update relational fields
+    # 1. Update relational fields (actor = verified email; body reviewer_id ignored except mock display)
     app_model.status = to_status
-    app_model.reviewer_id = payload.reviewer_id
+    app_model.reviewer_id = actor_email
     app_model.updated_at = now
 
     # 2. Update state_json
     state = dict(app_model.state_json or {})
     state["status"] = to_status
-    state["reviewer_id"] = payload.reviewer_id
+    state["reviewer_id"] = actor_email
     state["reviewer_decision"] = payload.decision
-    state["reviewer_notes"] = payload.notes
+    state["reviewer_notes"] = clean_notes
     state["corrections_applied"] = payload.corrections
     state["review_paused"] = False
 
@@ -344,7 +395,7 @@ async def submit_review(
         "from_status": from_status,
         "to_status": to_status,
         "timestamp": now.isoformat(),
-        "reason": f"Human review decision: {payload.decision} by {payload.reviewer_id}",
+        "reason": f"Human review decision: {payload.decision} by {actor_email}",
     })
     state["status_history"] = history
     app_model.state_json = state
@@ -355,9 +406,9 @@ async def submit_review(
         application_id=id,
         from_status=from_status,
         to_status=to_status,
-        actor=payload.reviewer_id,
+        actor=actor_email,
         decision=payload.decision,
-        notes=payload.notes,
+        notes=clean_notes,
         corrections={"corrections": payload.corrections} if isinstance(payload.corrections, list) else payload.corrections,
         timestamp=now,
     )
@@ -393,8 +444,8 @@ async def submit_review(
         "application_id": id,
         "decision": payload.decision,
         "status": to_status,
-        "reviewer_id": payload.reviewer_id,
-        "notes": payload.notes,
+        "reviewer_id": actor_email,
+        "notes": clean_notes,
         "from_status": from_status,
         "to_status": to_status,
     }

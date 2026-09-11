@@ -30,7 +30,7 @@ class BankStatementExtractor(BaseExtractor):
         # 1. Account Holder
         holder_name, _ = find_text_match_with_evidence(
             pages,
-            r"(?:Account\s+Holder|Customer\s+Name|Account\s+Name|Name)\s*[:\-]\s*([A-Za-z .]+)",
+            r"(?:Account\s+Holder|Customer\s+Name|Account\s+Name|Name)\s*[:\-!|]?\s*([A-Za-z .]+)",
             doc_id,
             "bank_statement",
         )
@@ -38,7 +38,7 @@ class BankStatementExtractor(BaseExtractor):
         # 2. Bank Name
         bank_name, _ = find_text_match_with_evidence(
             pages,
-            r"(?:Bank\s+Name\s*[:\-]\s*([A-Za-z .]+)|(HDFC\s+Bank|ICICI\s+Bank|State\s+Bank\s+of\s+India|SBI|Axis\s+Bank|Kotak\s+Mahindra\s+Bank|Punjab\s+National\s+Bank))",
+            r"(?:Bank\s+Name\s*[:\-!|]?\s*([A-Za-z .]+)|(HDFC\s+Bank|ICICI\s+Bank|State\s+Bank\s+of\s+India|SBI|Axis\s+Bank|Kotak\s+Mahindra\s+Bank|Punjab\s+National\s+Bank))",
             doc_id,
             "bank_statement",
         )

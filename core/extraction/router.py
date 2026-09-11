@@ -1,6 +1,6 @@
 """
 OCR Router: Decides page-by-page extraction path.
-Order: PyMuPDF native text -> PaddleOCR CPU -> Optional managed Textract.
+Order: PyMuPDF native text -> Tesseract CPU -> PaddleOCR CPU -> Managed Textract (Detect only).
 Owned by Member 3 (Jeevan).
 
 Invariants & Guarantees from AGENTS.md:
@@ -8,24 +8,35 @@ Invariants & Guarantees from AGENTS.md:
 - Never train custom OCR models; use pre-trained engines only.
 - AWS Textract fallback is hard-capped in code under 100 total pages and disabled by default.
 - Every extracted fact/span receives a valid EvidenceRef.
+- core/ never imports boto3 (Textract lives in adapters/ocr/).
 """
 
 import logging
 import os
+import time
 from typing import List, Dict, Any, Union
 from core.contracts.evidence import EvidenceRef
 from core.extraction.native_parser import (
     extract_native_text_with_coordinates,
     extract_page_content,
+    get_page_image_coverage,
 )
 from core.extraction.paddle_parser import extract_scanned_text_with_ocr
 
 logger = logging.getLogger(__name__)
 
 # Hard budget safety guards mandated by AGENTS.md
+# DetectDocumentText only ($0.0015/page). NEVER AnalyzeDocument/Forms/Tables here.
 MAX_TEXTRACT_PAGES = 100
 _TEXTRACT_PAGES_CONSUMED = 0
-TEXTRACT_ENABLED = os.getenv("FINSCAN_ENABLE_TEXTRACT", "false").lower() in ("true", "1", "yes")
+
+
+def _textract_enabled() -> bool:
+    return os.getenv("FINSCAN_ENABLE_TEXTRACT", "false").lower() in ("true", "1", "yes")
+
+
+# Back-compat for tests that patch router.TEXTRACT_ENABLED directly.
+TEXTRACT_ENABLED = _textract_enabled()
 
 
 def get_textract_usage_count() -> int:
@@ -46,30 +57,38 @@ def inspect_page_route(
     min_word_threshold: int = 5,
 ) -> Dict[str, Any]:
     """
-    Analyzes page properties to determine the optimal perception route.
-    Returns metadata and selected route ('pymupdf_native' or 'paddleocr_cpu').
+    Analyzes NATIVE-ONLY page properties to determine the optimal perception route.
+    Pure probe: never runs OCR as a side-effect (that inflated char_count before).
+    Returns metadata and selected route ('pymupdf_native' or 'tesseract_cpu').
     """
     layout = extract_page_content(pdf_input, page_number)
     char_count = layout.get("char_count", 0)
     word_count = layout.get("word_count", 0)
+    try:
+        image_coverage = get_page_image_coverage(pdf_input, page_number)
+    except Exception:
+        image_coverage = 0.0
 
-    if char_count >= min_char_threshold and word_count >= min_word_threshold:
+    # Image-heavy pages go to OCR even if a small native layer (stamp/header) exists.
+    if char_count >= min_char_threshold and word_count >= min_word_threshold and image_coverage < 0.5:
         return {
             "page_number": page_number,
             "route": "pymupdf_native",
-            "reason": f"Native text layer present ({char_count} chars, {word_count} words)",
+            "reason": f"Native text layer present ({char_count} chars, {word_count} words, img {image_coverage:.0%})",
             "char_count": char_count,
             "word_count": word_count,
+            "image_coverage": round(image_coverage, 3),
             "page_width": layout.get("page_width", 0.0),
             "page_height": layout.get("page_height", 0.0),
         }
 
     return {
         "page_number": page_number,
-        "route": "paddleocr_cpu",
-        "reason": f"Scanned or sparse text ({char_count} chars < {min_char_threshold} threshold)",
+        "route": "tesseract_cpu",
+        "reason": f"Scanned or sparse text ({char_count} chars < {min_char_threshold} threshold, img {image_coverage:.0%})",
         "char_count": char_count,
         "word_count": word_count,
+        "image_coverage": round(image_coverage, 3),
         "page_width": layout.get("page_width", 0.0),
         "page_height": layout.get("page_height", 0.0),
     }
@@ -82,13 +101,16 @@ def route_page_extraction(
     document_type: str = "unknown",
     min_char_threshold: int = 50,
     min_word_threshold: int = 5,
+    ocr_timeout_s: int = 60,
 ) -> List[EvidenceRef]:
     """
     Evaluates page properties and dynamically routes extraction:
-    1. If usable native text layer present -> PyMuPDF with exact coordinates.
-    2. If scanned / sparse text -> PaddleOCR on CPU.
-    3. If CPU OCR produces nothing and Textract is enabled -> AWS Textract fallback (hard-capped < 100 pages).
+    1. Usable native text layer -> PyMuPDF with exact coordinates.
+    2. Scanned / sparse / image-heavy -> Tesseract CPU (dpi 200, retry 300) -> PaddleOCR where available.
+    3. If CPU OCR empty and Textract enabled -> AWS Textract DetectDocumentText (hard-capped < 100 pages).
+    Emits per-page route/reason/char_count/dpi/latency_ms logs for audit.
     """
+    t0 = time.monotonic()
     decision = inspect_page_route(
         pdf_input=pdf_input,
         page_number=page_number,
@@ -99,7 +121,7 @@ def route_page_extraction(
     route = decision["route"]
     logger.info(f"Routing document {document_id} page {page_number} via {route} ({decision['reason']})")
 
-    # Route 1: PyMuPDF Native Text Layer
+    # Route 1: PyMuPDF Native Text Layer (pure native, no hidden OCR)
     if route == "pymupdf_native":
         evidence = extract_native_text_with_coordinates(
             pdf_input=pdf_input,
@@ -108,21 +130,37 @@ def route_page_extraction(
             document_type=document_type,
         )
         if evidence:
+            logger.info(
+                f"OCR route done doc={document_id} pg={page_number} route=pymupdf_native "
+                f"chars={decision['char_count']} latency_ms={int((time.monotonic() - t0) * 1000)}"
+            )
             return evidence
+        logger.info(f"Native layer empty on retry for {document_id} p{page_number}; escalating to CPU OCR")
 
-    # Route 2: Scanned Fallback via local PaddleOCR CPU
-    logger.info(f"Executing CPU PaddleOCR fallback for {document_id} page {page_number}")
-    ocr_evidence = extract_scanned_text_with_ocr(
-        pdf_input=pdf_input,
-        page_number=page_number,
-        document_id=document_id,
-        document_type=document_type,
-    )
-    if ocr_evidence:
-        return ocr_evidence
+    # Route 2: CPU OCR with dpi ladder (200 fast, 300 accurate). extract_scanned_text_with_ocr
+    # tries PaddleOCR where installed, else Tesseract via MuPDF, and labels honestly.
+    for dpi in (200, 300):
+        try:
+            ocr_evidence = extract_scanned_text_with_ocr(
+                pdf_input=pdf_input,
+                page_number=page_number,
+                document_id=document_id,
+                document_type=document_type,
+                dpi=dpi,
+            )
+        except Exception as exc:
+            logger.warning(f"CPU OCR dpi={dpi} failed for {document_id} p{page_number}: {exc}")
+            ocr_evidence = []
+        if ocr_evidence:
+            logger.info(
+                f"OCR route done doc={document_id} pg={page_number} "
+                f"route={ocr_evidence[0].extraction_method} dpi={dpi} "
+                f"spans={len(ocr_evidence)} latency_ms={int((time.monotonic() - t0) * 1000)}"
+            )
+            return ocr_evidence
 
-    # Route 3: Managed Cloud OCR Fallback (Hard-Capped Under 100 Pages, Disabled by Default)
-    if TEXTRACT_ENABLED:
+    # Route 3: Managed Cloud OCR Fallback (DetectDocumentText only, hard-capped, off by default)
+    if _textract_enabled():
         textract_evidence = call_textract_fallback_guarded(
             pdf_input=pdf_input,
             page_number=page_number,
@@ -132,18 +170,23 @@ def route_page_extraction(
         if textract_evidence:
             return textract_evidence
 
+    logger.info(
+        f"OCR route done doc={document_id} pg={page_number} route=UNKNOWN "
+        f"latency_ms={int((time.monotonic() - t0) * 1000)}"
+    )
     return []
 
 
 def call_textract_fallback_guarded(
     pdf_input: Union[str, bytes],
     page_number: int,
-    document_id: str,
-    document_type: str,
+    document_id: str = "DOC-UNKNOWN",
+    document_type: str = "unknown",
 ) -> List[EvidenceRef]:
     """
-    Selective managed OCR path.
+    Selective managed OCR path: DetectDocumentText ONLY ($0.0015/page).
     Enforces inviolable hard ceiling: under 100 pages total across runtime.
+    core/ never imports boto3; adapter does.
     """
     global _TEXTRACT_PAGES_CONSUMED
 
@@ -156,8 +199,54 @@ def call_textract_fallback_guarded(
 
     _TEXTRACT_PAGES_CONSUMED += 1
     logger.warning(
-        f"Invoked managed Textract for page {page_number} (Page {_TEXTRACT_PAGES_CONSUMED}/{MAX_TEXTRACT_PAGES})"
+        f"Invoked managed Textract DetectDocumentText for page {page_number} "
+        f"(Page {_TEXTRACT_PAGES_CONSUMED}/{MAX_TEXTRACT_PAGES})"
     )
 
-    # In production, boto3 textract call would sit behind an adapter if enabled.
-    return []
+    # Offline-safe: counter increments for the spend-guard test, but no network
+    # unless explicitly enabled. Keeps CI hermetic.
+    if not _textract_enabled():
+        return []
+
+    try:
+        from adapters.ocr.textract_adapter import detect_text_page
+        from core.extraction.native_parser import open_pdf_document, validate_and_clamp_bbox
+
+        doc = open_pdf_document(pdf_input)
+        try:
+            if page_number > len(doc):
+                return []
+            page = doc[page_number - 1]
+            pw, ph = float(page.rect.width), float(page.rect.height)
+            pix = page.get_pixmap(dpi=200)
+            img_bytes = pix.tobytes("png")
+        finally:
+            doc.close()
+
+        lines = detect_text_page(img_bytes)
+        evidence: List[EvidenceRef] = []
+        for ln in lines:
+            text = (ln.get("text") or "").strip()
+            if not text:
+                continue
+            norm = ln.get("bbox_norm") or {}
+            x0 = float(norm.get("Left", 0.0)) * pw
+            y0 = float(norm.get("Top", 0.0)) * ph
+            x1 = x0 + float(norm.get("Width", 0.0)) * pw
+            y1 = y0 + float(norm.get("Height", 0.02)) * ph
+            bbox = validate_and_clamp_bbox(x0, y0, x1, y1, pw, ph)
+            evidence.append(
+                EvidenceRef(
+                    document_id=document_id,
+                    document_type=document_type,
+                    page_number=page_number,
+                    quoted_span=text,
+                    bounding_box=bbox,
+                    extraction_method="textract_managed",
+                    confidence=max(0.0, min(1.0, float(ln.get("confidence", 0.99)))),
+                )
+            )
+        return evidence
+    except Exception as exc:
+        logger.warning(f"Textract DetectDocumentText failed for {document_id} p{page_number}: {exc}")
+        return []

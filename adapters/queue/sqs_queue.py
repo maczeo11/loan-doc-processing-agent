@@ -66,10 +66,12 @@ class SQSQueue(QueuePort):
         )
         logger.info(f"Published job {job_ref.job_id} to SQS (MessageId={response.get('MessageId')})")
 
-    def receive(self, max_n: int = 1, visibility_timeout: int = 30) -> List[Delivery]:
+    def receive(self, max_n: int = 1, visibility_timeout: int = 90) -> List[Delivery]:
         """
         Receives messages from SQS with a visibility timeout lease.
-        Synchronizes attempt_count from SQS ApproximateReceiveCount attribute.
+        Uses long polling (20s) to cut cost/throttle; syncs attempt_count.
+        Standard queue (parallel jobs, no ordering). RedrivePolicy (maxReceiveCount=3)
+        is the primary DLQ mechanism and preserves the full JobRef body.
         """
         if not self.queue_url:
             return []
@@ -79,6 +81,7 @@ class SQSQueue(QueuePort):
                 QueueUrl=self.queue_url,
                 MaxNumberOfMessages=min(max(max_n, 1), 10),
                 VisibilityTimeout=visibility_timeout,
+                WaitTimeSeconds=20,
                 AttributeNames=["ApproximateReceiveCount"],
                 MessageAttributeNames=["All"],
             )
@@ -135,21 +138,23 @@ class SQSQueue(QueuePort):
     def fail(self, handle: str, retryable: bool) -> None:
         """
         Handles message processing failure:
-        - If retryable: resets VisibilityTimeout to 0 to trigger immediate retry.
-        - If not retryable: routes message to DLQ (if configured) and deletes from primary queue.
+        - If retryable: VisibilityTimeout=30 (backoff, avoids hot-loop tight redelivery).
+        - If not retryable: delete from primary; SQS RedrivePolicy (maxReceiveCount=3)
+          is the primary DLQ path and preserves the full JobRef body. Manual DLQ
+          send is best-effort fallback (handle-only; body preserved by RedrivePolicy).
         """
         if not self.queue_url:
             return
 
         try:
             if retryable:
-                # Immediate redelivery
+                # Backoff redelivery (not 0) to avoid poison hot-loop tight retry.
                 self.client.change_message_visibility(
                     QueueUrl=self.queue_url,
                     ReceiptHandle=handle,
-                    VisibilityTimeout=0,
+                    VisibilityTimeout=30,
                 )
-                logger.warning(f"Reset visibility timeout to 0 for retry of {handle[:16]}...")
+                logger.warning(f"Backoff retry (30s) for {handle[:16]}...")
             else:
                 # Non-retryable: send to DLQ if configured, then ack from main queue
                 if self.dlq_url:

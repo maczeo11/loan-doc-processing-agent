@@ -37,7 +37,8 @@ class PostgresQueue(QueuePort):
         table_name: str = "outbox_jobs",
         conn: Optional[Any] = None,
     ):
-        self.dsn = connection_string or dsn or "postgresql://postgres:postgrespassword@localhost:5432/finscan"
+        raw_dsn = connection_string or dsn or "postgresql://postgres:postgrespassword@localhost:5432/finscan"
+        self.dsn = raw_dsn.replace("postgresql+asyncpg://", "postgresql://")
         self.table_name = table_name
         self._conn = conn
 

@@ -22,7 +22,9 @@ langchain>=0.1.14
 langchain-core>=0.1.38
 langchain-community>=0.0.31
 langchain-openai>=0.1.1
-boto3>=1.34.0  # AWS Bedrock & S3
+boto3>=1.34.0  # AWS Bedrock & S3 & Textract DetectDocumentText
+google-auth>=2.30.0  # Google GIS id_token verification (auth only, apps/api/auth)
+PyJWT>=2.8.0  # stateless session JWT
 
 # OCR & Document Intelligence
 azure-ai-formrecognizer>=3.3.3

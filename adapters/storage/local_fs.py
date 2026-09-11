@@ -14,7 +14,7 @@ import os
 import secrets
 import time
 from pathlib import Path
-from typing import BinaryIO, Union, Dict, Any
+from typing import BinaryIO, Union, Dict, Any, Optional
 from adapters.storage.base import (
     StoragePort,
     StorageTamperError,
@@ -29,8 +29,9 @@ class LocalFileSystemStorage(StoragePort):
     StoragePort implementation for local disk storage.
     """
 
-    def __init__(self, base_dir: str = "data/storage", base_url: str = "http://localhost:8000"):
-        self.base_dir = Path(base_dir).resolve()
+    def __init__(self, base_dir: Optional[str] = None, base_url: str = "http://localhost:8000"):
+        resolved_dir = base_dir or os.getenv("STORAGE_BASE_DIR", "data/storage")
+        self.base_dir = Path(resolved_dir).resolve()
         self.base_url = base_url.rstrip("/")
         self.base_dir.mkdir(parents=True, exist_ok=True)
 

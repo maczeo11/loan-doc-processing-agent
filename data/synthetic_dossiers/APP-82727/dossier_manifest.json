@@ -1,0 +1,47 @@
+{
+  "application_id": "APP-82727",
+  "applicant_name": "Sneha Kulkarni",
+  "injected_anomaly": "NAME_MISMATCH",
+  "payslip": {
+    "employee_name": "Sneha Joshi",
+    "employer_name": "Wipro Enterprises",
+    "gross_salary": 70000.0,
+    "net_salary": 61600.0,
+    "epf_deduction": 5600.0,
+    "tds_deduction": 2800.0
+  },
+  "bank_statement": {
+    "account_holder": "Sneha Kulkarni",
+    "bank_name": "HDFC Bank Ltd",
+    "account_number": "501009155709",
+    "monthly_salary_credits": [
+      70000.0,
+      70000.0,
+      70000.0
+    ],
+    "average_balance": 31500.0,
+    "bounced_transactions": 0
+  },
+  "tax_return": {
+    "assessee_name": "Sneha Kulkarni",
+    "pan_number": "ABCDE9672F",
+    "gross_total_income": 840000.0,
+    "total_tax_paid": 100800.0
+  },
+  "kyc": {
+    "full_name": "Sneha Kulkarni",
+    "pan_number": "ABCDE9672F",
+    "dob": "1994-06-15",
+    "aadhaar_masked": "XXXX-XXXX-6695"
+  },
+  "tabular_features": {
+    "no_of_dependents": 0,
+    "education": "Graduate",
+    "self_employed": "No",
+    "income_annum": 840000.0,
+    "loan_amount": 2000000.0,
+    "loan_term": 8,
+    "cibil_score": 760,
+    "assets_total": 2200000.0
+  }
+}

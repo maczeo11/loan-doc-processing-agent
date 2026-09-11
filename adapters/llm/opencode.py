@@ -26,13 +26,18 @@ class OpenCodeZenLLM(LLMPort):
         self,
         api_key: Optional[str] = None,
         base_url: Optional[str] = None,
-        model: str = "zen-small",
+        model: Optional[str] = None,
         timeout_seconds: float = 30.0,
         http_client: Optional[httpx.Client] = None,
     ):
-        self.api_key = api_key or os.getenv("OPENCODE_API_KEY") or os.getenv("OPENAI_API_KEY", "")
-        self.base_url = (base_url or os.getenv("OPENCODE_BASE_URL") or "https://opencode.ai/zen/v1").rstrip("/")
-        self.model = model
+        groq_key = os.getenv("GROQ_API_KEY")
+        self.api_key = api_key or groq_key or os.getenv("OPENCODE_API_KEY") or os.getenv("OPENAI_API_KEY", "")
+
+        default_base = "https://api.groq.com/openai/v1" if (groq_key and not base_url) else "https://opencode.ai/zen/v1"
+        self.base_url = (base_url or os.getenv("OPENCODE_BASE_URL") or default_base).rstrip("/")
+
+        default_model = "openai/gpt-oss-20b" if ("groq.com" in self.base_url or groq_key) else "zen-small"
+        self.model = model or os.getenv("LLM_MODEL") or default_model
         self.timeout_seconds = timeout_seconds
         self._client = http_client
 

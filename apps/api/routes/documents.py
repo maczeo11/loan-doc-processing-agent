@@ -14,7 +14,7 @@ import tempfile
 import logging
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, status
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, status, Response
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -191,6 +191,21 @@ async def upload_document(
                 detail="Failed to store uploaded document content",
             )
 
+        # Tamper close-loop: re-read + verify hash immediately after put.
+        try:
+            await asyncio.to_thread(storage.verify_integrity, storage_key, sha256_digest)
+        except Exception as tamper_err:
+            logger.error(f"Integrity verification failed for '{storage_key}': {tamper_err}", exc_info=True)
+            try:
+                if hasattr(storage, "delete"):
+                    await asyncio.to_thread(storage.delete, storage_key)
+            except Exception:
+                pass
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Uploaded bytes failed integrity verification (tamper guard)",
+            )
+
     finally:
         spooled_file.close()
 
@@ -254,3 +269,59 @@ async def upload_document(
         sha256=sha256_digest,
         size_bytes=total_bytes,
     )
+
+
+@router.get("/{id}/documents/{doc_id}")
+async def get_document_content(
+    id: str,
+    doc_id: str,
+    session: AsyncSession = Depends(get_db),
+    storage: StoragePort = Depends(get_storage),
+):
+    """
+    Stream raw document PDF bytes for in-browser canvas rendering.
+    """
+    stmt = select(DocumentModel).where(
+        DocumentModel.id == doc_id,
+        DocumentModel.application_id == id,
+    )
+    doc_model = (await session.execute(stmt)).scalar_one_or_none()
+    if not doc_model:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Document '{doc_id}' not found in application '{id}'",
+        )
+
+    storage_key = build_storage_key(
+        application_id=id,
+        document_id=doc_id,
+        filename=doc_model.filename,
+    )
+    try:
+        data = await asyncio.to_thread(storage.get, storage_key)
+        # Tamper guard: hash bytes vs DB record; mismatch -> 422 (never serve corrupt PII).
+        import hashlib as _hl
+
+        actual = _hl.sha256(data).hexdigest()
+        if actual != doc_model.sha256:
+            logger.error(f"SHA-256 mismatch for '{storage_key}': db={doc_model.sha256} actual={actual}")
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Document failed integrity verification (hash mismatch)",
+            )
+        return Response(
+            content=data,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f'inline; filename="{doc_model.filename}"',
+                "Cache-Control": "private, max-age=3600",
+                "ETag": f'"{doc_model.sha256}"',
+            },
+        )
+    except Exception as e:
+        logger.error(f"Failed to fetch document content for '{storage_key}': {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document content not found in storage",
+        )
+

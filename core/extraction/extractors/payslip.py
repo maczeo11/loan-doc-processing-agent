@@ -30,7 +30,7 @@ class PayslipExtractor(BaseExtractor):
         # 1. Employee Name
         emp_name, emp_name_ev = find_text_match_with_evidence(
             pages,
-            r"(?:Employee\s+Name|Emp\s+Name|Name)\s*[:\-]\s*([A-Za-z .]+)",
+            r"(?:Employee\s+Name|Emp\s+Name|Name)\s*[:\-!|]?\s*([A-Za-z .]+)",
             doc_id,
             "payslip",
         )
@@ -38,7 +38,7 @@ class PayslipExtractor(BaseExtractor):
         # 2. Employer Name
         employer, employer_ev = find_text_match_with_evidence(
             pages,
-            r"(?:Employer\s+Name|Employer|Company\s+Name|Company|Organization)\s*[:\-]\s*([A-Za-z0-9 .,&]+)",
+            r"(?:Employer\s+Name|Employer|Company\s+Name|Company|Organization)\s*[:\-!|]?\s*([A-Za-z0-9 .,&]+)",
             doc_id,
             "payslip",
         )
@@ -46,7 +46,7 @@ class PayslipExtractor(BaseExtractor):
         # 3. Gross Salary
         gross_val_str, gross_ev = find_text_match_with_evidence(
             pages,
-            r"(?:Gross\s+Salary|Gross\s+Pay|Gross\s+Earnings|Total\s+Earnings)\s*[:\-]?\s*(?:INR|₹|Rs\.?)?\s*([\d,]+(?:\.\d+)?)",
+            r"(?:Gross\s+Salary|Gross\s+Pay|Gross\s+Earnings|Total\s+Earnings)\s*[:\-!|]?\s*(?:INR|₹|Rs\.?)?\s*([\d,]+(?:\.\d+)?)",
             doc_id,
             "payslip",
         )

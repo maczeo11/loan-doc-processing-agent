@@ -12,7 +12,6 @@ Core Requirements:
 
 import uuid
 import logging
-import os
 from typing import Optional, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel
@@ -369,69 +368,22 @@ async def export_application(
         import tempfile
 
         from fastapi.responses import FileResponse
-        from reportlab.lib.pagesizes import A4
-        from reportlab.pdfgen import canvas
 
-        findings = state.get("findings", []) or []
-        memo = state.get("summary_markdown") or "No memo synthesized yet."
+        from core.reporting.exporter import export_reviewed_dossier_pdf
+
+        # applicant_name lives on the relational model, not state_json.
+        state["applicant_name"] = app_model.applicant_name
 
         tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
         tmp_path = tmp.name
         tmp.close()
         try:
-            c = canvas.Canvas(tmp_path, pagesize=A4)
-            y = 800
-            c.setFont("Helvetica-Bold", 16)
-            c.drawString(60, y, f"Credit Appraisal Export — {id}")
-            y -= 24
-            c.setFont("Helvetica", 11)
-            for line in (
-                f"Applicant: {app_model.applicant_name}",
-                f"Status: {app_model.status}",
-                f"Findings: {len(findings)}",
-            ):
-                c.drawString(60, y, line)
-                y -= 16
-            y -= 8
-            c.setFont("Helvetica-Bold", 12)
-            c.drawString(60, y, "Findings")
-            y -= 16
-            c.setFont("Helvetica", 10)
-            for finding in findings:
-                if isinstance(finding, dict):
-                    text = f"- {finding.get('rule_id')} [{finding.get('verdict')}]: {finding.get('reason')}"
-                else:
-                    text = f"- {finding}"
-                for chunk in [text[i : i + 95] for i in range(0, len(text), 95)] or ["-"]:
-                    if y < 60:
-                        c.showPage()
-                        y = 800
-                        c.setFont("Helvetica", 10)
-                    c.drawString(60, y, chunk)
-                    y -= 13
-            if y < 60:
-                c.showPage()
-                y = 800
-            y -= 8
-            c.setFont("Helvetica-Bold", 12)
-            c.drawString(60, y, "Memo")
-            y -= 16
-            c.setFont("Helvetica", 10)
-            for raw_line in memo.splitlines():
-                for chunk in [raw_line[i : i + 95] for i in range(0, max(len(raw_line), 1), 95)]:
-                    if y < 60:
-                        c.showPage()
-                        y = 800
-                        c.setFont("Helvetica", 10)
-                    c.drawString(60, y, chunk)
-                    y -= 13
-            c.save()
-        except Exception:
-            try:
-                os.remove(tmp_path)
-            except OSError:
-                pass
-            raise
+            export_reviewed_dossier_pdf(state, tmp_path)
+        except RuntimeError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_501_NOT_IMPLEMENTED,
+                detail=str(exc),
+            ) from exc
         return FileResponse(
             tmp_path,
             media_type="application/pdf",

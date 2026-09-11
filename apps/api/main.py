@@ -6,10 +6,11 @@ Serves REST API and mounts React SPA from apps/ui/dist.
 
 import os
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
+from apps.api.auth.deps import get_current_user
 from apps.api.routes.applications import router as applications_router
 from apps.api.routes.documents import router as documents_router
 from apps.api.routes.review import router as review_router
@@ -47,23 +48,78 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Register route modules
+# Every dossier route carries applicant PII, so all of them sit behind a
+# verified session. AUTH_MODE=mock keeps get_current_user a passthrough, so
+# local/demo/test flows stay open; google/required enforce 401/403 here.
+AUTHENTICATED = [Depends(get_current_user)]
+
 app.include_router(auth_router)
-app.include_router(applications_router)
-app.include_router(documents_router)
-app.include_router(review_router)
-app.include_router(uploads_router)
+app.include_router(applications_router, dependencies=AUTHENTICATED)
+app.include_router(documents_router, dependencies=AUTHENTICATED)
+app.include_router(review_router, dependencies=AUTHENTICATED)
+app.include_router(uploads_router, dependencies=AUTHENTICATED)
 
 
 @app.get("/health", tags=["Health"])
 async def health_check():
+    """Liveness: the process is up and serving. Dependencies: see /health/ready."""
     from apps.api.config import settings
+
     return {
         "status": "ok",
         "service": "finscan-api",
         "version": settings.RELEASE_VERSION,
         "git_sha": settings.GIT_SHA,
         "build_timestamp": settings.BUILD_TIMESTAMP,
+        "environment": settings.ENVIRONMENT,
+    }
+
+
+@app.get("/health/ready", tags=["Health"])
+async def readiness_check():
+    """
+    Readiness: reports `degraded` when Postgres or Redis is unreachable, so a
+    probe (and the UI's connectivity banner) can tell a live API apart from a
+    working system. /health stays a pure liveness signal.
+    """
+    from sqlalchemy import text
+
+    from apps.api.config import settings
+    from apps.api.db.session import async_session_factory
+    from apps.api.middleware.rate_limit import get_redis_client
+
+    checks: dict[str, str] = {}
+
+    try:
+        async with async_session_factory() as session:
+            await session.execute(text("SELECT 1"))
+        checks["database"] = "ok"
+    except Exception as db_err:  # noqa: BLE001 - probe must never raise
+        checks["database"] = f"unavailable: {type(db_err).__name__}"
+
+    try:
+        redis_client = await get_redis_client()
+        if redis_client is None:
+            checks["redis"] = "not_configured"
+        else:
+            await redis_client.ping()
+            # Local dev silently substitutes FakeRedis; say so rather than
+            # reporting a rate-limiter/spend-guard that isn't really shared.
+            checks["redis"] = (
+                "in_memory_fallback"
+                if type(redis_client).__module__.startswith("fakeredis")
+                else "ok"
+            )
+    except Exception as redis_err:  # noqa: BLE001 - probe must never raise
+        checks["redis"] = f"unavailable: {type(redis_err).__name__}"
+
+    degraded = [name for name, value in checks.items() if value.startswith("unavailable")]
+
+    return {
+        "status": "degraded" if degraded else "ok",
+        "service": "finscan-api",
+        "checks": checks,
+        "version": settings.RELEASE_VERSION,
         "environment": settings.ENVIRONMENT,
     }
 

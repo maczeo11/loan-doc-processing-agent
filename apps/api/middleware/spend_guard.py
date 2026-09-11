@@ -7,19 +7,27 @@ Rules:
 - Bounded configurable reservation TTL (SPEND_GUARD_RESERVATION_TTL_SECONDS).
 - Release reservation on database transaction failure or explicit cancellation.
 - Idempotent processing calls returning existing jobs do NOT consume extra slots.
-- Worker completion integration note: Terminal job state updates (SUCCEEDED, FAILED)
-  require an upstream worker hook (Bhanu) to invoke release_active_job_by_id;
-  TTL provides an autonomous safety backstop.
+- Terminal jobs (SUCCEEDED/FAILED/CANCELLED) free their slot lazily at the next
+  reservation attempt, via the `resolve_finished_job_ids` hook the API supplies.
+  A finished job used to keep its slot for the full reservation TTL, so two
+  completed dossiers locked the user out for 15 minutes behind the misleading
+  message "wait for ongoing processing to complete" while nothing was running.
+  TTL remains the autonomous backstop if the hook is unavailable.
 """
 
 import time
 import logging
+from typing import Awaitable, Callable, Iterable, List, Optional, Set
 from fastapi import HTTPException, status
 import redis.asyncio as aioredis
 
 from apps.api.config import settings
 
 logger = logging.getLogger("finscan.spend_guard")
+
+# Given the currently-reserved job ids, returns the subset that has reached a
+# terminal state and may therefore be evicted.
+FinishedJobResolver = Callable[[Iterable[str]], Awaitable[Set[str]]]
 
 
 async def reserve_active_job_slot(
@@ -29,11 +37,16 @@ async def reserve_active_job_slot(
     max_active: int = settings.MAX_ACTIVE_JOBS_PER_USER,
     ttl_seconds: int = settings.SPEND_GUARD_RESERVATION_TTL_SECONDS,
     max_retries: int = 5,
+    resolve_finished_job_ids: Optional[FinishedJobResolver] = None,
 ) -> bool:
     """
     Atomically reserves one active-job slot for the user.
     Returns True if slot reserved; False if user has reached max_active.
     Raises HTTPException(503) on Redis failure.
+
+    `resolve_finished_job_ids` lets the caller (which has database access) say
+    which reserved jobs have already finished, so their slots are reclaimed
+    instead of idling until the reservation TTL expires.
     """
     active_key = f"spend_guard:active:{user_id}"
     job_map_key = f"spend_guard:job_user:{job_id}"
@@ -47,6 +60,20 @@ async def reserve_active_job_slot(
 
                     # Retrieve current active non-expired reservations
                     active_jobs = await redis_client.zrangebyscore(active_key, now, "+inf")
+
+                    # Reclaim slots held by jobs that have already finished.
+                    if active_jobs and len(active_jobs) >= max_active and resolve_finished_job_ids:
+                        try:
+                            finished = await resolve_finished_job_ids(active_jobs)
+                        except Exception as resolve_err:  # noqa: BLE001 - advisory
+                            logger.warning(f"Could not resolve finished jobs: {resolve_err}")
+                            finished = set()
+                        if finished:
+                            await pipe.unwatch()
+                            await _evict_finished(redis_client, active_key, finished)
+                            active_jobs = [j for j in active_jobs if j not in finished]
+                            await pipe.watch(active_key)
+
                     if len(active_jobs) >= max_active:
                         await pipe.unwatch()
                         return False
@@ -74,6 +101,26 @@ async def reserve_active_job_slot(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Coordination service temporarily unavailable. Cannot verify active job limits.",
         )
+
+
+async def _evict_finished(
+    redis_client: aioredis.Redis,
+    active_key: str,
+    finished_job_ids: Set[str],
+) -> None:
+    """Drop reservations for jobs that have reached a terminal state."""
+    try:
+        async with redis_client.pipeline(transaction=True) as pipe:
+            for finished_id in finished_job_ids:
+                pipe.zrem(active_key, finished_id)
+                pipe.delete(f"spend_guard:job_user:{finished_id}")
+            await pipe.execute()
+        logger.info(
+            f"Reclaimed {len(finished_job_ids)} spend-guard slot(s) from finished jobs: "
+            f"{sorted(finished_job_ids)}"
+        )
+    except Exception as err:  # noqa: BLE001 - TTL remains the backstop
+        logger.warning(f"Failed to evict finished reservations from '{active_key}': {err}")
 
 
 async def release_active_job_slot(

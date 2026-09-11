@@ -77,6 +77,92 @@ def sanitize_filename(raw_filename: Optional[str]) -> str:
     return cleaned
 
 
+EXTENSION_MEDIA_TYPES = {
+    ".pdf": "application/pdf",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png": "image/png",
+    ".tiff": "image/tiff",
+}
+
+
+def media_type_for_filename(filename: str) -> str:
+    """
+    Resolve the served Content-Type from the stored extension.
+
+    ALLOWED_EXTENSIONS admits scanned images, so serving everything as
+    application/pdf made an uploaded payslip photo unrenderable in the viewer.
+    """
+    ext = os.path.splitext(filename or "")[1].lower()
+    return EXTENSION_MEDIA_TYPES.get(ext, "application/octet-stream")
+
+
+# Canonical document types the pipeline's completeness rule requires. A hint
+# lands directly in `classified_types`, and the classifier will not revisit a
+# document that already carries a non-unknown type — so an off-vocabulary hint
+# is sticky and makes RULE-COMP-01 report a document that is present as missing.
+CANONICAL_DOC_TYPES = {
+    "application_form",
+    "payslip",
+    "bank_statement",
+    "tax_acknowledgement",
+    "id_card",
+}
+
+DOC_TYPE_ALIASES = {
+    "tax_return": "tax_acknowledgement",
+    "tax": "tax_acknowledgement",
+    "itr": "tax_acknowledgement",
+    "itr_v": "tax_acknowledgement",
+    "form16": "tax_acknowledgement",
+    "salary": "payslip",
+    "payslips": "payslip",
+    "bank": "bank_statement",
+    "statement": "bank_statement",
+    "pan": "id_card",
+    "pan_card": "id_card",
+    "aadhaar": "id_card",
+    "kyc": "id_card",
+    "identity": "id_card",
+    "application": "application_form",
+    "loan_application": "application_form",
+}
+
+
+def normalize_doc_type_hint(raw: Optional[str]) -> Optional[str]:
+    """Map a client-supplied hint onto the pipeline's vocabulary, or drop it."""
+    if not raw or not raw.strip():
+        return None
+    value = raw.strip().lower().replace("-", "_").replace(" ", "_")
+    if value in CANONICAL_DOC_TYPES:
+        return value
+    mapped = DOC_TYPE_ALIASES.get(value)
+    if mapped:
+        return mapped
+    # Unrecognised: let the classifier decide rather than pinning a bad label.
+    logger.info(f"Ignoring unrecognised doc_type_hint '{raw}'; deferring to classifier")
+    return None
+
+
+def count_pdf_pages(storage_key: str, storage: StoragePort) -> Optional[int]:
+    """
+    Real page count for an uploaded PDF, or None when it cannot be determined
+    (a scanned image, or PyMuPDF unavailable). Returning None is deliberate:
+    the UI shows nothing rather than inventing a plausible page count.
+    """
+    if not storage_key.lower().endswith(".pdf"):
+        return 1 if os.path.splitext(storage_key)[1].lower() in EXTENSION_MEDIA_TYPES else None
+    try:
+        import fitz  # PyMuPDF
+
+        raw = storage.get(storage_key)
+        with fitz.open(stream=raw, filetype="pdf") as doc:
+            return int(doc.page_count)
+    except Exception as err:  # noqa: BLE001 - metadata only, never fails an upload
+        logger.warning(f"Could not determine page count for '{storage_key}': {err}")
+        return None
+
+
 def validate_file_signature(first_chunk: bytes) -> None:
     """
     Validates file magic bytes to prevent trusting client-provided Content-Type alone.
@@ -210,13 +296,14 @@ async def upload_document(
         spooled_file.close()
 
     # 6. Persist DocumentModel and update application state_json
+    normalized_hint = normalize_doc_type_hint(doc_type_hint)
     try:
         doc_model = DocumentModel(
             id=doc_id,
             application_id=id,
             filename=sanitized_filename,
             storage_uri=storage_uri,
-            doc_type=doc_type_hint.strip() if doc_type_hint and doc_type_hint.strip() else None,
+            doc_type=normalized_hint,
             sha256=sha256_digest,
             size_bytes=total_bytes,
             created_at=utc_now(),
@@ -233,9 +320,22 @@ async def upload_document(
         manifest[doc_id] = storage_uri
         state["document_manifest"] = manifest
 
-        if doc_type_hint and doc_type_hint.strip():
+        # Real filename + real page count, so the reviewer's dossier index
+        # describes the file that was actually uploaded rather than a
+        # placeholder derived from the generated document id.
+        filenames = dict(state.get("document_filenames", {}))
+        filenames[doc_id] = sanitized_filename
+        state["document_filenames"] = filenames
+
+        page_count = await asyncio.to_thread(count_pdf_pages, storage_key, storage)
+        if page_count is not None:
+            pages = dict(state.get("document_pages", {}))
+            pages[doc_id] = page_count
+            state["document_pages"] = pages
+
+        if normalized_hint:
             classified = dict(state.get("classified_types", {}))
-            classified[doc_id] = doc_type_hint.strip()
+            classified[doc_id] = normalized_hint
             state["classified_types"] = classified
 
         app_model.state_json = state
@@ -299,29 +399,33 @@ async def get_document_content(
     )
     try:
         data = await asyncio.to_thread(storage.get, storage_key)
-        # Tamper guard: hash bytes vs DB record; mismatch -> 422 (never serve corrupt PII).
-        import hashlib as _hl
-
-        actual = _hl.sha256(data).hexdigest()
-        if actual != doc_model.sha256:
-            logger.error(f"SHA-256 mismatch for '{storage_key}': db={doc_model.sha256} actual={actual}")
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="Document failed integrity verification (hash mismatch)",
-            )
-        return Response(
-            content=data,
-            media_type="application/pdf",
-            headers={
-                "Content-Disposition": f'inline; filename="{doc_model.filename}"',
-                "Cache-Control": "private, max-age=3600",
-                "ETag": f'"{doc_model.sha256}"',
-            },
-        )
     except Exception as e:
         logger.error(f"Failed to fetch document content for '{storage_key}': {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Document content not found in storage",
         )
+
+    # Tamper guard: hash bytes vs DB record; mismatch -> 422 (never serve corrupt
+    # PII). Raised OUTSIDE the storage try/except so it cannot be swallowed and
+    # re-reported as a benign 404.
+    import hashlib as _hl
+
+    actual = _hl.sha256(data).hexdigest()
+    if actual != doc_model.sha256:
+        logger.error(f"SHA-256 mismatch for '{storage_key}': db={doc_model.sha256} actual={actual}")
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Document failed integrity verification (hash mismatch)",
+        )
+
+    return Response(
+        content=data,
+        media_type=media_type_for_filename(doc_model.filename),
+        headers={
+            "Content-Disposition": f'inline; filename="{doc_model.filename}"',
+            "Cache-Control": "private, max-age=3600",
+            "ETag": f'"{doc_model.sha256}"',
+        },
+    )
 

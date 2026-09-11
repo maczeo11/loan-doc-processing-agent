@@ -10,6 +10,7 @@ import type {
   QuestionRequest,
   QuestionResponse,
   ExportResponse,
+  AuditEvent,
 } from '../types/contracts';
 
 const BASE_URL = (import.meta.env.VITE_API_BASE_URL as string) || '';
@@ -64,13 +65,60 @@ async function handleResponse<T>(response: Response): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+/**
+ * Fetch a document's raw bytes with the session attached.
+ *
+ * Exported so the PDF viewer stops using a bare `fetch()`: once the dossier
+ * routes require a session, an unauthenticated viewer fetch 401s and every
+ * document renders as a load failure.
+ */
+export async function fetchDocumentBlob(
+  applicationId: string,
+  documentId: string
+): Promise<{ data: ArrayBuffer; contentType: string }> {
+  const res = await authedFetch(
+    `${BASE_URL}/applications/${encodeURIComponent(applicationId)}/documents/${encodeURIComponent(documentId)}`,
+    { headers: { Accept: 'application/pdf,image/*' } }
+  );
+  if (!res.ok) {
+    let detail = res.statusText;
+    try {
+      const body = await res.json();
+      if (body.detail) detail = typeof body.detail === 'string' ? body.detail : JSON.stringify(body.detail);
+    } catch {
+      /* non-JSON error body */
+    }
+    throw new Error(`Document request failed (${res.status}): ${detail}`);
+  }
+  return {
+    data: await res.arrayBuffer(),
+    contentType: res.headers.get('content-type') || 'application/octet-stream',
+  };
+}
+
 export const api = {
   /**
-   * Health check endpoint
+   * Liveness check
    */
   async checkHealth(): Promise<{ status: string; service: string; version: string }> {
     const res = await authedFetch(`${BASE_URL}/health`);
     return handleResponse(res);
+  },
+
+  /**
+   * Readiness check: reports Postgres/Redis reachability.
+   */
+  async checkReadiness(): Promise<{ status: string; checks: Record<string, string> }> {
+    const res = await authedFetch(`${BASE_URL}/health/ready`);
+    return handleResponse(res);
+  },
+
+  /**
+   * Append-only audit trail for a dossier.
+   */
+  async getAuditTrail(applicationId: string): Promise<AuditEvent[]> {
+    const res = await authedFetch(`${BASE_URL}/applications/${encodeURIComponent(applicationId)}/audit`);
+    return handleResponse<AuditEvent[]>(res);
   },
 
   /**
@@ -192,6 +240,8 @@ export const api = {
       `${BASE_URL}/applications/${encodeURIComponent(applicationId)}/export?format=${encodeURIComponent(format)}`
     );
     if (!res.ok) {
+      // Throws with the server's reason (409 before the pipeline has run, 501
+      // without reportlab) instead of opening a raw JSON error page in a tab.
       return handleResponse<ExportResponse>(res);
     }
     const contentType = res.headers.get('content-type') || '';
@@ -202,3 +252,14 @@ export const api = {
     return res.json() as Promise<ExportResponse>;
   },
 };
+
+/** Trigger a browser download for an object URL, then release it. */
+export function downloadBlobUrl(blobUrl: string, filename: string): void {
+  const link = document.createElement('a');
+  link.href = blobUrl;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  setTimeout(() => URL.revokeObjectURL(blobUrl), 10_000);
+}

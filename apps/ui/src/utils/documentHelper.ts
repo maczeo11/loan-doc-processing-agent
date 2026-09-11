@@ -33,6 +33,9 @@ export function getDocumentCategory(docType?: string): string {
       return 'Salary Payslip';
     case 'bank_statement':
       return 'Bank Account';
+    // `tax_acknowledgement` is the pipeline's canonical type; `tax_return` is
+    // kept only so older persisted dossiers still render a readable label.
+    case 'tax_acknowledgement':
     case 'tax_return':
       return 'Tax Return';
     case 'id_card':

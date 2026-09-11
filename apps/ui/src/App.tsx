@@ -6,14 +6,14 @@ import { PdfViewer } from './components/viewer/PdfViewer';
 import { KeyboardShortcutsModal } from './components/common/KeyboardShortcutsModal';
 import { ReviewActionModal } from './components/review/ReviewActionModal';
 import { NewApplicationModal, NewApplicationPayload } from './components/navigation/NewApplicationModal';
-import { DashboardPage } from './components/DashboardPage';
+import { DashboardPage, DashboardApp } from './components/DashboardPage';
 import { LoginPage } from './components/auth/LoginPage';
-import { getDemoDossier } from './data/mockDossier';
+import { getDemoDossier, isDemoDossierId } from './data/mockDossier';
 import { getDocumentTitle } from './utils/documentHelper';
 import { EvidenceNavigationProvider, useEvidenceNavigation } from './context/EvidenceNavigationContext';
 import { AuthProvider } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
-import type { LoanApplicationState } from './types/contracts';
+import type { LoanApplicationState, JobStatusResponse } from './types/contracts';
 import type { LoanApplication, DossierDocument } from './types/application';
 import type { EvidenceRef } from './types/evidence';
 import type { ReviewDecision } from './types/api';
@@ -27,10 +27,22 @@ import { useAuth } from './context/AuthContext';
  */
 function toLoanApplication(
   state: LoanApplicationState,
-  liveApps?: Array<{ application_id: string; loan_amount?: number }>
+  liveApps?: DashboardApp[]
 ): LoanApplication {
   const docIds = state.document_ids || [];
   const classified = state.classified_types || {};
+
+  const pageCounts = state.document_pages || {};
+  const ocrRoutes = state.ocr_routes || {};
+  const filenames = state.document_filenames || {};
+  // A document counts as verified only when at least one finding actually cites
+  // it. Hardcoding `verified: true` put a green check on every file in the
+  // dossier regardless of whether anything had been checked against it.
+  const citedDocIds = new Set(
+    (state.findings || []).flatMap((f) =>
+      (f.supporting_evidence || []).map((ev) => ev.document_id)
+    )
+  );
 
   const documents: DossierDocument[] = docIds.map((id) => {
     const docType = classified[id] || 'document';
@@ -44,27 +56,33 @@ function toLoanApplication(
 
     return {
       id,
-      name: getDocumentTitle(id, docType),
+      name: filenames[id] || getDocumentTitle(id, docType),
       document_type: mappedType,
-      page_count: (state as any).document_pages?.[id] ?? (mappedType === 'APPLICATION_FORM' ? 2 : mappedType === 'BANK_STATEMENT' ? 3 : 1),
-      ocr_route: (state as any).ocr_routes?.[id] ?? (docType.includes('id') || docType.includes('pan') ? 'paddle' : 'native'),
-      verified: true,
+      // Undefined rather than a fabricated default: the pane omits the badge
+      // until perception reports a real value.
+      page_count: pageCounts[id],
+      ocr_route: ocrRoutes[id],
+      verified: citedDocIds.has(id),
     } as DossierDocument;
   });
 
   const history = state.status_history || [];
   const liveApp = liveApps?.find((a) => a.application_id === state.application_id);
-  const loanAmount = (state as any).loan_amount ?? liveApp?.loan_amount ?? 2500000;
+  const loanAmount = state.loan_amount ?? liveApp?.loan_amount;
 
   return {
     id: state.application_id,
-    applicant_name: state.applicant?.full_name || 'Applicant',
+    applicant_name: state.applicant?.full_name || liveApp?.applicant_name || 'Applicant',
     pan_masked: state.applicant?.pan_number || '—',
     loan_amount: loanAmount,
     currency: 'INR',
     status: state.status,
-    created_at: history[0]?.timestamp || new Date().toISOString(),
+    // No history yet means no known clock start. `new Date()` here restarted the
+    // SLA timer on every 2s poll; undefined lets SlaTimer show "not started".
+    created_at: history[0]?.timestamp || liveApp?.created_at,
     updated_at: history.length > 0 ? history[history.length - 1].timestamp : undefined,
+    missing_documents: state.missing_documents || [],
+    summary_grounded: !!state.summary_grounded,
     documents,
     findings: state.findings || [],
     payslip_facts: state.payslip || undefined,
@@ -111,6 +129,10 @@ function AppInner({
   });
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [notification, setNotification] = useState<string | null>(null);
+  // Non-dismissable: a dossier we could not refresh must stay visibly stale.
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [appsLoading, setAppsLoading] = useState<boolean>(false);
+  const [activeJob, setActiveJob] = useState<JobStatusResponse | null>(null);
 
   // Modal state
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
@@ -118,19 +140,26 @@ function AppInner({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isNewAppModalOpen, setIsNewAppModalOpen] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [mobilePane, setMobilePane] = useState<'documents' | 'viewer' | 'inspector'>('viewer');
 
-  const { user, mode, isLoading: authLoading } = useAuth();
-  const [liveApps, setLiveApps] = useState<Array<{ application_id: string; applicant_name: string; status: string }>>([]);
+  const { user, isLoading: authLoading } = useAuth();
+  const [liveApps, setLiveApps] = useState<DashboardApp[]>([]);
+  const [backendError, setBackendError] = useState<string | null>(null);
 
   const refreshLiveApps = useCallback(async () => {
+    setAppsLoading(true);
     try {
       const apps = await api.listApplications();
       if (Array.isArray(apps)) {
         setLiveApps(apps);
+        setBackendError(null);
         // Dashboard-first: do NOT auto-pick apps[0]; user opens explicitly.
       }
-    } catch {
-      // Backend offline or unreachable
+    } catch (err) {
+      // An unreachable backend must be stated, not shown as "no dossiers yet".
+      setBackendError(err instanceof Error ? err.message : 'Backend unreachable');
+    } finally {
+      setAppsLoading(false);
     }
   }, []);
 
@@ -159,38 +188,44 @@ function AppInner({
 
   const fetchApplicationData = useCallback(async (isPolling = false) => {
     if (!selectedAppId) return;
-    if (!isPolling) setIsLoading(true);
-    try {
-      // 1. Try to fetch from live backend API first
-      try {
-        const liveState = await api.getApplication(selectedAppId);
-        if (liveState && liveState.application_id) {
-          setDossierState(liveState as LoanApplicationState);
-          if (liveState.document_ids && liveState.document_ids.length > 0 && !selectedDocId) {
-            onSelectDoc(liveState.document_ids[0]);
-          }
-          if (!isPolling) {
-            setNotification(`Live dossier loaded: ${selectedAppId} (${liveState.applicant?.full_name || 'Underwriting'})`);
-          }
-          return;
-        }
-      } catch {
-        // Fall back to demo preset if backend doesn't have this application
-      }
 
-      // 2. Load demo preset for the chosen archetype
-      const dossier = getDemoDossier(selectedAppId);
+    // Offline archetypes are explicit, not a fallback. A live dossier NEVER
+    // silently resolves to preset data — showing one applicant's findings under
+    // another applicant's id is how a real loan gets signed off on fabricated
+    // evidence.
+    if (isDemoDossierId(selectedAppId)) {
+      const dossier = getDemoDossier(selectedAppId)!;
       setDossierState(dossier);
+      setLoadError(null);
       if (dossier.document_ids && dossier.document_ids.length > 0 && !selectedDocId) {
         onSelectDoc(dossier.document_ids[0]);
       }
+      if (!isPolling) setNotification(`Demo preset loaded: ${selectedAppId}`);
+      return;
+    }
+
+    if (!isPolling) setIsLoading(true);
+    try {
+      const liveState = await api.getApplication(selectedAppId);
+      if (!liveState || !liveState.application_id) {
+        throw new Error('Backend returned an empty dossier');
+      }
+      setDossierState(liveState as LoanApplicationState);
+      setLoadError(null);
+      if (liveState.document_ids && liveState.document_ids.length > 0 && !selectedDocId) {
+        onSelectDoc(liveState.document_ids[0]);
+      }
       if (!isPolling) {
-        setNotification(`Demo preset loaded: ${selectedAppId}`);
+        setNotification(
+          `Live dossier loaded: ${selectedAppId} (${liveState.applicant?.full_name || liveState.applicant_name || 'Underwriting'})`
+        );
       }
     } catch (err) {
-      if (!isPolling) {
-        setNotification(err instanceof Error ? err.message : 'Failed to fetch application');
-      }
+      const msg = err instanceof Error ? err.message : 'Failed to fetch application';
+      // Surface the outage instead of substituting data. Polling errors update
+      // the banner too, so a backend that dies mid-review is visible.
+      setLoadError(msg);
+      if (!isPolling) setNotification(msg);
     } finally {
       if (!isPolling) setIsLoading(false);
     }
@@ -202,7 +237,8 @@ function AppInner({
     }
   }, [selectedAppId, fetchApplicationData]);
 
-  // Live polling: automatically poll backend every 2s while job is QUEUED or PROCESSING
+  // Live polling while a job is in flight. 3s keeps us inside
+  // MAX_STATUS_POLLS_PER_MIN (30) for the rate-limited /jobs endpoint.
   useEffect(() => {
     const isQueuedOrProcessing = dossierState.status === 'QUEUED' || dossierState.status === 'PROCESSING';
     if (!isQueuedOrProcessing) return;
@@ -210,10 +246,48 @@ function AppInner({
     const interval = setInterval(() => {
       fetchApplicationData(true);
       refreshLiveApps();
-    }, 2000);
+    }, 3000);
 
     return () => clearInterval(interval);
   }, [dossierState.status, fetchApplicationData, refreshLiveApps]);
+
+  // Job-status polling: the application row alone cannot distinguish "still
+  // working" from "the worker died", so poll the authoritative JobModel and
+  // surface attempt count + error_message.
+  useEffect(() => {
+    if (!activeJob) return;
+    if (activeJob.status !== 'QUEUED' && activeJob.status !== 'PROCESSING') return;
+
+    let cancelled = false;
+    const interval = setInterval(async () => {
+      try {
+        const status = await api.getJobStatus(activeJob.job_id);
+        if (cancelled) return;
+        setActiveJob(status);
+        if (status.status === 'FAILED' || status.status === 'CANCELLED') {
+          setNotification(
+            `Job ${status.job_id} ${status.status.toLowerCase()}${
+              status.error_message ? `: ${status.error_message}` : ''
+            }`
+          );
+          fetchApplicationData(true);
+        }
+      } catch {
+        // Transient poll failure: the dossier poll above is the safety net.
+      }
+    }, 3000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [activeJob, fetchApplicationData]);
+
+  // Dropping a dossier drops its job tracking with it.
+  useEffect(() => {
+    setActiveJob(null);
+    setLoadError(null);
+  }, [selectedAppId]);
 
   const handleSelectDoc = (docId: string) => {
     onSelectDoc(docId);
@@ -248,33 +322,44 @@ function AppInner({
     setReviewDecision(decision);
   };
 
-  const handleSubmitReview = async (notes: string) => {
+  const handleSubmitReview = async (notes: string, confirmAppId: string) => {
     if (!reviewDecision) return;
     setIsSubmitting(true);
     try {
-      try {
-        await api.submitReview(selectedAppId, {
-          decision: reviewDecision,
-          reviewer_id: user?.email || 'underwriter-bhanu',
-          notes,
-          corrections: [],
-        });
-        await fetchApplicationData();
-        refreshLiveApps();
-        setNotification(`Review submitted: ${reviewDecision} (persisted to PostgreSQL)`);
-      } catch {
-        // Offline fallback for demo presets
+      // Offline archetypes are local by definition: mutate the preset and say so.
+      if (isDemoDossierId(selectedAppId)) {
         setDossierState((prev) => ({
           ...prev,
           status: reviewDecision === 'NEEDS_INFO' ? 'NEEDS_INFORMATION' : 'REVIEWED',
           reviewer_decision: reviewDecision,
           reviewer_notes: notes,
         }));
-        setNotification(`Review updated (preset): ${reviewDecision}`);
+        setNotification(`Preset dossier marked ${reviewDecision} locally — not persisted.`);
+        setReviewDecision(null);
+        return;
       }
+
+      // Live dossier: a failure here is a failure, full stop. Faking a local
+      // REVIEWED state told the underwriter a rejected 409/400/401 had been
+      // recorded in the audit trail when nothing was written.
+      await api.submitReview(selectedAppId, {
+        decision: reviewDecision,
+        reviewer_id: user?.email || 'underwriter',
+        notes,
+        // Server re-checks the dossier-ID challenge; client-side friction alone
+        // is bypassable from the console.
+        confirm_app_id: confirmAppId,
+        corrections: [],
+      });
+      await fetchApplicationData();
+      refreshLiveApps();
+      setNotification(`Review submitted: ${reviewDecision} (persisted to PostgreSQL)`);
       setReviewDecision(null);
     } catch (err) {
-      setNotification(err instanceof Error ? err.message : 'Error submitting review');
+      // Re-thrown so the modal stays open and renders the reason inline.
+      const msg = err instanceof Error ? err.message : 'Error submitting review';
+      setNotification(msg);
+      throw err;
     } finally {
       setIsSubmitting(false);
     }
@@ -334,7 +419,15 @@ function AppInner({
     setIsProcessing(true);
     try {
       const res = await api.processApplication(selectedAppId);
-      setNotification(`Pipeline enqueued for ${selectedAppId} (Job: ${res.job_id}). Polling status...`);
+      // Track the job itself, so a worker-side failure surfaces as an error with
+      // a reason instead of an endless "processing" spinner.
+      setActiveJob({
+        job_id: res.job_id,
+        application_id: res.application_id,
+        status: res.status,
+        attempt_count: 1,
+      });
+      setNotification(`Pipeline enqueued for ${selectedAppId} (Job: ${res.job_id}).`);
       await fetchApplicationData();
       refreshLiveApps();
     } catch (err) {
@@ -343,6 +436,19 @@ function AppInner({
       setIsProcessing(false);
     }
   };
+
+  const handleCancelJob = useCallback(async () => {
+    if (!activeJob) return;
+    try {
+      await api.cancelJob(activeJob.job_id);
+      setNotification(`Job ${activeJob.job_id} cancelled.`);
+      setActiveJob(null);
+      await fetchApplicationData();
+      refreshLiveApps();
+    } catch (err) {
+      setNotification(err instanceof Error ? err.message : 'Failed to cancel job');
+    }
+  }, [activeJob, fetchApplicationData, refreshLiveApps]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -416,27 +522,36 @@ function AppInner({
     dossierState.classified_types?.[selectedDocId]
   );
 
-  const isDemoPreset = ['APP-25195', 'APP-68210', 'APP-10492'].includes(selectedAppId);
-  // Guard empty app/doc + use same-origin relative URL (Vite proxy in dev,
-  // FastAPI-served dist in prod). encodeURIComponent prevents path breakage.
-  // Falls through to `unavailable` empty state instead of pdf.js MissingPDF.
-  const pdfSource =
-    selectedAppId && selectedDocId
-      ? `/applications/${encodeURIComponent(selectedAppId)}/documents/${encodeURIComponent(selectedDocId)}`
-      : undefined;
+  const isDemoPreset = isDemoDossierId(selectedAppId);
+  const flagCount = (dossierState.findings || []).filter((f) => f.verdict === 'flag').length;
+  // Guard empty app/doc: the viewer fetches through the authenticated API
+  // client, and falls through to the `unavailable` empty state rather than
+  // pdf.js MissingPDF. Demo archetypes have no backend document route, so
+  // leaving this undefined lets the viewer generate the synthetic preset PDF.
+  const pdfSource = useMemo(
+    () =>
+      !isDemoPreset && selectedAppId && selectedDocId
+        ? { applicationId: selectedAppId, documentId: selectedDocId }
+        : undefined,
+    [isDemoPreset, selectedAppId, selectedDocId]
+  );
 
   // Real loan-app start: dashboard first when no dossier selected.
   if (!selectedAppId) {
-    if (mode === 'google' && !user && !authLoading) {
+    // Signed out is signed out in both modes. Gating this on google-only left
+    // mock-mode Logout as a dead end with no way back in short of a reload.
+    if (!user && !authLoading) {
       return <LoginPage onLoggedIn={() => refreshLiveApps()} />;
     }
     return (
       <div className="h-screen w-screen flex flex-col bg-theme-app overflow-hidden">
-        {mode === 'google' && authLoading ? (
+        {authLoading ? (
           <div className="m-auto text-xs text-theme-muted">Verifying session…</div>
         ) : (
           <DashboardPage
             apps={liveApps}
+            isLoading={appsLoading}
+            backendError={backendError}
             onRefresh={refreshLiveApps}
             onOpen={(id) => handleSelectAppId(id)}
             onNew={() => setIsNewAppModalOpen(true)}
@@ -470,6 +585,7 @@ function AppInner({
         onSelectAppId={handleSelectAppId}
         status={application.status}
         createdAt={application.created_at}
+        updatedAt={application.updated_at}
         onOpenShortcuts={() => setShortcutsOpen(true)}
         liveApplications={liveApps}
         onRefresh={refreshLiveApps}
@@ -489,6 +605,26 @@ function AppInner({
         </div>
       )}
 
+      {/* Stale-dossier banner: stays until a refresh succeeds, because acting on
+          a dossier we could not re-read is the risk we are guarding against. */}
+      {loadError && (
+        <div
+          role="alert"
+          className="bg-theme-flag-bg border-b border-theme-flag-border text-theme-flag text-[11px] font-mono px-4 py-1.5 flex items-center justify-between gap-3 shrink-0"
+        >
+          <span className="truncate">
+            Dossier not refreshed — showing last known state. {loadError}
+          </span>
+          <button
+            type="button"
+            onClick={() => fetchApplicationData()}
+            className="shrink-0 px-2 py-0.5 rounded-xs border border-theme-flag-border hover:bg-theme-card"
+          >
+            Retry
+          </button>
+        </div>
+      )}
+
       {/* Notification Toast (theme-aware) */}
       {notification && (
         <div className="bg-theme-card border-b border-theme-border text-theme-primary text-xs px-4 py-1.5 flex items-center justify-between shrink-0">
@@ -502,21 +638,27 @@ function AppInner({
         </div>
       )}
 
-      {/* Three-Pane Swiss Reviewer Workspace Layout */}
+      {/* Three-Pane Swiss Reviewer Workspace Layout.
+          Below lg the panes become a single switched view rather than
+          disappearing — the inspector holds findings and sign-off, so hiding it
+          removed the entire review workflow on anything narrower than a laptop. */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Left Pane: Dossier Documents (hidden on small, overlay via drawer pattern) */}
-        <div className="hidden md:block shrink-0">
+        {/* Left Pane: Dossier Documents */}
+        <div className={`${mobilePane === 'documents' ? 'flex' : 'hidden'} lg:block shrink-0 w-full lg:w-auto`}>
           <LeftDossierPane
             application={application}
             activeDocId={selectedDocId}
-            onSelectDocId={handleSelectDoc}
+            onSelectDocId={(docId) => {
+              handleSelectDoc(docId);
+              setMobilePane('viewer');
+            }}
             onUploadDocument={handleUploadDocument}
             width={280}
           />
         </div>
 
         {/* Center Pane: PDF.js Viewer */}
-        <div className="flex-1 h-full min-w-0">
+        <div className={`${mobilePane === 'viewer' ? 'block' : 'hidden'} lg:block flex-1 h-full min-w-0`}>
           <PdfViewer
             docId={selectedDocId}
             docTitle={currentDocTitle}
@@ -525,8 +667,8 @@ function AppInner({
           />
         </div>
 
-        {/* Right Pane: Inspector (collapses below lg) */}
-        <div className="hidden lg:block shrink-0">
+        {/* Right Pane: Inspector */}
+        <div className={`${mobilePane === 'inspector' ? 'block' : 'hidden'} lg:block shrink-0 w-full lg:w-auto`}>
           <RightInspectorPane
             application={application}
             activeEvidenceKey={activeEvidenceKey}
@@ -537,10 +679,36 @@ function AppInner({
             onProcessDossier={handleProcessDossier}
             isProcessing={isProcessing}
             inspectedKeys={inspectedKeys}
+            activeJob={activeJob}
+            onCancelJob={handleCancelJob}
+            isReadOnlyPreset={isDemoPreset}
             width={390}
           />
         </div>
       </div>
+
+      {/* Mobile/tablet pane switcher */}
+      <nav className="lg:hidden border-t border-theme-border bg-theme-panel grid grid-cols-3 shrink-0">
+        {([
+          ['documents', `Documents (${application.documents.length})`],
+          ['viewer', 'Viewer'],
+          ['inspector', `Inspector${flagCount > 0 ? ` (${flagCount})` : ''}`],
+        ] as const).map(([pane, label]) => (
+          <button
+            key={pane}
+            type="button"
+            onClick={() => setMobilePane(pane)}
+            aria-current={mobilePane === pane}
+            className={`py-2.5 text-[11px] font-mono font-bold border-r border-theme-border last:border-r-0 transition-colors ${
+              mobilePane === pane
+                ? 'bg-theme-card text-theme-primary'
+                : 'text-theme-muted hover:text-theme-primary'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </nav>
 
       {/* Keyboard Shortcuts Modal */}
       <KeyboardShortcutsModal

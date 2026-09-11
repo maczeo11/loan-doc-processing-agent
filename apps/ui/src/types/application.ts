@@ -46,12 +46,17 @@ export interface TaxReturnFacts {
   total_tax_paid?: MoneyFact | null;
 }
 
+export type OcrRoute = 'native' | 'ocr' | 'paddle' | 'textract';
+
 export interface DossierDocument {
   id: string;
   name: string;
   document_type: string;
-  page_count: number;
-  ocr_route: 'native' | 'paddle' | 'textract';
+  /** Real page count from perception; undefined until it is actually known. */
+  page_count?: number;
+  /** Route that produced the text layer; undefined until perception has run. */
+  ocr_route?: OcrRoute;
+  /** True only when a finding cites this document as supporting evidence. */
   verified: boolean;
 }
 
@@ -59,13 +64,17 @@ export interface LoanApplication {
   id: string;
   applicant_name: string;
   pan_masked: string;
-  loan_amount: number;
+  /** Undefined when the backend has not supplied an amount — never defaulted. */
+  loan_amount?: number;
   currency: string;
   status: ApplicationStatus;
-  created_at: string;
+  /** Undefined until a status transition establishes the clock start. */
+  created_at?: string;
   updated_at?: string;
   documents: DossierDocument[];
   findings: Finding[];
+  missing_documents?: string[];
+  summary_grounded?: boolean;
   payslip_facts?: PayslipFacts;
   bank_facts?: BankStatementFacts;
   tax_facts?: TaxReturnFacts;

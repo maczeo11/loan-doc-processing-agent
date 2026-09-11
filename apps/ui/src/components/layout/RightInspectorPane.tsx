@@ -2,11 +2,27 @@ import React, { useState } from 'react';
 import { LoanApplication } from '../../types/application';
 import { EvidenceRef } from '../../types/evidence';
 import { ReviewDecision } from '../../types/api';
+import { JobStatusResponse } from '../../types/contracts';
 import { FindingCard } from '../review/FindingCard';
 import { FactsTab } from '../review/FactsTab';
 import { MemoNarrativeTab } from '../review/MemoNarrativeTab';
 import { PolicyQaTab } from '../review/PolicyQaTab';
-import { ShieldCheck, Table, FileText, BookOpen, CheckCircle, AlertTriangle, HelpCircle, Play, Loader2 } from 'lucide-react';
+import { AuditTrailTab } from '../review/AuditTrailTab';
+import { getEvidenceKey } from '../../utils/coordinates';
+import {
+  ShieldCheck,
+  Table,
+  FileText,
+  BookOpen,
+  History,
+  CheckCircle,
+  AlertTriangle,
+  HelpCircle,
+  Play,
+  Loader2,
+  XCircle,
+  FileWarning,
+} from 'lucide-react';
 
 interface RightInspectorPaneProps {
   application: LoanApplication;
@@ -18,10 +34,21 @@ interface RightInspectorPaneProps {
   onProcessDossier?: () => Promise<void>;
   isProcessing?: boolean;
   inspectedKeys?: Set<string>;
+  activeJob?: JobStatusResponse | null;
+  onCancelJob?: () => void;
+  isReadOnlyPreset?: boolean;
   width: number;
 }
 
-type TabType = 'findings' | 'facts' | 'cam' | 'policy';
+type TabType = 'findings' | 'facts' | 'cam' | 'policy' | 'audit';
+
+const REQUIRED_DOC_LABELS: Record<string, string> = {
+  application_form: 'Application Form',
+  payslip: 'Payslip',
+  bank_statement: 'Bank Statement',
+  tax_acknowledgement: 'Tax Acknowledgement (ITR-V)',
+  id_card: 'KYC / ID Proof',
+};
 
 export const RightInspectorPane: React.FC<RightInspectorPaneProps> = ({
   application,
@@ -32,6 +59,10 @@ export const RightInspectorPane: React.FC<RightInspectorPaneProps> = ({
   onTriggerAction,
   onProcessDossier,
   isProcessing = false,
+  inspectedKeys,
+  activeJob,
+  onCancelJob,
+  isReadOnlyPreset = false,
   width,
 }) => {
   const [activeTab, setActiveTab] = useState<TabType>('findings');
@@ -39,6 +70,15 @@ export const RightInspectorPane: React.FC<RightInspectorPaneProps> = ({
   const flagCount = application.findings.filter((f) => f.verdict === 'flag').length;
   const passCount = application.findings.filter((f) => f.verdict === 'pass').length;
   const unknownCount = application.findings.filter((f) => f.verdict === 'unknown').length;
+  const missingDocuments = application.missing_documents || [];
+
+  // Flagged findings the reviewer has not yet opened the evidence for. This is
+  // the signal `inspectedKeys` was always collected for but never displayed.
+  const uninspectedFlags = application.findings.filter(
+    (f) =>
+      f.verdict === 'flag' &&
+      !(f.supporting_evidence || []).some((ev) => inspectedKeys?.has(getEvidenceKey(ev)))
+  ).length;
   // Sign-off unlocks ONLY on a reviewed-ready dossier with findings present.
   // Backend enforces the same (409 unless READY_FOR_REVIEW); this mirrors it
   // so the underwriter can never authorize from UPLOADED/QUEUED/PROCESSING
@@ -53,9 +93,10 @@ export const RightInspectorPane: React.FC<RightInspectorPaneProps> = ({
       style={{ width: `${width}px` }}
       className="h-full flex-none flex flex-col border-l border-theme-border bg-theme-panel select-none overflow-hidden transition-colors duration-200"
     >
-      {/* Tab Navigation Header */}
-      <div className="h-11 min-h-[44px] border-b border-theme-border bg-theme-header px-2 flex items-center justify-between">
-        <div className="flex items-center gap-1">
+      {/* Tab Navigation Header. Scrolls horizontally rather than overflowing:
+          five tabs do not fit a 390px pane at full label width. */}
+      <div className="h-11 min-h-[44px] border-b border-theme-border bg-theme-header px-2 flex items-center overflow-x-auto">
+        <div className="flex items-center gap-1 shrink-0">
           <button
             onClick={() => setActiveTab('findings')}
             className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xs text-xs font-mono font-bold transition-all ${
@@ -108,6 +149,18 @@ export const RightInspectorPane: React.FC<RightInspectorPaneProps> = ({
             <BookOpen className="w-3.5 h-3.5 text-theme-secondary" />
             <span>Policy RAG</span>
           </button>
+
+          <button
+            onClick={() => setActiveTab('audit')}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xs text-xs font-mono font-bold transition-all ${
+              activeTab === 'audit'
+                ? 'bg-theme-card text-theme-primary border border-theme-border shadow-xs'
+                : 'text-theme-muted hover:text-theme-primary hover:bg-theme-panel'
+            }`}
+          >
+            <History className="w-3.5 h-3.5 text-theme-secondary" />
+            <span>Audit</span>
+          </button>
         </div>
       </div>
 
@@ -115,14 +168,46 @@ export const RightInspectorPane: React.FC<RightInspectorPaneProps> = ({
       <div className="flex-1 overflow-y-auto p-3.5 bg-theme-card">
         {activeTab === 'findings' && (
           <div className="space-y-3">
+            {/* Terminal failure: the dossier stopped, and the reason is shown.
+                Previously a failed job left the card spinning forever. */}
+            {application.status === 'FAILED' && (
+              <div className="p-3.5 rounded-xs bg-theme-flag-bg border border-theme-flag-border space-y-2">
+                <div className="flex items-center gap-2 text-xs font-mono font-bold uppercase tracking-wider text-theme-flag">
+                  <XCircle className="w-4 h-4" />
+                  <span>Pipeline Failed</span>
+                </div>
+                <p className="text-[11px] text-theme-secondary leading-relaxed">
+                  {activeJob?.error_message ||
+                    'The verification pipeline could not complete. Check worker logs, then re-upload or retry.'}
+                </p>
+                {activeJob && (
+                  <p className="text-[10px] font-mono text-theme-muted">
+                    Job {activeJob.job_id} · attempt {activeJob.attempt_count}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {application.status === 'CANCELLED' && (
+              <div className="p-3.5 rounded-xs bg-theme-panel border border-theme-border space-y-1.5">
+                <div className="flex items-center gap-2 text-xs font-mono font-bold uppercase tracking-wider text-theme-secondary">
+                  <XCircle className="w-4 h-4" />
+                  <span>Processing Cancelled</span>
+                </div>
+                <p className="text-[11px] text-theme-secondary leading-relaxed">
+                  This dossier's verification job was cancelled. Create a new dossier to run it again.
+                </p>
+              </div>
+            )}
+
             {/* Pipeline Trigger Card for newly uploaded or processing applications */}
             {(application.status === 'UPLOADED' || application.status === 'QUEUED' || application.status === 'PROCESSING') && (
               <div className="p-3.5 rounded-xs bg-theme-unknown-bg border border-theme-unknown-border space-y-2.5">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between gap-2">
                   <span className="text-xs font-mono font-bold uppercase tracking-wider text-theme-unknown">
                     Dossier Processing Pipeline
                   </span>
-                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-xs bg-theme-card border border-theme-unknown-border text-theme-unknown">
+                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-xs bg-theme-card border border-theme-unknown-border text-theme-unknown shrink-0">
                     {application.status}
                   </span>
                 </div>
@@ -134,9 +219,16 @@ export const RightInspectorPane: React.FC<RightInspectorPaneProps> = ({
                 {application.status === 'UPLOADED' && onProcessDossier && (
                   <button
                     type="button"
-                    disabled={isProcessing}
+                    disabled={isProcessing || isReadOnlyPreset || application.documents.length === 0}
                     onClick={() => onProcessDossier()}
-                    className="w-full py-2 px-3 rounded-xs text-xs font-mono font-bold bg-theme-unknown hover:opacity-90 text-white flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer disabled:opacity-50"
+                    title={
+                      isReadOnlyPreset
+                        ? 'Offline preset — nothing to process on the backend'
+                        : application.documents.length === 0
+                          ? 'Upload at least one document first'
+                          : 'Run the deterministic verification pipeline'
+                    }
+                    className="w-full py-2 px-3 rounded-xs text-xs font-mono font-bold bg-theme-unknown hover:opacity-90 text-white flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {isProcessing ? (
                       <>
@@ -152,11 +244,47 @@ export const RightInspectorPane: React.FC<RightInspectorPaneProps> = ({
                   </button>
                 )}
                 {(application.status === 'QUEUED' || application.status === 'PROCESSING') && (
-                  <div className="flex items-center gap-2 text-xs font-mono text-theme-unknown pt-1">
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    <span>Worker actively processing pipeline...</span>
+                  <div className="space-y-2 pt-1">
+                    <div className="flex items-center gap-2 text-xs font-mono text-theme-unknown">
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Worker processing pipeline…</span>
+                    </div>
+                    {activeJob && (
+                      <p className="text-[10px] font-mono text-theme-muted">
+                        Job {activeJob.job_id} · status {activeJob.status} · attempt{' '}
+                        {activeJob.attempt_count}
+                      </p>
+                    )}
+                    {onCancelJob && activeJob && (
+                      <button
+                        type="button"
+                        onClick={onCancelJob}
+                        className="w-full py-1.5 px-3 rounded-xs text-[11px] font-mono font-bold bg-theme-card hover:bg-theme-panel text-theme-secondary hover:text-theme-primary border border-theme-border transition-colors cursor-pointer"
+                      >
+                        Cancel job
+                      </button>
+                    )}
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* Missing required documents: computed by the pipeline and, until
+                now, never shown to the person accountable for the decision. */}
+            {missingDocuments.length > 0 && (
+              <div className="p-3 rounded-xs bg-theme-unknown-bg border border-theme-unknown-border space-y-1.5">
+                <div className="flex items-center gap-2 text-xs font-mono font-bold uppercase tracking-wider text-theme-unknown">
+                  <FileWarning className="w-3.5 h-3.5" />
+                  <span>Missing Documents ({missingDocuments.length})</span>
+                </div>
+                <ul className="text-[11px] text-theme-secondary space-y-0.5">
+                  {missingDocuments.map((doc) => (
+                    <li key={doc} className="flex items-center gap-1.5">
+                      <span className="text-theme-unknown select-none">•</span>
+                      <span>{REQUIRED_DOC_LABELS[doc] || doc.replace(/_/g, ' ')}</span>
+                    </li>
+                  ))}
+                </ul>
               </div>
             )}
 
@@ -180,6 +308,12 @@ export const RightInspectorPane: React.FC<RightInspectorPaneProps> = ({
                     ? 'All checks verified. Ready for underwriter sign-off below.'
                     : 'Resolve flagged items or request information before signing.'}
               </p>
+              {uninspectedFlags > 0 && (
+                <p className="text-[10px] text-theme-flag font-mono mt-1">
+                  {uninspectedFlags} flagged {uninspectedFlags === 1 ? 'finding has' : 'findings have'} unopened
+                  evidence — press Enter or click a citation to review.
+                </p>
+              )}
               {application.updated_at && (
                 <p className="text-[10px] text-theme-muted font-mono mt-1">
                   State as of {new Date(application.updated_at).toLocaleString()}
@@ -227,10 +361,20 @@ export const RightInspectorPane: React.FC<RightInspectorPaneProps> = ({
           <FactsTab application={application} onSelectEvidence={onSelectEvidence} />
         )}
 
-        {activeTab === 'cam' && <MemoNarrativeTab application={application} />}
+        {activeTab === 'cam' && (
+          <MemoNarrativeTab application={application} isReadOnlyPreset={isReadOnlyPreset} />
+        )}
 
         {activeTab === 'policy' && (
-          <PolicyQaTab applicationId={application.id} onSelectEvidence={onSelectEvidence} />
+          <PolicyQaTab
+            applicationId={application.id}
+            onSelectEvidence={onSelectEvidence}
+            isReadOnlyPreset={isReadOnlyPreset}
+          />
+        )}
+
+        {activeTab === 'audit' && (
+          <AuditTrailTab applicationId={application.id} isReadOnlyPreset={isReadOnlyPreset} />
         )}
       </div>
 

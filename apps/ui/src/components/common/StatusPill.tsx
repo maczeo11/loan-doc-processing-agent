@@ -1,6 +1,6 @@
 import React from 'react';
 import { ApplicationStatus } from '../../types/application';
-import { CheckCircle2, AlertCircle, HelpCircle, Loader2, XCircle, Clock } from 'lucide-react';
+import { CheckCircle2, AlertCircle, HelpCircle, Loader2, XCircle, Clock, FileUp, Ban } from 'lucide-react';
 
 /**
  * Ledger accent families. Every pill resolves to one of these four so the
@@ -39,10 +39,25 @@ const STATUS_SPECS: Partial<Record<ApplicationStatus, StatusSpec>> = {
     label: 'Ready for Review',
     icon: <PulseDot />,
   },
+  UPLOADED: {
+    accent: 'neutral',
+    label: 'Uploaded',
+    icon: <FileUp className="w-3.5 h-3.5 text-theme-muted" />,
+  },
+  QUEUED: {
+    accent: 'neutral',
+    label: 'Queued',
+    icon: <Clock className="w-3.5 h-3.5 text-theme-muted" />,
+  },
   PROCESSING: {
     accent: 'neutral',
     label: 'Processing',
     icon: <Loader2 className="w-3.5 h-3.5 animate-spin text-theme-muted" />,
+  },
+  CANCELLED: {
+    accent: 'neutral',
+    label: 'Cancelled',
+    icon: <Ban className="w-3.5 h-3.5 text-theme-muted" />,
   },
   REVIEWED: {
     accent: 'pass',
@@ -67,7 +82,8 @@ interface StatusPillProps {
 }
 
 export const StatusPill: React.FC<StatusPillProps> = ({ status, className = '' }) => {
-  // QUEUED / UPLOADED and any future status fall back to the neutral clock.
+  // Every ApplicationStatus has a spec; this covers unknown values from an
+  // older or newer backend rather than printing a raw enum next to prose labels.
   const spec: StatusSpec = STATUS_SPECS[status] ?? {
     accent: 'neutral',
     label: status,

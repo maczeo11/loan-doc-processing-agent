@@ -8,7 +8,8 @@ interface ReviewActionModalProps {
   decision: ReviewDecision | null;
   applicationId: string;
   onClose: () => void;
-  onSubmit: (notes: string) => Promise<void>;
+  /** Receives the typed dossier-ID challenge so the server can re-enforce it. */
+  onSubmit: (notes: string, confirmAppId: string) => Promise<void>;
   isSubmitting: boolean;
 }
 
@@ -81,7 +82,13 @@ export const ReviewActionModal: React.FC<ReviewActionModalProps> = ({
       return;
     }
     setError(null);
-    await onSubmit(notes);
+    try {
+      await onSubmit(notes, confirmText.trim());
+    } catch (err) {
+      // The modal stays open on a rejected sign-off so the reviewer sees why,
+      // instead of the dossier appearing sealed when nothing was recorded.
+      setError(err instanceof Error ? err.message : 'Failed to record decision');
+    }
   };
 
   return (

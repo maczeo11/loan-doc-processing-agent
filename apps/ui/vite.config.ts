@@ -10,6 +10,9 @@ export default defineConfig({
       '/applications': 'http://localhost:8000',
       '/jobs': 'http://localhost:8000',
       '/health': 'http://localhost:8000',
+      // Without this, /auth/google, /auth/me and /auth/logout hit the Vite dev
+      // server and return index.html — Google sign-in could never work in dev.
+      '/auth': 'http://localhost:8000',
     },
   },
   build: {

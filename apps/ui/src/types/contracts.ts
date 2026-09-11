@@ -113,6 +113,19 @@ export interface LoanApplicationState {
   document_ids?: string[];
   document_manifest?: Record<string, string>;
   classified_types?: Record<string, string>;
+  /** Real filename as uploaded (doc_id -> filename). */
+  document_filenames?: Record<string, string>;
+  /** Observed page count per document (doc_id -> pages). */
+  document_pages?: Record<string, number>;
+  /** Route that produced the text layer (doc_id -> 'native' | 'ocr'). */
+  ocr_routes?: Record<string, 'native' | 'ocr'>;
+  /** Set on the relational model, echoed into state responses. */
+  loan_amount?: number;
+  loan_purpose?: string | null;
+  applicant_name?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  reviewer_id?: string | null;
 
   // Extracted facts
   applicant?: ApplicantFact | null;
@@ -176,6 +189,11 @@ export interface ReviewDecisionRequest {
   reviewer_id: string;
   notes?: string | null;
   corrections?: Array<Record<string, unknown>>;
+  /**
+   * Dossier-ID challenge the reviewer typed. Sent so the server re-enforces the
+   * dual-sign gate; client-side validation alone is bypassable.
+   */
+  confirm_app_id?: string;
 }
 
 export interface ReviewDecisionResponse {
@@ -214,4 +232,16 @@ export interface QuestionResponse {
 export interface ExportResponse {
   application_id: string;
   export_format: string;
+}
+
+/** One append-only row of the dossier's audit trail. */
+export interface AuditEvent {
+  id: string;
+  application_id: string;
+  from_status: string;
+  to_status: string;
+  actor: string;
+  decision?: string | null;
+  notes?: string | null;
+  timestamp?: string | null;
 }

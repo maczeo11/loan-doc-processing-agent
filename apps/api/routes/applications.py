@@ -162,6 +162,14 @@ async def get_application(
     state = dict(app_model.state_json or {})
     state["application_id"] = app_model.id
     state["status"] = app_model.status
+    # Relational columns the pipeline never writes into state_json, but which
+    # the reviewer UI needs (loan amount, applicant of record, clock start).
+    state["loan_amount"] = app_model.loan_amount
+    state["loan_purpose"] = app_model.loan_purpose
+    state["applicant_name"] = app_model.applicant_name
+    state["created_at"] = app_model.created_at.isoformat() if app_model.created_at else None
+    state["updated_at"] = app_model.updated_at.isoformat() if app_model.updated_at else None
+    state["reviewer_id"] = app_model.reviewer_id
     return state
 
 
@@ -245,17 +253,45 @@ async def trigger_processing(
     user_id = resolve_user_identity(request)
     job_id = f"JOB-{uuid.uuid4().hex[:8].upper()}"
 
+    async def resolve_finished_job_ids(candidate_ids) -> set[str]:
+        """
+        Which reserved jobs have already finished, per the authoritative JobModel.
+
+        Nothing released a slot on successful completion, so a finished job kept
+        occupying one until the reservation TTL lapsed.
+        """
+        candidates = [str(c) for c in candidate_ids]
+        if not candidates:
+            return set()
+        rows = (
+            await session.execute(
+                select(JobModel.id, JobModel.status).where(JobModel.id.in_(candidates))
+            )
+        ).all()
+        known = {row.id: row.status for row in rows}
+        finished = {
+            jid
+            for jid in candidates
+            # An id Redis holds but the DB has never seen is stale too.
+            if known.get(jid, "MISSING") not in ("QUEUED", "PROCESSING")
+        }
+        return finished
+
     slot_reserved = await reserve_active_job_slot(
         redis_client=redis_client,
         user_id=user_id,
         job_id=job_id,
         max_active=settings.MAX_ACTIVE_JOBS_PER_USER,
         ttl_seconds=settings.SPEND_GUARD_RESERVATION_TTL_SECONDS,
+        resolve_finished_job_ids=resolve_finished_job_ids,
     )
     if not slot_reserved:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail=f"Active job limit exceeded for user ({settings.MAX_ACTIVE_JOBS_PER_USER} active jobs allowed). Please wait for ongoing processing to complete.",
+            detail=(
+                f"Active job limit exceeded ({settings.MAX_ACTIVE_JOBS_PER_USER} concurrent jobs allowed). "
+                "Wait for an in-flight dossier to finish, or cancel one from its inspector panel."
+            ),
         )
 
     now = utc_now()
@@ -323,6 +359,55 @@ async def trigger_processing(
     )
 
 
+@router.get("/{id}/audit")
+async def list_audit_events(
+    id: str,
+    session: AsyncSession = Depends(get_db),
+):
+    """
+    Read the append-only audit trail for a dossier.
+
+    Every sign-off and cancellation writes an AuditEventModel row; without this
+    route the "immutable audit trail" promised at sign-off was invisible to the
+    underwriter who is accountable for it.
+    """
+    from apps.api.db.models import AuditEventModel
+
+    result = await session.execute(
+        select(ApplicationModel).where(ApplicationModel.id == id)
+    )
+    if result.scalar_one_or_none() is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Application '{id}' not found",
+        )
+
+    stmt = (
+        select(AuditEventModel)
+        .where(AuditEventModel.application_id == id)
+        .order_by(AuditEventModel.timestamp.asc())
+    )
+    rows = (await session.execute(stmt)).scalars().all()
+    return [
+        {
+            "id": event.id,
+            "application_id": event.application_id,
+            "from_status": event.from_status,
+            "to_status": event.to_status,
+            "actor": event.actor,
+            "decision": event.decision,
+            "notes": event.notes,
+            "timestamp": event.timestamp.isoformat() if event.timestamp else None,
+        }
+        for event in rows
+    ]
+
+
+# Exporting a Credit Appraisal Memo before a human has signed it off would put a
+# bank-letterhead PDF behind an unreviewed machine verdict.
+EXPORTABLE_STATUSES = ("READY_FOR_REVIEW", "REVIEWED", "NEEDS_INFORMATION")
+
+
 @router.get("/{id}/export")
 async def export_application(
     id: str,
@@ -333,7 +418,8 @@ async def export_application(
     Export finalized dossier analysis.
     - format=json: full application state (facts, findings, memo, citations).
     - format=pdf: generated Credit Appraisal Memo PDF (reportlab).
-    Returns 404 for unknown applications, 400 for unsupported formats.
+    Returns 404 for unknown applications, 409 before the pipeline has produced a
+    reviewable dossier, 400 for unsupported formats.
     """
     result = await session.execute(
         select(ApplicationModel).where(ApplicationModel.id == id)
@@ -345,6 +431,15 @@ async def export_application(
             detail=f"Application '{id}' not found",
         )
 
+    if app_model.status not in EXPORTABLE_STATUSES:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                f"Application '{id}' in status '{app_model.status}' has no appraisal to export. "
+                f"Run the verification pipeline first (exportable: {', '.join(EXPORTABLE_STATUSES)})."
+            ),
+        )
+
     state = dict(app_model.state_json or {})
     state["application_id"] = app_model.id
     state["status"] = app_model.status
@@ -353,9 +448,10 @@ async def export_application(
         return {"application_id": id, "export_format": "json", "analysis": state}
 
     if format == "pdf":
+        import os
         import tempfile
 
-        from fastapi.responses import FileResponse
+        from fastapi.responses import Response as _Response
 
         from core.reporting.exporter import export_reviewed_dossier_pdf
 
@@ -367,15 +463,27 @@ async def export_application(
         tmp.close()
         try:
             export_reviewed_dossier_pdf(state, tmp_path)
+            # Read-then-delete: FileResponse would stream a file nothing ever
+            # unlinks, leaking one temp PDF per download.
+            with open(tmp_path, "rb") as handle:
+                pdf_bytes = handle.read()
         except RuntimeError as exc:
             raise HTTPException(
                 status_code=status.HTTP_501_NOT_IMPLEMENTED,
                 detail=str(exc),
             ) from exc
-        return FileResponse(
-            tmp_path,
+        finally:
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                logger.warning(f"Could not remove temporary export file '{tmp_path}'")
+
+        return _Response(
+            content=pdf_bytes,
             media_type="application/pdf",
-            filename=f"{id}_credit_appraisal.pdf",
+            headers={
+                "Content-Disposition": f'attachment; filename="{id}_credit_appraisal.pdf"',
+            },
         )
 
     raise HTTPException(

@@ -30,12 +30,17 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
     }
   };
 
+  // These values are written straight into `classified_types` and compared
+  // against the pipeline's required set, so they must use the backend's
+  // vocabulary exactly. `tax_return` (the old value here) is not a recognised
+  // type: picking it tagged the document so that RULE-COMP-01 then reported the
+  // tax acknowledgement as missing.
   const autoDetectHint = (filename: string): string | undefined => {
     const f = filename.toLowerCase();
     if (f.includes('payslip') || f.includes('salary')) return 'payslip';
     if (f.includes('bank') || f.includes('statement')) return 'bank_statement';
-    if (f.includes('tax') || f.includes('itr')) return 'tax_return';
-    if (f.includes('pan') || f.includes('aadhaar') || f.includes('id')) return 'id_card';
+    if (f.includes('tax') || f.includes('itr')) return 'tax_acknowledgement';
+    if (f.includes('pan') || f.includes('aadhaar') || f.includes('kyc')) return 'id_card';
     if (f.includes('app') || f.includes('form')) return 'application_form';
     return undefined;
   };
@@ -121,12 +126,14 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
           {/* File Picker */}
           <div>
             <label className="block font-mono font-bold text-theme-primary mb-1.5">
-              Select Dossier PDF(s) *
+              Select Dossier File(s) *
             </label>
             <div className="border-2 border-dashed border-theme-border rounded-xs p-4 text-center hover:border-theme-brand transition-colors bg-theme-panel">
               <input
                 type="file"
-                accept=".pdf,application/pdf"
+                // Matches the server's ALLOWED_EXTENSIONS; restricting the
+                // picker to PDFs hid the scanned-document path the API supports.
+                accept=".pdf,.jpg,.jpeg,.png,.tiff,application/pdf,image/jpeg,image/png,image/tiff"
                 multiple
                 onChange={handleFileChange}
                 className="hidden"
@@ -140,10 +147,10 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
                 <span className="text-xs font-mono font-semibold text-theme-brand hover:underline">
                   {selectedFiles.length > 0
                     ? `${selectedFiles.length} file(s) selected: ${selectedFiles.map((f) => f.name).join(', ')}`
-                    : 'Choose one or more PDF files (multi-select supported)'}
+                    : 'Choose one or more files (multi-select supported)'}
                 </span>
                 <span className="text-[10px] text-theme-muted font-mono">
-                  Standard institutional PDFs (Max 10 MB each)
+                  PDF or scan (JPEG / PNG / TIFF), max 10 MB each
                 </span>
               </label>
             </div>
@@ -162,7 +169,7 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
               <option value="auto">✨ Auto-Detect from Filename & Content</option>
               <option value="payslip">Salary Payslip</option>
               <option value="bank_statement">Bank Account Statement</option>
-              <option value="tax_return">ITR Income Tax Return</option>
+              <option value="tax_acknowledgement">ITR Income Tax Return</option>
               <option value="id_card">KYC Identity Card (PAN / Aadhaar)</option>
               <option value="application_form">Loan Application Form</option>
             </select>

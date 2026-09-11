@@ -28,6 +28,8 @@ COPIED_STATE_FIELDS = (
     "findings",
     "missing_documents",
     "classified_types",
+    "document_pages",
+    "ocr_routes",
     "applicant",
     "payslip",
     "bank_statement",
@@ -128,5 +130,73 @@ def persist_pipeline_result(
                 f"findings={len(merged.get('findings', []))})"
             )
             return {"job_status": job.status, "app_status": app_status}
+    finally:
+        engine.dispose()
+
+
+def persist_job_failure(
+    db_url: str,
+    job_id: str,
+    application_id: str,
+    error_message: str,
+    terminal: bool,
+) -> None:
+    """
+    Record a pipeline failure so the dossier leaves QUEUED/PROCESSING.
+
+    Without this, an exception or a DLQ-routed poison message left the
+    application pinned at QUEUED forever while the UI polled a spinner with no
+    error and no way out.
+
+    - `terminal=True` (DLQ / attempt ceiling): application -> FAILED, job -> FAILED.
+    - `terminal=False` (retryable): job records the error and attempt count, but
+      the application stays QUEUED because a redelivery is still expected.
+
+    Best-effort by contract: raising here would mask the original failure, so
+    callers log and continue.
+    """
+    engine = create_engine(normalize_sync_dsn(db_url), pool_pre_ping=True)
+    factory = sessionmaker(bind=engine, expire_on_commit=False)
+    now = utc_now()
+    try:
+        with factory() as session:
+            job = session.execute(
+                select(JobModel).where(JobModel.id == job_id).with_for_update()
+            ).scalar_one_or_none()
+            if job is not None:
+                job.status = "FAILED" if terminal else "QUEUED"
+                job.error_message = error_message[:1000]
+                job.updated_at = now
+
+            if not terminal:
+                session.commit()
+                return
+
+            app = session.execute(
+                select(ApplicationModel)
+                .where(ApplicationModel.id == application_id)
+                .with_for_update()
+            ).scalar_one_or_none()
+            if app is not None:
+                from_status = app.status
+                merged: Dict[str, Any] = dict(app.state_json or {})
+                history: List[Any] = list(merged.get("status_history", []))
+                history.append(
+                    {
+                        "from_status": from_status,
+                        "to_status": "FAILED",
+                        "timestamp": now.isoformat(),
+                        "reason": f"Pipeline failed: {error_message[:200]}",
+                    }
+                )
+                merged["status_history"] = history
+                merged["status"] = "FAILED"
+                merged["application_id"] = app.id
+                app.status = "FAILED"
+                app.state_json = merged
+                app.updated_at = now
+
+            session.commit()
+            logger.info(f"Recorded terminal failure for job {job_id} (app={application_id})")
     finally:
         engine.dispose()

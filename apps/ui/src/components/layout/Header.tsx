@@ -4,30 +4,39 @@ import { ApplicationStatus } from '../../types/application';
 import { StatusPill } from '../common/StatusPill';
 import { SlaTimer } from '../common/SlaTimer';
 import { useAuth } from '../../context/AuthContext';
+import { initialsFor } from '../../services/auth';
 import { UnderwriterRole } from '../../types/auth';
 
 interface HeaderProps {
   selectedAppId: string;
   onSelectAppId: (id: string) => void;
   status: ApplicationStatus;
-  createdAt: string;
+  createdAt?: string;
+  updatedAt?: string;
   onOpenShortcuts: () => void;
   liveApplications?: Array<{ application_id: string; applicant_name: string; status: string }>;
   onRefresh?: () => void;
   onOpenNewApplication?: () => void;
 }
 
+/** Terminal states stop the SLA clock rather than accruing a breach forever. */
+const SEALED_STATUSES: ApplicationStatus[] = ['REVIEWED', 'CANCELLED', 'FAILED'];
+
 export const Header: React.FC<HeaderProps> = ({
   selectedAppId,
   onSelectAppId,
   status,
   createdAt,
+  updatedAt,
   onOpenShortcuts,
   liveApplications = [],
   onRefresh,
   onOpenNewApplication,
 }) => {
-  const { user, switchPersona, logout } = useAuth();
+  const { user, mode, switchPersona, logout } = useAuth();
+  // Google mode resolves the role server-side from the allowlist; letting the
+  // reviewer pick a persona here implied an authority the server ignores.
+  const personaLocked = mode === 'google';
 
   return (
     <header className="h-14 min-h-[56px] bg-theme-header border-b border-theme-border px-3 sm:px-5 flex items-center justify-between gap-3 select-none z-30 shadow-xs transition-colors duration-200">
@@ -103,10 +112,18 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       </div>
 
-      {/* Center: Live Status & SLA Timer (collapses below xl) */}
-      <div className="hidden xl:flex items-center gap-4 shrink-0">
+      {/* Center: Live Status & SLA Timer. The status pill is the single most
+          important signal on the screen, so it stays visible from md up; only
+          the wider SLA readout waits for xl. */}
+      <div className="hidden md:flex items-center gap-4 shrink-0">
         <StatusPill status={status} />
-        <SlaTimer createdAt={createdAt} />
+        <div className="hidden xl:block">
+          <SlaTimer
+            createdAt={createdAt}
+            stopped={SEALED_STATUSES.includes(status)}
+            stoppedAt={updatedAt}
+          />
+        </div>
       </div>
 
       {/* Right: Shortcuts + User (ledger theme locked; no theme switcher) */}
@@ -129,6 +146,10 @@ export const Header: React.FC<HeaderProps> = ({
           <div className="w-8 h-8 rounded-full bg-theme-panel border border-theme-border overflow-hidden flex items-center justify-center text-theme-secondary shadow-2xs shrink-0">
             {user?.avatarUrl ? (
               <img src={user.avatarUrl} alt={user.name} className="w-full h-full object-cover" />
+            ) : user?.name ? (
+              <span className="text-[11px] font-mono font-bold text-theme-primary">
+                {initialsFor(user.name)}
+              </span>
             ) : (
               <UserCheck className="w-4 h-4 text-theme-primary" />
             )}
@@ -137,22 +158,31 @@ export const Header: React.FC<HeaderProps> = ({
             <span className="text-xs font-semibold text-theme-primary leading-tight truncate max-w-[140px]">
               {user?.name || 'Reviewer'}
             </span>
-            <select
-              value={user?.role || 'SENIOR_UNDERWRITER'}
-              onChange={(e) => switchPersona(e.target.value as UnderwriterRole)}
-              className="bg-transparent text-[11px] text-theme-muted font-medium focus:outline-none cursor-pointer hover:text-theme-primary transition-colors"
-              title="Persona (mock mode; Google login locks role server-side)"
-            >
-              <option value="SENIOR_UNDERWRITER" className="bg-theme-card text-theme-primary">
-                Senior Underwriter
-              </option>
-              <option value="RISK_ANALYST" className="bg-theme-card text-theme-primary">
-                Risk Analyst
-              </option>
-              <option value="COMPLIANCE_OFFICER" className="bg-theme-card text-theme-primary">
-                Compliance Officer
-              </option>
-            </select>
+            {personaLocked ? (
+              <span
+                className="text-[11px] text-theme-muted font-medium truncate max-w-[140px]"
+                title="Role is assigned server-side from the Google allowlist"
+              >
+                {(user?.role || 'SENIOR_UNDERWRITER').replace(/_/g, ' ').toLowerCase()}
+              </span>
+            ) : (
+              <select
+                value={user?.role || 'SENIOR_UNDERWRITER'}
+                onChange={(e) => switchPersona(e.target.value as UnderwriterRole)}
+                className="bg-transparent text-[11px] text-theme-muted font-medium focus:outline-none cursor-pointer hover:text-theme-primary transition-colors"
+                title="Persona switcher (mock mode only)"
+              >
+                <option value="SENIOR_UNDERWRITER" className="bg-theme-card text-theme-primary">
+                  Senior Underwriter
+                </option>
+                <option value="RISK_ANALYST" className="bg-theme-card text-theme-primary">
+                  Risk Analyst
+                </option>
+                <option value="COMPLIANCE_OFFICER" className="bg-theme-card text-theme-primary">
+                  Compliance Officer
+                </option>
+              </select>
+            )}
           </div>
           {logout ? (
             <button

@@ -23,7 +23,7 @@ from core.contracts.jobs import JobRef
 from core.contracts.state import LoanApplicationState
 from core.contracts.facts import PayslipFacts, BankStatementFacts, TaxReturnFacts, ApplicantFact
 from core.graph.workflow import build_application_graph
-from worker.persistence import persist_pipeline_result
+from worker.persistence import persist_job_failure, persist_pipeline_result
 
 logger = logging.getLogger("finscan.worker")
 
@@ -118,6 +118,28 @@ class ApplicationWorker:
         # Opt-in Postgres write-back (None keeps fake-queue unit tests hermetic).
         self.db_url = db_url
 
+    def _record_failure(self, job_ref: JobRef, error_message: str, terminal: bool) -> None:
+        """
+        Write a failure back to Postgres so the dossier never sits in QUEUED
+        with no explanation. Best-effort: a write-back error must not replace
+        the original failure in the logs.
+        """
+        if not self.db_url:
+            return
+        try:
+            persist_job_failure(
+                db_url=self.db_url,
+                job_id=job_ref.job_id,
+                application_id=job_ref.application_id,
+                error_message=error_message,
+                terminal=terminal,
+            )
+        except Exception as writeback_err:  # noqa: BLE001 - advisory write-back
+            logger.error(
+                f"Could not record failure state for job {job_ref.job_id}: {writeback_err}",
+                exc_info=True,
+            )
+
     def start(self, poll_interval_seconds: float = 2.0) -> None:
         """Main consumer polling loop."""
         self.running = True
@@ -163,6 +185,11 @@ class ApplicationWorker:
             logger.error(
                 f"Job {job_ref.job_id} exceeded maximum attempt ceiling ({self.max_delivery_attempts}). "
                 f"Routing to Dead Letter Queue (DLQ)."
+            )
+            self._record_failure(
+                job_ref,
+                f"Exceeded maximum delivery attempts ({self.max_delivery_attempts}); routed to DLQ",
+                terminal=True,
             )
             self.queue.fail(handle, retryable=False)
             return None
@@ -262,6 +289,11 @@ class ApplicationWorker:
                             f"Write-back failed for job {job_ref.job_id}: {persist_err}",
                             exc_info=True,
                         )
+                        self._record_failure(
+                            job_ref,
+                            f"Result write-back failed: {persist_err}",
+                            terminal=job_ref.attempt_count >= self.max_delivery_attempts,
+                        )
                         self.queue.fail(handle, retryable=True)
                         return None
 
@@ -277,6 +309,13 @@ class ApplicationWorker:
 
             except Exception as err:
                 logger.error(f"Failure processing job {job_ref.job_id}: {err}", exc_info=True)
+                # Last attempt: mark the dossier FAILED so the reviewer sees a
+                # terminal state instead of an endless "processing" spinner.
+                self._record_failure(
+                    job_ref,
+                    f"{type(err).__name__}: {err}",
+                    terminal=job_ref.attempt_count >= self.max_delivery_attempts,
+                )
                 # Fail retryably if within delivery ceiling
                 self.queue.fail(handle, retryable=True)
                 return None

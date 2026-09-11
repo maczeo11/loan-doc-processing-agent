@@ -24,6 +24,21 @@ from adapters.storage.base import (
 )
 
 
+# Process-wide state for the local dev upload-relay. Both must outlive a single
+# adapter instance: get_storage() builds a fresh LocalFileSystemStorage for every
+# request, so instance-scoped state cannot span presign -> complete.
+_EPHEMERAL_UPLOAD_SECRET: Optional[str] = None
+_USED_UPLOAD_TICKETS: set = set()
+
+
+def _ephemeral_upload_secret() -> str:
+    """Lazily minted per-process signing secret for local upload tickets."""
+    global _EPHEMERAL_UPLOAD_SECRET
+    if _EPHEMERAL_UPLOAD_SECRET is None:
+        _EPHEMERAL_UPLOAD_SECRET = secrets.token_hex(32)
+    return _EPHEMERAL_UPLOAD_SECRET
+
+
 class LocalFileSystemStorage(StoragePort):
     """
     StoragePort implementation for local disk storage.
@@ -105,10 +120,12 @@ class LocalFileSystemStorage(StoragePort):
     def _upload_secret(self) -> bytes:
         secret = os.getenv("FINSCAN_LOCAL_UPLOAD_SECRET", "")
         if not secret:
-            # Ephemeral per-process secret: tickets never survive restarts (dev only).
-            if not hasattr(self, "_ephemeral_secret"):
-                self._ephemeral_secret = secrets.token_hex(32)
-            return self._ephemeral_secret.encode()
+            # Ephemeral per-PROCESS secret: tickets never survive restarts (dev
+            # only). This must not be per-instance — get_storage() constructs a
+            # new adapter per request, so an instance-scoped secret signed every
+            # ticket with a key the next request could not reproduce, and the
+            # local relay path rejected 100% of valid tickets.
+            return _ephemeral_upload_secret().encode()
         return secret.encode()
 
     def generate_upload_url(
@@ -159,12 +176,12 @@ class LocalFileSystemStorage(StoragePort):
         ).hexdigest()
         if not hmac.compare_digest(expected, mac):
             return False
-        used = getattr(self, "_used_tickets", None)
-        if used is None:
-            used = self._used_tickets = set()
-        if ticket in used:
+        # Single-use tracking is process-wide for the same reason the secret is:
+        # a per-instance set could never observe a ticket's first use, making
+        # "single-use" a no-op.
+        if ticket in _USED_UPLOAD_TICKETS:
             return False
-        used.add(ticket)
+        _USED_UPLOAD_TICKETS.add(ticket)
         return True
 
     def verify_integrity(self, key: str, expected_sha256_hex: str) -> Dict[str, Any]:

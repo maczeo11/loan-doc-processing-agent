@@ -124,7 +124,9 @@ export const LeftDossierPane: React.FC<LeftDossierPaneProps> = ({
           <div className="flex items-center justify-between text-theme-secondary">
             <span className="text-[11px] font-medium text-theme-muted">Loan Amount:</span>
             <span className="font-mono font-bold text-theme-pass tabular-nums text-xs">
-              {formatCurrency(application.loan_amount, application.currency)}
+              {typeof application.loan_amount === 'number'
+                ? formatCurrency(application.loan_amount, application.currency)
+                : '—'}
             </span>
           </div>
         </div>
@@ -188,23 +190,38 @@ export const LeftDossierPane: React.FC<LeftDossierPaneProps> = ({
                         {doc.name}
                       </p>
                       {doc.verified && (
-                        <CheckCircle2 className="w-3.5 h-3.5 text-theme-pass flex-shrink-0" />
+                        <CheckCircle2
+                          className="w-3.5 h-3.5 text-theme-pass flex-shrink-0"
+                          aria-label="Cited as supporting evidence by at least one finding"
+                        />
                       )}
                     </div>
 
-                    <div className="mt-1.5 flex items-center gap-1.5 text-[10px] text-theme-muted font-mono">
-                      <span className="px-1.5 py-0.5 rounded-xs bg-theme-panel border border-theme-border">
-                        {doc.page_count} {doc.page_count === 1 ? 'page' : 'pages'}
-                      </span>
-                      <span
-                        className={`px-1.5 py-0.5 rounded-xs border font-semibold ${
-                          doc.ocr_route === 'native'
-                            ? 'bg-theme-pass-bg border-theme-pass-border text-theme-pass'
-                            : 'bg-theme-unknown-bg border-theme-unknown-border text-theme-unknown'
-                        }`}
-                      >
-                        {doc.ocr_route === 'native' ? 'Native Layer' : 'PaddleOCR'}
-                      </span>
+                    {/* Badges appear only for metadata perception actually
+                        reported. They used to be synthesised in the adapter, so
+                        every document showed an invented page count and route. */}
+                    <div className="mt-1.5 flex items-center gap-1.5 text-[10px] text-theme-muted font-mono flex-wrap">
+                      {doc.page_count !== undefined && (
+                        <span className="px-1.5 py-0.5 rounded-xs bg-theme-panel border border-theme-border">
+                          {doc.page_count} {doc.page_count === 1 ? 'page' : 'pages'}
+                        </span>
+                      )}
+                      {doc.ocr_route && (
+                        <span
+                          className={`px-1.5 py-0.5 rounded-xs border font-semibold ${
+                            doc.ocr_route === 'native'
+                              ? 'bg-theme-pass-bg border-theme-pass-border text-theme-pass'
+                              : 'bg-theme-unknown-bg border-theme-unknown-border text-theme-unknown'
+                          }`}
+                        >
+                          {doc.ocr_route === 'native' ? 'Native Layer' : 'OCR'}
+                        </span>
+                      )}
+                      {doc.page_count === undefined && !doc.ocr_route && (
+                        <span className="px-1.5 py-0.5 rounded-xs bg-theme-panel border border-theme-border">
+                          Not yet analysed
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>

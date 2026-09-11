@@ -9,7 +9,7 @@ import { sanitizePiiInText } from '../../utils/pii';
 interface PdfViewerProps {
   docId: string;
   docTitle: string;
-  pdfSource?: Uint8Array | ArrayBuffer | string | null;
+  pdfSource?: Uint8Array | ArrayBuffer | { applicationId: string; documentId: string } | null;
   isDemoMode: boolean;
 }
 
@@ -21,8 +21,10 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({
 }) => {
   const {
     canvasRef,
+    containerRef,
     canvasDimensions,
     pdfDocument,
+    imageUrl,
     numPages,
     currentPage,
     zoom,
@@ -110,10 +112,23 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({
             <span className="italic font-medium truncate font-mono text-theme-secondary">
               &ldquo;{sanitizePiiInText(activeEvidence.quoted_span || '')}&rdquo;
             </span>
-            <span className="text-[10px] font-mono hidden sm:inline">
-              ({Math.round((activeEvidence.confidence ?? 1) * 100)}% conf |{' '}
-              {activeEvidence.extraction_method || 'pymupdf_native'})
-            </span>
+            {/* Only stated when the extractor actually reported it. Defaulting
+                to "100% conf | pymupdf_native" invented precision for evidence
+                that carried neither value. */}
+            {(activeEvidence.confidence !== undefined || activeEvidence.extraction_method) && (
+              <span className="text-[10px] font-mono hidden sm:inline">
+                (
+                {[
+                  activeEvidence.confidence !== undefined
+                    ? `${Math.round(activeEvidence.confidence * 100)}% conf`
+                    : null,
+                  activeEvidence.extraction_method,
+                ]
+                  .filter(Boolean)
+                  .join(' | ')}
+                )
+              </span>
+            )}
           </div>
           <button
             type="button"
@@ -127,7 +142,10 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({
       )}
 
       {/* Main Viewport */}
-      <div className="flex-1 overflow-auto p-3 sm:p-6 flex justify-center items-start bg-theme-desk transition-colors duration-200">
+      <div
+        ref={containerRef}
+        className="flex-1 overflow-auto p-3 sm:p-6 flex justify-center items-start bg-theme-desk transition-colors duration-200"
+      >
         {isLoading ? (
           <div className="flex flex-col items-center justify-center p-16 text-center">
             <Loader2 className="w-8 h-8 text-theme-muted animate-spin mb-3" />
@@ -172,17 +190,37 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({
               </div>
             )}
           </div>
-        ) : (
-          <div className="flex flex-col items-center relative shadow-xl">
-            {/* Watermark header banner */}
-            <div
-              style={{ width: `${canvasDimensions.width}px` }}
-              className="bg-theme-unknown-bg border border-theme-unknown-border rounded-t px-4 py-1 text-center shadow-xs transition-all"
-            >
-              <span className="text-[10px] font-bold font-mono tracking-wider text-theme-unknown uppercase">
-                SYNTHETIC DEMO — NOT VALID (FinScan AI)
+        ) : imageUrl ? (
+          /* Scanned upload (JPEG/PNG/TIFF): rendered as an image. Bounding-box
+             overlays are PDF-coordinate based and do not apply here. */
+          <div className="flex flex-col items-center shadow-xl max-w-full">
+            <div className="bg-theme-panel border border-theme-border rounded-t px-4 py-1 text-center w-full">
+              <span className="text-[10px] font-bold font-mono tracking-wider text-theme-secondary uppercase">
+                Scanned image — no text layer
               </span>
             </div>
+            <img
+              src={imageUrl}
+              alt={docTitle}
+              style={{ width: `${zoom}%` }}
+              className="bg-white rounded-b-sm shadow-2xl border border-t-0 border-theme-border max-w-full"
+            />
+          </div>
+        ) : (
+          <div className="flex flex-col items-center relative shadow-xl">
+            {/* Synthetic-document watermark — ONLY for generated preset PDFs.
+                Rendering this unconditionally stamped real customer uploads
+                "NOT VALID". */}
+            {sourceType === 'demo' && (
+              <div
+                style={{ width: `${canvasDimensions.width}px` }}
+                className="bg-theme-unknown-bg border border-theme-unknown-border rounded-t px-4 py-1 text-center shadow-xs transition-all"
+              >
+                <span className="text-[10px] font-bold font-mono tracking-wider text-theme-unknown uppercase">
+                  SYNTHETIC DEMO — NOT VALID (FinScan AI)
+                </span>
+              </div>
+            )}
 
             {/* Rendering Indicator */}
             {isRendering && (
@@ -198,7 +236,9 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({
                 width: `${canvasDimensions.width}px`,
                 height: `${canvasDimensions.height}px`,
               }}
-              className="bg-white rounded-b-sm shadow-2xl border border-t-0 border-theme-border relative overflow-hidden transition-all"
+              className={`bg-white shadow-2xl border border-theme-border relative overflow-hidden transition-all ${
+                sourceType === 'demo' ? 'rounded-b-sm border-t-0' : 'rounded-sm'
+              }`}
             >
               {/* HTML5 Canvas rendered by PDF.js */}
               <canvas ref={canvasRef} className="block w-full h-full" />

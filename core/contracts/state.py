@@ -38,6 +38,10 @@ class LoanApplicationState(TypedDict):
     document_manifest: Dict[str, str]  # doc_id -> storage_uri
     document_bytes: Optional[Dict[str, bytes]]
     classified_types: Dict[str, str]  # doc_id -> doc_type
+    # Observed during perception, not guessed by the UI: real page count and the
+    # route that actually produced the text layer for each document.
+    document_pages: Dict[str, int]  # doc_id -> page count
+    ocr_routes: Dict[str, str]  # doc_id -> 'native' | 'ocr'
 
     # Extracted structured facts
     applicant: Optional[ApplicantFact]

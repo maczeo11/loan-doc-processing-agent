@@ -272,15 +272,28 @@ async def ask_question(id: str, payload: QuestionRequest, session: AsyncSession 
     for hit in hits:
         text = str(hit.get("text", "")).strip()
         excerpt = text[:400] + ("..." if len(text) > 400 else "")
-        citations.append(
-            {
-                "chunk_id": hit.get("chunk_id"),
-                "doc_id": hit.get("doc_id"),
-                "page_number": hit.get("page_number"),
-                "score": hit.get("score"),
-                "excerpt": excerpt,
-            }
-        )
+        doc_id = hit.get("doc_id") or hit.get("document_id")
+        is_policy = bool(hit.get("is_policy", True))
+        page_number = hit.get("page_number")
+        citation: Dict[str, Any] = {
+            "chunk_id": hit.get("chunk_id"),
+            "policy_id": doc_id,
+            "section": f"Page {page_number}" if page_number else None,
+            "page_number": page_number,
+            "score": hit.get("score"),
+            "text": text,
+            "excerpt": excerpt,
+            "is_policy": is_policy,
+        }
+        # `document_id` is the Citation contract's jump-to-evidence key. Only a
+        # chunk from an uploaded dossier document can be located on the PDF
+        # canvas; policy-corpus chunks stay read-only rather than sending the
+        # viewer after a document id that is not in this application.
+        if not is_policy and doc_id:
+            citation["document_id"] = doc_id
+            citation["document_type"] = hit.get("document_type") or "document"
+            citation["bounding_box"] = hit.get("bounding_box")
+        citations.append(citation)
 
     # If LLM is configured (e.g. Groq or OpenCode), generate grounded synthesis
     answer_text = None

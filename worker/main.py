@@ -14,6 +14,12 @@ from adapters.queue.sqs_queue import SQSQueueAdapter
 from core.graph.checkpoint import SqliteSaver
 from worker.consumer import ApplicationWorker
 
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 logger = logging.getLogger("finscan.worker.main")
 
@@ -22,12 +28,21 @@ def main():
     queue_backend = os.getenv("QUEUE_BACKEND", "postgres")
     logger.info(f"Starting FinScan Worker with queue backend: {queue_backend}")
 
+    db_url = os.getenv("DATABASE_URL", "postgresql://postgres:postgrespassword@localhost:5432/finscan")
+
     if queue_backend == "sqs":
         queue_url = os.getenv("SQS_QUEUE_URL", "")
         region = os.getenv("AWS_REGION", "us-east-1")
-        queue_adapter = SQSQueueAdapter(queue_url=queue_url, region_name=region)
+        # Without dlq_url the worker deletes poison messages from the primary
+        # queue with no DLQ record, and SQS RedrivePolicy never fires because
+        # the delete beats maxReceiveCount.
+        dlq_url = os.getenv("SQS_DLQ_URL", "")
+        if not dlq_url:
+            logger.warning(
+                "SQS_DLQ_URL is not set: poison messages will be dropped without a dead-letter record."
+            )
+        queue_adapter = SQSQueueAdapter(queue_url=queue_url, dlq_url=dlq_url, region_name=region)
     else:
-        db_url = os.getenv("DATABASE_URL", "postgresql://postgres:postgrespassword@localhost:5432/finscan")
         queue_adapter = PostgresQueueAdapter(connection_string=db_url)
         queue_adapter.ensure_schema()
 
@@ -52,7 +67,7 @@ def main():
         queue_adapter=queue_adapter,
         storage_adapter=storage_adapter,
         checkpointer=checkpointer,
-        db_url=os.getenv("DATABASE_URL"),
+        db_url=db_url,
     )
 
     try:

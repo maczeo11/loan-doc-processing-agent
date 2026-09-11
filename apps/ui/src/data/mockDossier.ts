@@ -762,6 +762,20 @@ export const DEMO_DOSSIERS: Record<string, LoanApplicationState> = {
   'APP-10492': DEMO_DOSSIER_APP_10492,
 };
 
-export function getDemoDossier(appId: string): LoanApplicationState {
-  return DEMO_DOSSIERS[appId] || DEMO_DOSSIER_APP_25195;
+export const DEMO_DOSSIER_IDS = Object.keys(DEMO_DOSSIERS);
+
+export function isDemoDossierId(appId: string): boolean {
+  return Object.prototype.hasOwnProperty.call(DEMO_DOSSIERS, appId);
+}
+
+/**
+ * Returns the preset for a demo archetype, or `null` for anything else.
+ *
+ * This deliberately does NOT fall back to a default dossier: returning
+ * APP-25195 for an unknown id meant a backend outage silently showed one
+ * applicant's facts, findings and READY_FOR_REVIEW status under a different
+ * applicant's application id — with sign-off enabled.
+ */
+export function getDemoDossier(appId: string): LoanApplicationState | null {
+  return DEMO_DOSSIERS[appId] ?? null;
 }

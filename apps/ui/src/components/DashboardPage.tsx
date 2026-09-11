@@ -1,12 +1,16 @@
-import React, { useState } from 'react';
-import { Plus, RefreshCw, FolderOpen, ShieldCheck } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { Plus, RefreshCw, FolderOpen, ShieldCheck, AlertTriangle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { StatusPill } from './common/StatusPill';
+import { formatCurrency } from '../utils/pii';
+import type { ApplicationStatus } from '../types/application';
 
 export interface DashboardApp {
   application_id: string;
   applicant_name: string;
   status: string;
   loan_amount?: number;
+  loan_purpose?: string | null;
   created_at?: string;
 }
 
@@ -16,6 +20,8 @@ interface DashboardPageProps {
   onOpen: (appId: string) => void;
   onNew: () => void;
   isLoading?: boolean;
+  /** Set when the dossier list could not be fetched at all. */
+  backendError?: string | null;
 }
 
 const PRESETS: DashboardApp[] = [
@@ -24,17 +30,59 @@ const PRESETS: DashboardApp[] = [
   { application_id: 'APP-10492', applicant_name: 'Pooja Iyer (Identity Discrepancy)', status: 'READY_FOR_REVIEW' },
 ];
 
+/** Dossiers needing a human first; then newest. */
+const STATUS_PRIORITY: Record<string, number> = {
+  READY_FOR_REVIEW: 0,
+  NEEDS_INFORMATION: 1,
+  PROCESSING: 2,
+  QUEUED: 3,
+  UPLOADED: 4,
+  FAILED: 5,
+  REVIEWED: 6,
+  CANCELLED: 7,
+};
+
+function relativeAge(iso?: string): string {
+  if (!iso) return '—';
+  const ms = Date.now() - new Date(iso).getTime();
+  if (Number.isNaN(ms)) return '—';
+  const mins = Math.floor(ms / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.floor(hours / 24)}d ago`;
+}
+
 /**
  * Real loan-app start: dashboard first (not empty viewer).
  * Lists live backend dossiers + offline presets, explicit New flow.
  */
-export const DashboardPage: React.FC<DashboardPageProps> = ({ apps, onRefresh, onOpen, onNew, isLoading }) => {
+export const DashboardPage: React.FC<DashboardPageProps> = ({
+  apps,
+  onRefresh,
+  onOpen,
+  onNew,
+  isLoading,
+  backendError,
+}) => {
   const { user } = useAuth();
   const [query, setQuery] = useState('');
 
   const q = query.trim().toLowerCase();
-  const live = q ? apps.filter((a) => `${a.application_id} ${a.applicant_name} ${a.status}`.toLowerCase().includes(q)) : apps;
+  const live = useMemo(() => {
+    const filtered = q
+      ? apps.filter((a) => `${a.application_id} ${a.applicant_name} ${a.status}`.toLowerCase().includes(q))
+      : apps;
+    // Queue order, not insertion order: what needs a decision comes first.
+    return [...filtered].sort((a, b) => {
+      const byStatus = (STATUS_PRIORITY[a.status] ?? 9) - (STATUS_PRIORITY[b.status] ?? 9);
+      if (byStatus !== 0) return byStatus;
+      return (b.created_at || '').localeCompare(a.created_at || '');
+    });
+  }, [apps, q]);
   const presets = q ? PRESETS.filter((a) => `${a.application_id} ${a.applicant_name}`.toLowerCase().includes(q)) : PRESETS;
+  const awaitingReview = apps.filter((a) => a.status === 'READY_FOR_REVIEW').length;
 
   return (
     <div className="min-h-screen w-screen bg-theme-app text-theme-primary">
@@ -48,6 +96,11 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ apps, onRefresh, o
               <h1 className="font-serif font-bold text-xl">Dossier Desk</h1>
               <p className="text-xs text-theme-muted font-mono">
                 {user ? `Signed in as ${user.name} (${user.role})` : 'FinScan AI — retail loan underwriting'}
+                {awaitingReview > 0 && (
+                  <span className="text-theme-unknown font-bold">
+                    {' '}· {awaitingReview} awaiting review
+                  </span>
+                )}
               </p>
             </div>
           </div>
@@ -84,41 +137,92 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ apps, onRefresh, o
           Live backend dossiers ({live.length})
         </h2>
         <div className="bg-theme-card border border-theme-border rounded-xs overflow-hidden mb-6">
-          {isLoading ? (
+          {/* An unreachable backend is stated plainly. Rendering the "no
+              dossiers yet" empty state for a connection failure invited the
+              reviewer to create duplicates of work that already exists. */}
+          {backendError ? (
+            <div className="p-6 text-center">
+              <div className="w-10 h-10 rounded-full bg-theme-flag-bg border border-theme-flag-border flex items-center justify-center text-theme-flag mx-auto mb-2">
+                <AlertTriangle className="w-5 h-5" />
+              </div>
+              <p className="text-sm font-serif font-bold mb-1">Cannot reach the FinScan API</p>
+              <p className="text-xs text-theme-muted mb-3 font-mono break-words max-w-md mx-auto">
+                {backendError}
+              </p>
+              <button
+                type="button"
+                onClick={onRefresh}
+                className="px-4 py-2 rounded-xs border border-theme-border hover:bg-theme-panel text-xs font-mono font-bold"
+              >
+                Retry
+              </button>
+            </div>
+          ) : isLoading && live.length === 0 ? (
             <p className="p-5 text-xs text-theme-muted">Loading dossiers…</p>
           ) : live.length === 0 ? (
             <div className="p-6 text-center">
-              <p className="text-sm font-serif font-bold mb-1">No live dossiers yet</p>
-              <p className="text-xs text-theme-muted mb-3">When a customer walks in, create their dossier to begin upload → verify → review.</p>
-              <button type="button" onClick={onNew} className="px-4 py-2 rounded-xs bg-theme-brand text-white text-xs font-bold">
-                + Create first dossier
-              </button>
+              <p className="text-sm font-serif font-bold mb-1">
+                {q ? 'No dossiers match that search' : 'No live dossiers yet'}
+              </p>
+              <p className="text-xs text-theme-muted mb-3">
+                {q
+                  ? 'Clear the search to see every dossier on the desk.'
+                  : 'When a customer walks in, create their dossier to begin upload → verify → review.'}
+              </p>
+              {!q && (
+                <button type="button" onClick={onNew} className="px-4 py-2 rounded-xs bg-theme-brand text-white text-xs font-bold">
+                  + Create first dossier
+                </button>
+              )}
             </div>
           ) : (
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="text-left text-[11px] font-mono uppercase tracking-wider text-theme-muted border-b border-theme-border">
-                  <th className="px-3 py-2">Application</th>
-                  <th className="px-3 py-2">Applicant</th>
-                  <th className="px-3 py-2">Status</th>
-                  <th className="px-3 py-2 text-right">Open</th>
-                </tr>
-              </thead>
-              <tbody>
-                {live.map((a) => (
-                  <tr key={a.application_id} className="border-b border-theme-border/60 last:border-0 hover:bg-theme-panel/60">
-                    <td className="px-3 py-2.5 font-mono font-bold">{a.application_id}</td>
-                    <td className="px-3 py-2.5">{a.applicant_name}</td>
-                    <td className="px-3 py-2.5 font-mono">{a.status}</td>
-                    <td className="px-3 py-2.5 text-right">
-                      <button type="button" onClick={() => onOpen(a.application_id)} className="px-2.5 py-1 rounded-xs border border-theme-border hover:bg-theme-panel font-mono">
-                        Open →
-                      </button>
-                    </td>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs min-w-[640px]">
+                <thead>
+                  <tr className="text-left text-[11px] font-mono uppercase tracking-wider text-theme-muted border-b border-theme-border">
+                    <th className="px-3 py-2">Application</th>
+                    <th className="px-3 py-2">Applicant</th>
+                    <th className="px-3 py-2 text-right">Amount</th>
+                    <th className="px-3 py-2">Status</th>
+                    <th className="px-3 py-2">Age</th>
+                    <th className="px-3 py-2 text-right">Open</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {live.map((a) => (
+                    <tr
+                      key={a.application_id}
+                      onClick={() => onOpen(a.application_id)}
+                      className="border-b border-theme-border/60 last:border-0 hover:bg-theme-panel/60 cursor-pointer"
+                    >
+                      <td className="px-3 py-2.5 font-mono font-bold whitespace-nowrap">{a.application_id}</td>
+                      <td className="px-3 py-2.5">
+                        <span className="block truncate max-w-[200px]">{a.applicant_name}</span>
+                        {a.loan_purpose && (
+                          <span className="block text-[10px] text-theme-muted truncate max-w-[200px]">
+                            {a.loan_purpose}
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2.5 text-right font-mono tabular-nums whitespace-nowrap">
+                        {typeof a.loan_amount === 'number' ? formatCurrency(a.loan_amount) : '—'}
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <StatusPill status={a.status as ApplicationStatus} />
+                      </td>
+                      <td className="px-3 py-2.5 font-mono text-theme-muted whitespace-nowrap">
+                        {relativeAge(a.created_at)}
+                      </td>
+                      <td className="px-3 py-2.5 text-right">
+                        <span className="px-2.5 py-1 rounded-xs border border-theme-border font-mono inline-block">
+                          Open →
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
 

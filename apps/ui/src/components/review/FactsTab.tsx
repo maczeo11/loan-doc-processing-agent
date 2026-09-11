@@ -3,7 +3,7 @@ import { LoanApplication } from '../../types/application';
 import { EvidenceRef } from '../../types/evidence';
 import { formatCurrency } from '../../utils/pii';
 import { MaskedValue } from '../common/MaskedValue';
-import { ExternalLink, CheckCircle2, AlertTriangle, Building2, Landmark, FileText, UserCheck, ShieldCheck } from 'lucide-react';
+import { ExternalLink, CheckCircle2, AlertTriangle, HelpCircle, Building2, Landmark, FileText, UserCheck, ShieldCheck } from 'lucide-react';
 
 interface FactsTabProps {
   application: LoanApplication;
@@ -23,6 +23,9 @@ export const FactsTab: React.FC<FactsTabProps> = ({ application, onSelectEvidenc
   const salaryFinding = (application.findings || []).find((f) => f.rule_id === 'RULE-INC-01');
   const salaryVerdict = salaryFinding?.verdict || 'unknown';
   const isVarianceAcceptable = salaryVerdict === 'pass';
+  // `unknown` is not `flag`. Painting anything that is not a pass in claret
+  // made an unevaluated or missing value look like a detected discrepancy.
+  const isVarianceFlagged = salaryVerdict === 'flag';
 
   const hasAnyFacts = !!(payslip || bank || tax || applicant?.full_name);
 
@@ -55,17 +58,19 @@ export const FactsTab: React.FC<FactsTabProps> = ({ application, onSelectEvidenc
           </div>
           <span
             className={`inline-flex items-center gap-1 text-[11px] font-mono font-bold px-2 py-0.5 rounded-xs border ${
-              statedNet > 0 && isVarianceAcceptable
+              isVarianceAcceptable
                 ? 'bg-theme-pass-bg border-theme-pass-border text-theme-pass'
-                : statedNet > 0
-                ? 'bg-theme-flag-bg border-theme-flag-border text-theme-flag'
-                : 'bg-theme-unknown-bg border-theme-unknown-border text-theme-unknown'
+                : isVarianceFlagged
+                  ? 'bg-theme-flag-bg border-theme-flag-border text-theme-flag'
+                  : 'bg-theme-unknown-bg border-theme-unknown-border text-theme-unknown'
             }`}
           >
-            {statedNet > 0 && isVarianceAcceptable ? (
-              <CheckCircle2 className="w-3 h-3 text-theme-pass" />
+            {isVarianceAcceptable ? (
+              <CheckCircle2 className="w-3 h-3" />
+            ) : isVarianceFlagged ? (
+              <AlertTriangle className="w-3 h-3" />
             ) : (
-              <AlertTriangle className="w-3 h-3 text-theme-flag" />
+              <HelpCircle className="w-3 h-3" />
             )}
             <span>
               {salaryFinding
@@ -110,7 +115,11 @@ export const FactsTab: React.FC<FactsTabProps> = ({ application, onSelectEvidenc
               </span>
               <div
                 className={`text-base font-mono font-bold tabular-nums tracking-tight ${
-                  statedNet > 0 && isVarianceAcceptable ? 'text-theme-pass' : 'text-theme-flag'
+                  isVarianceAcceptable
+                    ? 'text-theme-pass'
+                    : isVarianceFlagged
+                      ? 'text-theme-flag'
+                      : 'text-theme-primary'
                 }`}
               >
                 {verifiedCredit > 0 ? formatCurrency(verifiedCredit) : '—'}

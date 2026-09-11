@@ -8,6 +8,8 @@ import { Send, BookOpen, ShieldCheck, ShieldAlert, Loader2, ExternalLink } from 
 interface PolicyQaTabProps {
   applicationId?: string;
   onSelectEvidence?: (ev: EvidenceRef) => void;
+  /** Offline archetypes have no backend policy index to query. */
+  isReadOnlyPreset?: boolean;
 }
 
 /**
@@ -26,33 +28,48 @@ function toEvidenceRef(c: PolicyCitation): EvidenceRef | null {
   };
 }
 
-const SEED_ANSWER: PolicyQaResponse = {
-  question: 'What is the salary reconciliation tolerance and DTI ceiling under policy?',
-  answer:
-    'Under FinScan Retail Underwriting Policy v2026.1 (Section 4.2), net monthly income must be verified against at least 3 consecutive salary credits with a maximum permissible variance of ±5.0%. Debt-to-Income (DTI) ratio must not exceed 50.0% for Tier-1 applicants.',
-  // Illustrative seed shown before any live retrieval — NOT a grounded answer.
-  is_grounded: false,
-  citations: [
-    {
-      chunk_id: 'POL-RET-2026-S4',
-      policy_name: 'Retail Lending Credit Policy v2026.1',
-      section: 'Section 4.2 — Income Verification & DTI Ceiling',
-      text: 'Net salary reconciliation variance tolerance is bounded at ±5.0%. Total proposed loan EMI plus existing obligations shall not exceed 50% of verified monthly disposable income.',
-      score: 0.94,
-    },
-  ],
-};
+/**
+ * Prompts, not answers.
+ *
+ * This panel previously opened with a fabricated "±5.0% / 50% DTI" answer and a
+ * citation to a policy section that had never been retrieved. Even flagged
+ * unverified, a made-up threshold sitting in the answer stream is exactly the
+ * hallucination this product exists to prevent — so the empty state now offers
+ * questions to ask instead of pre-filled conclusions.
+ */
+const SUGGESTED_QUESTIONS = [
+  'What is the salary reconciliation variance tolerance?',
+  'What is the maximum permitted debt-to-income ratio?',
+  'Which documents are mandatory for retail loan underwriting?',
+];
 
-export const PolicyQaTab: React.FC<PolicyQaTabProps> = ({ applicationId, onSelectEvidence }) => {
+export const PolicyQaTab: React.FC<PolicyQaTabProps> = ({
+  applicationId,
+  onSelectEvidence,
+  isReadOnlyPreset = false,
+}) => {
   const [question, setQuestion] = useState('');
   const [loading, setLoading] = useState(false);
-  const [history, setHistory] = useState<PolicyQaResponse[]>([SEED_ANSWER]);
+  const [history, setHistory] = useState<PolicyQaResponse[]>([]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!question.trim() || loading) return;
+  const ask = async (raw: string) => {
+    const q = raw.trim();
+    if (!q || loading) return;
 
-    const q = question.trim();
+    if (isReadOnlyPreset) {
+      setHistory((prev) => [
+        {
+          question: q,
+          answer:
+            'Policy retrieval runs server-side against the policy corpus. Open a live dossier to query it.',
+          is_grounded: false,
+          citations: [],
+        },
+        ...prev,
+      ]);
+      return;
+    }
+
     if (!applicationId) {
       setHistory((prev) => [
         {
@@ -111,6 +128,11 @@ export const PolicyQaTab: React.FC<PolicyQaTabProps> = ({ applicationId, onSelec
     }
   };
 
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    ask(question);
+  };
+
   return (
     <div className="space-y-3.5">
       {/* Policy Search Input */}
@@ -132,6 +154,33 @@ export const PolicyQaTab: React.FC<PolicyQaTabProps> = ({ applicationId, onSelec
           {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
         </button>
       </form>
+
+      {/* Empty state: offer questions, never a pre-filled answer. */}
+      {history.length === 0 && (
+        <div className="p-3.5 rounded-xs bg-theme-panel border border-theme-border space-y-2">
+          <div className="flex items-center gap-1.5 text-[10px] uppercase font-mono font-bold text-theme-muted tracking-wider">
+            <BookOpen className="w-3 h-3" />
+            <span>Grounded policy retrieval</span>
+          </div>
+          <p className="text-[11px] text-theme-secondary leading-relaxed">
+            Answers quote retrieved policy passages with chunk citations. Nothing is asserted
+            without a citation.
+          </p>
+          <div className="flex flex-col gap-1.5 pt-0.5">
+            {SUGGESTED_QUESTIONS.map((suggestion) => (
+              <button
+                key={suggestion}
+                type="button"
+                onClick={() => ask(suggestion)}
+                disabled={loading}
+                className="text-left text-[11px] font-mono text-theme-brand hover:underline disabled:opacity-50"
+              >
+                → {suggestion}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Q&A Stream */}
       <div className="space-y-3">

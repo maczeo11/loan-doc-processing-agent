@@ -9,17 +9,19 @@ Flow:
 2. Browser uploads bytes direct to S3 (or relays to /uploads/complete locally).
 3. POST /applications/{id}/uploads/complete {document_id, storage_key, sha256_hex,
    size_bytes[, ticket]} -> server recomputes SHA-256; mismatch -> 422 + object
-   treated as untrusted (deleted when possible). Returns a verified receipt that
-   Balaji's document-registration flow can persist.
+   treated as untrusted (deleted when possible). On success the document is
+   registered (DocumentModel + application state_json) so the dossier can be
+   processed, exactly as with the proxied POST /documents path.
 
 Owned by Member 2 (Bhanu Teja). Additive: does not modify documents.py.
 """
 
 import logging
+import os
 from typing import Any, Dict, Optional
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
-from pydantic import BaseModel, Field
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
+from pydantic import BaseModel, Field, ValidationError
 
 from adapters.storage.base import (
     StoragePort,
@@ -75,10 +77,12 @@ class CompleteRequest(BaseModel):
 class CompleteResponse(BaseModel):
     document_id: str
     application_id: str
+    filename: str
     storage_key: str
     sha256: str
     size_bytes: int
     verified_via: str
+    registered: bool
 
 
 def _max_upload_bytes() -> int:
@@ -155,6 +159,35 @@ async def presign_upload(
     )
 
 
+async def _parse_complete_request(request: Request) -> CompleteRequest:
+    """
+    Read CompleteRequest from either a JSON body (S3 mode) or multipart form
+    fields (local api_relay mode, where the bytes ride along as `file`).
+
+    FastAPI cannot bind a Pydantic body model and multipart fields on the same
+    endpoint: declaring `payload: CompleteRequest` next to `file: UploadFile`
+    made the relay path impossible to call, since a multipart request always
+    failed body validation with "payload: Field required".
+    """
+    content_type = (request.headers.get("content-type") or "").lower()
+    if content_type.startswith("multipart/form-data") or content_type.startswith(
+        "application/x-www-form-urlencoded"
+    ):
+        form = await request.form()
+        raw: Dict[str, Any] = {
+            key: value for key, value in form.items() if not hasattr(value, "filename")
+        }
+    else:
+        try:
+            raw = await request.json()
+        except Exception:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Request body must be JSON or multipart form")
+    try:
+        return CompleteRequest.model_validate(raw)
+    except ValidationError as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, exc.errors())
+
+
 @router.post(
     "/{id}/uploads/complete",
     response_model=CompleteResponse,
@@ -162,7 +195,7 @@ async def presign_upload(
 )
 async def complete_upload(
     id: str,
-    payload: CompleteRequest,
+    request: Request,
     storage: StoragePort = Depends(get_storage),
     session=Depends(get_db),
     file: Optional[UploadFile] = File(default=None),
@@ -171,15 +204,19 @@ async def complete_upload(
     """
     Verify a direct upload by recomputing SHA-256 server-side.
 
-    - S3 mode: object already in bucket; verify checksum/metadata only.
+    - S3 mode: JSON body; object already in bucket, verify checksum/metadata only.
     - Local api_relay mode: multipart `file` + `ticket` carry the bytes; bytes are
       stored first, then verified, and deleted on mismatch.
+
+    On success the document is registered so the dossier is processable.
     """
     import asyncio
 
     from sqlalchemy import select
 
     from apps.api.db.models import ApplicationModel
+
+    payload = await _parse_complete_request(request)
 
     result = await session.execute(select(ApplicationModel).where(ApplicationModel.id == id))
     if result.scalar_one_or_none() is None:
@@ -236,11 +273,115 @@ async def complete_upload(
         logger.error(f"Integrity verification failed for '{storage_key}': {e}", exc_info=True)
         raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "Integrity verification failed")
 
+    verified_sha = str(receipt.get("sha256", payload.sha256_hex.lower()))
+    verified_size = int(receipt.get("size_bytes", payload.size_bytes))
+
+    # Register the document so a presigned upload produces the same durable
+    # state as POST /documents. Without this the bytes landed in storage but no
+    # DocumentModel row existed, so the dossier could never be processed — the
+    # direct-upload path was effectively a no-op.
+    registered = await _register_document(
+        session=session,
+        application_id=id,
+        document_id=payload.document_id,
+        storage_key=storage_key,
+        sha256=verified_sha,
+        size_bytes=verified_size,
+    )
+
     return CompleteResponse(
         document_id=payload.document_id,
         application_id=id,
+        filename=os.path.basename(storage_key),
         storage_key=storage_key,
-        sha256=str(receipt.get("sha256", payload.sha256_hex.lower())),
-        size_bytes=int(receipt.get("size_bytes", payload.size_bytes)),
+        sha256=verified_sha,
+        size_bytes=verified_size,
         verified_via=str(receipt.get("verified_via", "rehash")),
+        registered=registered,
     )
+
+
+async def _register_document(
+    session,
+    application_id: str,
+    document_id: str,
+    storage_key: str,
+    sha256: str,
+    size_bytes: int,
+) -> bool:
+    """
+    Persist DocumentModel + application state_json for a verified direct upload.
+
+    Idempotent: re-completing the same document_id updates the existing row
+    rather than raising, because at-least-once clients may retry.
+    """
+    from sqlalchemy import select
+
+    from apps.api.db.models import ApplicationModel, DocumentModel, utc_now
+
+    filename = os.path.basename(storage_key)
+    now = utc_now()
+
+    existing = (
+        await session.execute(select(DocumentModel).where(DocumentModel.id == document_id))
+    ).scalar_one_or_none()
+
+    if existing is not None:
+        if existing.application_id != application_id:
+            raise HTTPException(
+                status.HTTP_409_CONFLICT,
+                f"Document '{document_id}' already belongs to another application",
+            )
+        existing.storage_uri = storage_key
+        existing.sha256 = sha256
+        existing.size_bytes = size_bytes
+    else:
+        session.add(
+            DocumentModel(
+                id=document_id,
+                application_id=application_id,
+                filename=filename,
+                storage_uri=storage_key,
+                doc_type=None,
+                sha256=sha256,
+                size_bytes=size_bytes,
+                created_at=now,
+            )
+        )
+
+    app_model = (
+        await session.execute(
+            select(ApplicationModel).where(ApplicationModel.id == application_id)
+        )
+    ).scalar_one_or_none()
+    if app_model is not None:
+        state = dict(app_model.state_json or {})
+        doc_ids = list(state.get("document_ids", []))
+        if document_id not in doc_ids:
+            doc_ids.append(document_id)
+        state["document_ids"] = doc_ids
+
+        manifest = dict(state.get("document_manifest", {}))
+        manifest[document_id] = storage_key
+        state["document_manifest"] = manifest
+
+        filenames = dict(state.get("document_filenames", {}))
+        filenames[document_id] = filename
+        state["document_filenames"] = filenames
+
+        app_model.state_json = state
+        app_model.updated_at = now
+
+    try:
+        await session.commit()
+    except Exception as db_err:  # noqa: BLE001 - surfaced to the caller
+        await session.rollback()
+        logger.error(
+            f"Failed to register direct upload '{document_id}' for '{application_id}': {db_err}",
+            exc_info=True,
+        )
+        raise HTTPException(
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+            "Upload verified but document registration failed",
+        )
+    return True

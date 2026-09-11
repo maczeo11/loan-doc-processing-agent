@@ -2,6 +2,13 @@ import { UnderwriterProfile, UnderwriterRole } from '../types/auth';
 
 const STORAGE_KEY = 'finscan_underwriter_session';
 
+/**
+ * Mock personas carry no avatar URL on purpose.
+ *
+ * These previously pointed at Unsplash, so a workstation without internet (the
+ * deployment this product targets) rendered three broken images on the sign-in
+ * screen. The UI falls back to an initials/icon chip, which needs no network.
+ */
 export const UNDERWRITER_PERSONAS: Record<UnderwriterRole, UnderwriterProfile> = {
   SENIOR_UNDERWRITER: {
     id: 'USR-AKSHAYA-01',
@@ -9,7 +16,6 @@ export const UNDERWRITER_PERSONAS: Record<UnderwriterRole, UnderwriterProfile> =
     email: 'akshaya.underwriting@finscan.internal',
     role: 'SENIOR_UNDERWRITER',
     token: 'mock_jwt_token_senior_underwriter_akshaya_2026',
-    avatarUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=100&auto=format&fit=crop&q=80',
   },
   RISK_ANALYST: {
     id: 'USR-KARTHIK-02',
@@ -17,7 +23,6 @@ export const UNDERWRITER_PERSONAS: Record<UnderwriterRole, UnderwriterProfile> =
     email: 'karthik.risk@finscan.internal',
     role: 'RISK_ANALYST',
     token: 'mock_jwt_token_risk_analyst_karthik_2026',
-    avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80',
   },
   COMPLIANCE_OFFICER: {
     id: 'USR-MANJU-03',
@@ -25,9 +30,16 @@ export const UNDERWRITER_PERSONAS: Record<UnderwriterRole, UnderwriterProfile> =
     email: 'manju.compliance@finscan.internal',
     role: 'COMPLIANCE_OFFICER',
     token: 'mock_jwt_token_compliance_officer_manju_2026',
-    avatarUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&auto=format&fit=crop&q=80',
   },
 };
+
+/** Two-letter initials for the avatar chip when no picture is available. */
+export function initialsFor(name?: string | null): string {
+  const parts = (name || '').trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '??';
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[1][0]).toUpperCase();
+}
 
 export class AuthService {
   static getStoredUser(): UnderwriterProfile | null {

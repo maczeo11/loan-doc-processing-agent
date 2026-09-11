@@ -97,6 +97,10 @@ def ocr_and_classify_node(state: LoanApplicationState) -> Dict[str, Any]:
     doc_ids = state.get("document_ids", []) or list(manifest.keys())
     doc_bytes_map = state.get("document_bytes", {}) or {}
     doc_texts_map = dict(state.get("document_texts", {}) or {})
+    # Observed perception metadata, surfaced to the reviewer UI so the dossier
+    # index reports what actually happened instead of a plausible-looking guess.
+    page_counts: Dict[str, int] = dict(state.get("document_pages", {}) or {})
+    ocr_routes: Dict[str, str] = dict(state.get("ocr_routes", {}) or {})
 
     storage = LocalFileSystemStorage()
     all_ids = list(set(doc_ids + list(manifest.keys())))
@@ -134,10 +138,14 @@ def ocr_and_classify_node(state: LoanApplicationState) -> Dict[str, Any]:
                     import time as _t
                     _t0 = _t.monotonic()
                     pages = extract_all_pages_content(pdf_input)
+                    page_counts[doc_id] = len(pages)
                     if len(pages) > 30:
                         logger.warning(f"Truncating {doc_id} from {len(pages)} to 30 pages (dossier cap)")
                         pages = pages[:30]
                     page_texts = [p.get("text", "") for p in pages if p.get("text", "").strip()]
+                    # Every page carried a usable native text layer -> native route.
+                    # Any page without one had to be escalated to OCR downstream.
+                    ocr_routes[doc_id] = "native" if pages and len(page_texts) == len(pages) else "ocr"
                     # Cache for Node 3 reuse (avoids second OCR pass).
                     doc_texts_map[doc_id] = page_texts
                     logger.info(f"Parsed {doc_id}: {len(page_texts)} text pages in {int((_t.monotonic() - _t0) * 1000)}ms")
@@ -177,7 +185,12 @@ def ocr_and_classify_node(state: LoanApplicationState) -> Dict[str, Any]:
 
         classified[doc_id] = predicted
 
-    return {"classified_types": classified, "document_texts": doc_texts_map}
+    return {
+        "classified_types": classified,
+        "document_texts": doc_texts_map,
+        "document_pages": page_counts,
+        "ocr_routes": ocr_routes,
+    }
 
 
 def extract_facts_node(state: LoanApplicationState) -> Dict[str, Any]:

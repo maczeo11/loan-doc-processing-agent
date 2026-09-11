@@ -17,7 +17,7 @@ Rules:
 
 import time
 import logging
-from typing import Awaitable, Callable, Iterable, List, Optional, Set
+from typing import Awaitable, Callable, Iterable, Optional, Set
 from fastapi import HTTPException, status
 import redis.asyncio as aioredis
 

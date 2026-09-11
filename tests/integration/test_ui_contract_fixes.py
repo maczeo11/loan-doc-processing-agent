@@ -24,7 +24,7 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from apps.api.db.models import ApplicationModel, Base, DocumentModel, utc_now
+from apps.api.db.models import ApplicationModel, Base, DocumentModel
 from apps.api.db.session import get_db
 from apps.api.main import app
 from apps.api.middleware.rate_limit import get_redis_client

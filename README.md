@@ -54,24 +54,38 @@ FinScan AI resolves this through **Provenance-Grounded Deterministic Verificatio
 
 FinScan AI follows a **Hexagonal Ports & Adapters** architecture. The core domain code (`core/`) contains pure business logic and remains completely decoupled from external cloud SDKs or infrastructure providers.
 
-```
-       [ Client Layer: React 18 SPA / OpenAPI REST API ]
-                               │
-                               ▼
-     ┌─────────────────────────────────────────────────────────┐
-     │              core/ (Pure Business Logic)                │
-     │  contracts/    extraction/    rules/    rag/    graph/  │
-     └─────────────────────────┬───────────────────────────────┘
-                               │ (Abstract Interfaces)
-                               ▼
-     ┌─────────────────────────────────────────────────────────┐
-     │                  adapters/ (Ports)                      │
-     │     StoragePort           QueuePort           LLMPort   │
-     └─────────┬─────────────────────┬───────────────────┬─────┘
-               │                     │                   │
-     ┌─────────┴─────────┐ ┌─────────┴─────────┐ ┌───────┴───────┐
-     │ Local FS / AWS S3 │ │ PG Queue / AWS SQS│ │ Zen / Qwen    │
-     └───────────────────┘ └───────────────────┘ └───────────────┘
+```mermaid
+graph TD
+    subgraph Clients["Client Layer"]
+        SPA["React 18 SPA (Vite + TS + Tailwind)"]
+        API["FastAPI REST Endpoints"]
+    end
+
+    subgraph Core["Core Domain (Pure Business Logic)"]
+        Contracts["core/contracts<br/>(EvidenceRef, MoneyFact, Finding, State)"]
+        Extract["core/extraction<br/>(OCR Routing & Extractors)"]
+        Rules["core/rules<br/>(Deterministic Decimal Engine)"]
+        RAG["core/rag<br/>(Hybrid RRF & Grounding Gate)"]
+        Graph["core/graph<br/>(LangGraph StateMachine)"]
+    end
+
+    subgraph Ports["Ports Layer (Abstract Interfaces)"]
+        SPort["StoragePort"]
+        QPort["QueuePort"]
+        LPort["LLMPort"]
+    end
+
+    subgraph Providers["Adapters & Infrastructure Providers"]
+        SImpl["Local FS / AWS S3 (SSE-AES256)"]
+        QImpl["Postgres SKIP LOCKED / AWS SQS + DLQ"]
+        LImpl["OpenCode Zen / Qwen3-4B GGUF"]
+    end
+
+    Clients --> Core
+    Core --> Ports
+    SPort --> SImpl
+    QPort --> QImpl
+    LPort --> LImpl
 ```
 
 ### LangGraph Execution Pipeline

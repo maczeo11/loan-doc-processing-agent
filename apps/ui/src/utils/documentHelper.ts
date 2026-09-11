@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Utility functions to map document identifiers and types to human-readable titles and categories.
  */
 
@@ -18,15 +18,13 @@ export function getDocumentTitle(docId: string, docType?: string): string {
       return 'ITR-V Acknowledgement (AY 24-25)';
     case 'doc-pan-card':
       return 'PAN Card Identity Proof';
-    default:
-      if (docType) {
-        return docType
-          .split('_')
-          .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-          .join(' ');
-      }
-      return docId;
   }
+
+  if (docType && docType !== 'document' && docType !== 'unknown') {
+    const category = getDocumentCategory(docType);
+    return `${category} • ${docId}`;
+  }
+  return docId;
 }
 
 export function getDocumentCategory(docType?: string): string {

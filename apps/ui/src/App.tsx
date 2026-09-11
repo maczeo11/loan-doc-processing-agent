@@ -25,7 +25,10 @@ import { useAuth } from './context/AuthContext';
  * Adapter: convert LoanApplicationState (backend contract) → LoanApplication (UI component model).
  * The new Swiss layout components expect the richer LoanApplication interface.
  */
-function toLoanApplication(state: LoanApplicationState): LoanApplication {
+function toLoanApplication(
+  state: LoanApplicationState,
+  liveApps?: Array<{ application_id: string; loan_amount?: number }>
+): LoanApplication {
   const docIds = state.document_ids || [];
   const classified = state.classified_types || {};
 
@@ -43,19 +46,21 @@ function toLoanApplication(state: LoanApplicationState): LoanApplication {
       id,
       name: getDocumentTitle(id, docType),
       document_type: mappedType,
-      page_count: mappedType === 'APPLICATION_FORM' ? 2 : mappedType === 'BANK_STATEMENT' ? 3 : 1,
-      ocr_route: id === 'doc-pan-card' ? 'paddle' : 'native',
+      page_count: (state as any).document_pages?.[id] ?? (mappedType === 'APPLICATION_FORM' ? 2 : mappedType === 'BANK_STATEMENT' ? 3 : 1),
+      ocr_route: (state as any).ocr_routes?.[id] ?? (docType.includes('id') || docType.includes('pan') ? 'paddle' : 'native'),
       verified: true,
     } as DossierDocument;
   });
 
   const history = state.status_history || [];
+  const liveApp = liveApps?.find((a) => a.application_id === state.application_id);
+  const loanAmount = (state as any).loan_amount ?? liveApp?.loan_amount ?? 2500000;
 
   return {
     id: state.application_id,
     applicant_name: state.applicant?.full_name || 'Applicant',
     pan_masked: state.applicant?.pan_number || '—',
-    loan_amount: 2500000, // Demo seed value: ₹ 25,00,000
+    loan_amount: loanAmount,
     currency: 'INR',
     status: state.status,
     created_at: history[0]?.timestamp || new Date().toISOString(),
@@ -150,7 +155,7 @@ function AppInner({
   }, []);
 
   // Convert state to LoanApplication for Swiss components
-  const application = useMemo(() => toLoanApplication(dossierState), [dossierState]);
+  const application = useMemo(() => toLoanApplication(dossierState, liveApps), [dossierState, liveApps]);
 
   const fetchApplicationData = useCallback(async (isPolling = false) => {
     if (!selectedAppId) return;
@@ -416,7 +421,7 @@ function AppInner({
   // FastAPI-served dist in prod). encodeURIComponent prevents path breakage.
   // Falls through to `unavailable` empty state instead of pdf.js MissingPDF.
   const pdfSource =
-    selectedAppId && selectedDocId && !isDemoPreset
+    selectedAppId && selectedDocId
       ? `/applications/${encodeURIComponent(selectedAppId)}/documents/${encodeURIComponent(selectedDocId)}`
       : undefined;
 

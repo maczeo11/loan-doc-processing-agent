@@ -13,7 +13,7 @@ import datetime
 import logging
 import os
 import re
-from typing import Dict, Any, List, Optional, Union
+from typing import Any, Dict, List, Optional, Set, Union
 
 from core.contracts.state import LoanApplicationState, StatusTransition, ApplicationStatus
 from core.contracts.findings import Finding

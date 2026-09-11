@@ -53,11 +53,24 @@ export const PolicyQaTab: React.FC<PolicyQaTabProps> = ({ applicationId, onSelec
     if (!question.trim() || loading) return;
 
     const q = question.trim();
+    if (!applicationId) {
+      setHistory((prev) => [
+        {
+          question: q,
+          answer: 'Please select an active loan dossier before querying policy guidelines.',
+          is_grounded: false,
+          citations: [],
+        },
+        ...prev,
+      ]);
+      return;
+    }
+
     setLoading(true);
     setQuestion('');
 
     try {
-      const resp = await api.askQuestion(applicationId || 'APP-25195', { question: q });
+      const resp = await api.askQuestion(applicationId, { question: q });
       const citations: PolicyCitation[] = (resp.citations || []).map((c) => ({
         chunk_id: c.chunk_id || '',
         policy_name: c.policy_id || c.title || 'Policy',

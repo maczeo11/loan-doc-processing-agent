@@ -465,6 +465,7 @@ def test_flagged_dossier_report(tmp_path):
     assert "#### ⚠️ Flagged Findings (Attention Required)" in memo
     assert "RULE-INC-01" in memo
     assert "Salary discrepancy detected" in memo
+    assert summary["counts"]["flag"] == 1
 
 
 def test_unknown_values_report(tmp_path):
@@ -491,6 +492,7 @@ def test_unknown_values_report(tmp_path):
     assert "- **Net Take-Home Salary:** UNKNOWN" in memo
     assert "- **Average Monthly Salary Credit:** UNKNOWN" in memo
     assert "- **Gross Total Annual Income:** UNKNOWN" in memo
+    assert summary["financial_summary"]["payslip"]["gross_salary"] == "UNKNOWN"
 
 
 def test_evidence_preservation_across_all_financial_facts():

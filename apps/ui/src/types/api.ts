@@ -1,20 +1,8 @@
-import type { BoundingBox } from './evidence';
+import type { BoundingBox, ReviewDecisionRequest, ReviewDecisionResponse } from './contracts';
 
 export type ReviewDecision = 'APPROVED' | 'REJECTED' | 'NEEDS_INFO';
 
-export interface ReviewDecisionRequest {
-  decision: ReviewDecision;
-  reviewer_id: string;
-  notes?: string;
-  corrections?: Array<Record<string, unknown>>;
-}
-
-export interface ReviewDecisionResponse {
-  application_id: string;
-  status: string;
-  updated_at: string;
-  decision?: string;
-}
+export type { ReviewDecisionRequest, ReviewDecisionResponse };
 
 export interface PolicyCitation {
   chunk_id: string;

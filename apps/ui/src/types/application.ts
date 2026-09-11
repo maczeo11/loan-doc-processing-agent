@@ -1,14 +1,6 @@
-import { EvidenceRef, Finding } from './evidence';
+import type { EvidenceRef, Finding, ApplicationStatus } from './contracts';
 
-export type ApplicationStatus =
-  | 'UPLOADED'
-  | 'QUEUED'
-  | 'PROCESSING'
-  | 'READY_FOR_REVIEW'
-  | 'NEEDS_INFORMATION'
-  | 'REVIEWED'
-  | 'FAILED'
-  | 'CANCELLED';
+export type { ApplicationStatus };
 
 export interface MoneyFact {
   amount: number;
@@ -61,8 +53,6 @@ export interface DossierDocument {
   page_count: number;
   ocr_route: 'native' | 'paddle' | 'textract';
   verified: boolean;
-  signed_url?: string;
-  download_url?: string;
 }
 
 export interface LoanApplication {

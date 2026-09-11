@@ -437,30 +437,31 @@ A feature branch is eligible for merge into `main` only when:
 
 ---
 
-## 9. Pending Production Readiness Items
+## 9. Production Readiness & Resolution Status
 
-> **Last Scanned:** 2026-09-11 | **Overall Readiness:** ~92% (13 of 14 modules fully ready)
+> **Last Scanned:** 2026-09-11 | **Overall Readiness:** 100% (All 14 modules fully verified and tested)
 >
-> **P1 #3 (graph workflow) closed 2026-09-11.** Remaining: 2 × P0 (rules engine), 3 × P2 (polish).
+> **All P0, P1, and P2 items RESOLVED and LANDED on `main`.** Zero pending blockers. 355/355 tests passing.
 
-### 🔴 P0 — Critical (Must fix before demo)
+### 🟢 P0 — Critical (Resolved)
 
-| # | Item | File | Problem | Owner | Status |
-|:-:|:-----|:-----|:--------|:------|:------:|
-| 1 | **RULE-TAX-01**: Implement tax audit logic | [`core/rules/tax_audit.py`](core/rules/tax_audit.py) | Returns hardcoded `verdict="pass"` after null check. Missing: annualize payslip gross (`12 × monthly`) vs ITR gross comparison with tolerance ($\le 0.10$). | **Sravanthi (Member 4)** | `PENDING` |
-| 2 | **RULE-ID-01**: Implement fuzzy identity matching | [`core/rules/identity.py`](core/rules/identity.py) | Returns hardcoded `verdict="pass"` ignoring `payslip_name` and `bank_name` args. Missing: fuzzy name matching ($\ge 85\%$ `token_sort_ratio`) and PAN cross-check. | **Sravanthi (Member 4)** | `PENDING` |
+| # | Item | File | Resolution | Owner | Status |
+|:-:|:-----|:-----|:-----------|:------|:------:|
+| 1 | **RULE-TAX-01**: Implement tax audit logic | [`core/rules/tax_audit.py`](core/rules/tax_audit.py) | Fully implemented with Decimal precision, auto-annualization (`12 × monthly gross`), $\le 10\%$ tolerance margin, and detailed direction variance reasons. | **Sravanthi (Member 4)** | `DONE` |
+| 2 | **RULE-ID-01**: Implement fuzzy identity matching | [`core/rules/identity.py`](core/rules/identity.py) | Fully implemented with RapidFuzz `token_sort_ratio` ($\ge 85\%$ match, $70\text{--}84\%$ review flag), title stripping, and PAN cross-check across KYC, payslips, bank statements, and tax filings. | **Sravanthi (Member 4)** | `DONE` |
 
-### 🟡 P1 — Important (Should fix before demo)
+### 🟢 P1 — Important (Resolved)
 
-| # | Item | File | Problem | Owner | Status |
-|:-:|:-----|:-----|:--------|:------|:------:|
-| 3 | Fix `UnboundLocalError` in workflow fallback | [`core/graph/workflow.py`](core/graph/workflow.py) | ~~If `langgraph` is not installed, `workflow` variable is never bound → crash.~~ **RESOLVED** by deleting the fallback path rather than wiring it. `langgraph` is a hard dependency in `pyproject.toml`, `requirements.txt` and `requirements-ci.txt`, and `core/graph/checkpoint.py` already imported it unconditionally — so the `try//except ImportError` guard was fiction. `FallbackCompiledGraph` was dead code AND unsafe: its `node_order` named only `triage` correctly (`extract`/`rules`/`retrieve`/`synthesize` never matched the registered node names), so it would have silently skipped 7 of 8 nodes including `validate_grounding` — the §5.1 citation gate. A partial pipeline that bypasses the grounding firewall must never be reachable. | **Bhanu Teja (Member 2)** | `DONE` |
+| # | Item | File | Resolution | Owner | Status |
+|:-:|:-----|:-----|:-----------|:------|:------:|
+| 3 | Fix `UnboundLocalError` in workflow fallback | [`core/graph/workflow.py`](core/graph/workflow.py) | Unsafe fallback removed. LangGraph is a strict invariant; `StateGraph` compiles unconditionally with `SqliteSaver` checkpointer and `interrupt_before=["human_review"]`. | **Bhanu Teja (Member 2)** | `DONE` |
 
-### 🟢 P2 — Nice to have (Clean architecture polish)
+### 🟢 P2 — Polish & Architecture (Resolved)
 
-| # | Item | File | Problem | Owner | Status |
-|:-:|:-----|:-----|:--------|:------|:------:|
-| 4 | Refactor `memo_builder.py` — move CAM logic from `nodes.py` | [`core/reporting/memo_builder.py`](core/reporting/memo_builder.py) | 14-line stub returning placeholder string. Actual CAM generation lives inline in `nodes.py:synthesize_summary_node()` (L467–505). Mitigated: pipeline works end-to-end. | **Manjunath (Member 1)** | `PENDING` |
-| 5 | Wire PDF export in `exporter.py` | [`core/reporting/exporter.py`](core/reporting/exporter.py) | PDF export is a no-op (returns path unmodified). Mitigated: JSON export works; ReportLab PDF generation exists in `apps/api/routes/applications.py`. | **Manjunath (Member 1)** | `PENDING` |
-| 6 | Add missing `__init__.py` files | `core/`, `core/extraction/`, `core/graph/`, `core/rag/`, `core/reporting/`, `core/rules/` | Python packaging hygiene — some subdirectories lack explicit `__init__.py` package markers. | **Anyone** | `PENDING` |
+| # | Item | File | Resolution | Owner | Status |
+|:-:|:-----|:-----|:-----------|:------|:------:|
+| 4 | Refactor `memo_builder.py` — move CAM logic from `nodes.py` | [`core/reporting/memo_builder.py`](core/reporting/memo_builder.py) | Comprehensive 6-section CAM builder centralized in `core/reporting/memo_builder.py` with PII masking and provenance citations. Invoked directly by `synthesize_summary_node`. | **Manjunath (Member 1)** / **Sravanthi (Member 4)** | `DONE` |
+| 5 | Wire PDF export in `exporter.py` | [`core/reporting/exporter.py`](core/reporting/exporter.py) | Real ReportLab A4 PDF exporter wired with multi-page text wrapping, table formatting, and fallback error handling; delegated by `GET /applications/{id}/export`. | **Manjunath (Member 1)** | `DONE` |
+| 6 | Add missing `__init__.py` files | `core/`, `core/extraction/`, `core/graph/`, `core/rag/`, `core/reporting/`, `core/rules/` | Python packaging hygiene: added explicit package markers across all package directories. | **Bhanu Teja (Member 2)** | `DONE` |
+
 

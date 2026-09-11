@@ -28,63 +28,83 @@ The FinScan AI frontend is a single-page application (SPA) built with React 18, 
 
 ## Component Architecture
 
+Verified against `main` @ `89390f0`. Every file below exists; nothing reachable
+is omitted.
+
 ```
 apps/ui/src/
-├── App.tsx                          # Root component with providers
+├── App.tsx                          # Root: providers, routing, keyboard shortcuts
+├── main.tsx                         # Vite entry
+├── index.css                        # Ledger design tokens (see Theming)
 ├── components/
+│   ├── DashboardPage.tsx            # Dossier desk — landing view, live roster
+│   ├── auth/
+│   │   └── LoginPage.tsx            # Google sign-in gate
 │   ├── layout/
-│   │   ├── Header.tsx               # Top bar with app title, auth, SLA timer
-│   │   ├── LeftDossierPane.tsx      # Document list navigation
-│   │   ├── RightInspectorPane.tsx   # Findings, facts, Q&A, memo tabs
-│   │   └── Resizer.tsx              # Draggable pane dividers
+│   │   ├── Header.tsx               # App title, dossier switcher, SLA timer
+│   │   ├── LeftDossierPane.tsx      # Document index (inlines its own cards)
+│   │   └── RightInspectorPane.tsx   # Findings / facts / memo / Q&A + sign-off
 │   ├── viewer/
-│   │   ├── PdfViewer.tsx            # Main PDF canvas container
-│   │   ├── PdfPage.tsx              # Single page renderer
-│   │   ├── PdfToolbar.tsx           # Zoom, page navigation controls
+│   │   ├── PdfViewer.tsx            # pdf.js canvas container + page render
 │   │   ├── usePdfDocument.ts        # pdf.js document hook
 │   │   ├── BoundingBoxOverlay.tsx   # Evidence highlight layer
-│   │   ├── EvidenceBox.tsx          # Individual evidence highlight
-│   │   └── ViewerToolbar.tsx        # Document-level toolbar
+│   │   ├── EvidenceBox.tsx          # Individual evidence highlight + tooltip
+│   │   └── ViewerToolbar.tsx        # Zoom, paging, document-level controls
 │   ├── review/
 │   │   ├── FindingCard.tsx          # Rule result with evidence citations
 │   │   ├── FactsTab.tsx             # Extracted facts display
-│   │   ├── MemoNarrativeTab.tsx     # Credit Appraisal Memo
-│   │   ├── PolicyQaTab.tsx          # Policy Q&A interface
-│   │   └── ReviewActionModal.tsx    # Approve/Reject/Request Info modal
-│   ├── qa/
-│   │   └── QaPanel.tsx              # Interactive Q&A with citations
+│   │   ├── MemoNarrativeTab.tsx     # Credit Appraisal Memo + exports
+│   │   ├── PolicyQaTab.tsx          # Policy Q&A with grounding banner
+│   │   └── ReviewActionModal.tsx    # Approve / Reject / Request Info + dual-sign
 │   ├── navigation/
-│   │   ├── DocumentList.tsx         # Document navigation list
-│   │   ├── DocumentCard.tsx         # Single document card
-│   │   └── DocumentUploadModal.tsx  # Upload interface
+│   │   ├── DocumentUploadModal.tsx  # Upload interface
+│   │   └── NewApplicationModal.tsx  # Create dossier
 │   └── common/
-│       ├── StatusPill.tsx           # Status/verdict badge
+│       ├── StatusPill.tsx           # StatusPill + VerdictPill (token-driven)
 │       ├── MaskedValue.tsx          # PII-masked display
 │       ├── SlaTimer.tsx             # Review SLA countdown
 │       └── KeyboardShortcutsModal.tsx
 ├── context/
 │   ├── AuthContext.tsx              # Authentication state
-│   └── EvidenceNavigationContext.tsx # Evidence click-to-jump
-├── hooks/
-│   ├── useEvidenceNavigation.ts     # Evidence navigation hook
-│   └── useKeyboardShortcuts.ts      # Keyboard shortcuts
+│   ├── EvidenceNavigationContext.tsx # Evidence click-to-jump (the live one)
+│   └── ThemeContext.tsx             # Stamps data-theme="ledger"; no state
 ├── services/
 │   ├── api.ts                       # Typed API client
-│   ├── auth.ts                      # Auth service
-│   └── documentStorage.ts           # Document storage helpers
+│   └── auth.ts                      # Auth service
 ├── types/
 │   ├── contracts.ts                 # Backend contract types
+│   ├── api.ts                       # Request/response + PolicyCitation
 │   ├── application.ts               # UI-specific types
-│   ├── evidence.ts                  # Evidence types
+│   ├── evidence.ts                  # EvidenceRef, Finding, BoundingBox
 │   └── auth.ts                      # Auth types
 ├── utils/
 │   ├── pii.ts                       # PII masking utilities
 │   ├── coordinates.ts               # Bounding box coordinate utils
 │   ├── documentHelper.ts            # Document metadata helpers
-│   └── exportUtils.ts               # Export functionality
+│   └── demoPdfGenerator.ts          # Synthetic PDFs for demo presets
 └── data/
     └── mockDossier.ts               # Demo data for development
 ```
+
+### Removed in `77baa1d`
+
+Fifteen unreferenced modules were deleted. They are listed here so the names
+in older design notes and PR descriptions resolve to something:
+
+| Removed | Superseded by |
+|---------|---------------|
+| `components/DossierPane.tsx`, `ReviewPane.tsx`, `TopBar.tsx`, `ViewerPane.tsx` | the `layout/` three-pane components |
+| `layout/Resizer.tsx` | fixed pane widths (`width` props on the panes) |
+| `viewer/PdfPage.tsx`, `viewer/EvidenceOverlay.tsx` | inline render path in `PdfViewer` + `BoundingBoxOverlay` → `EvidenceBox` |
+| `viewer/PdfToolbar.tsx` | `viewer/ViewerToolbar.tsx` |
+| `qa/QaPanel.tsx` | `review/PolicyQaTab.tsx` |
+| `navigation/DocumentList.tsx`, `DocumentCard.tsx` | list inlined in `LeftDossierPane` |
+| `hooks/useEvidenceNavigation.ts` | `context/EvidenceNavigationContext.tsx` — the hook was a **name collision** with a different API |
+| `hooks/useKeyboardShortcuts.ts` | inline `keydown` handler in `App.tsx` |
+| `services/documentStorage.ts`, `utils/exportUtils.ts` | no call sites |
+
+There is no `hooks/` directory. `useEvidenceNavigation` is exported from
+`context/EvidenceNavigationContext.tsx` — import it from there.
 
 ---
 
@@ -390,76 +410,55 @@ export const FindingCard: React.FC<FindingCardProps> = ({
 
 ---
 
-## Q&A Panel
+## Policy Q&A
 
-The Q&A panel allows underwriters to ask questions about the application and receive RAG-grounded answers with citations:
+Lives in `review/PolicyQaTab.tsx`, rendered as a tab of the right inspector.
+Underwriters ask policy questions and receive RAG answers that must declare
+their own grounding.
 
-```typescript
-// apps/ui/src/components/qa/QaPanel.tsx
-export const QaPanel: React.FC<QaPanelProps> = ({ applicationId, isDemoMode }) => {
-  const [messages, setMessages] = useState<QaMessage[]>([]);
-  const [input, setInput] = useState('');
+**The grounding banner is not decoration — it is the abstention contract.**
+Every answer renders one, and it is derived, never asserted:
 
-  const handleSubmit = async (question: string) => {
-    // Add user message
-    setMessages(prev => [...prev, { id: nanoid(), question, isLoading: true }]);
-    
-    try {
-      // Call RAG endpoint
-      const response = await api.askQuestion(applicationId, { question });
-      
-      // Add AI response with citations
-      setMessages(prev => prev.map(m => 
-        m.question === question 
-          ? { ...m, answer: response.answer, citations: response.citations, isLoading: false }
-          : m
-      ));
-    } catch (error) {
-      // Handle error
-    }
-  };
+```tsx
+// apps/ui/src/components/review/PolicyQaTab.tsx
+const citations: PolicyCitation[] = (resp.citations || []).map(/* … */);
 
-  return (
-    <div className="flex flex-col h-full">
-      {/* Message history */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {messages.map(msg => (
-          <div key={msg.id}>
-            <div className="text-sm font-medium">{msg.question}</div>
-            {msg.isLoading ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <div className="mt-2">
-                <p className="text-sm text-stone-700">{msg.answer}</p>
-                {/* Citations */}
-                {msg.citations?.map((cit, i) => (
-                  <button
-                    key={i}
-                    onClick={() => navigateToEvidence(cit)}
-                    className="text-xs text-amber-700 hover:underline"
-                  >
-                    [{cit.document_type} P.{cit.page_number}]
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
-
-      {/* Input */}
-      <div className="p-4 border-t">
-        <input
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && handleSubmit(input)}
-          placeholder="Ask about this application..."
-        />
-      </div>
-    </div>
-  );
-};
+setHistory((prev) => [{
+  question: q,
+  answer: resp.answer,
+  // Grounded only when the backend returned at least one citation.
+  is_grounded: citations.length > 0,
+  citations,
+}, ...prev]);
 ```
+
+An ungrounded answer renders `ShieldAlert` + *"Unverified — illustrative
+example, not retrieved evidence"*; a grounded one renders `ShieldCheck` +
+the citation's policy name. The seeded example answer shipped for demos is
+hardcoded `is_grounded: false` for exactly this reason.
+
+Three rules for anyone touching this component:
+
+1. **Never hardcode `is_grounded: true`.** A regression once did, which made the
+   fabricated demo seed render under "Authoritative Citation" — the precise
+   failure [`AGENTS.md`](../AGENTS.md) §1–2 exists to prevent.
+2. **Never swallow the API error.** A bare `catch {}` makes a failed request
+   indistinguishable from a considered answer. Failures are pushed into the
+   stream as an ungrounded entry carrying the error text.
+3. **Citations that carry provenance are navigable.** A citation with
+   `document_id` + `page_number` becomes a jump target into the PDF canvas via
+   `onSelectEvidence`; policy-corpus chunks without them render read-only:
+
+```tsx
+function toEvidenceRef(c: PolicyCitation): EvidenceRef | null {
+  if (!c.document_id || !c.page_number) return null;
+  return { document_id: c.document_id, document_type: c.document_type || 'document',
+           page_number: c.page_number, quoted_span: c.text || '',
+           bounding_box: c.bounding_box ?? null };
+}
+```
+
+Answer text and citation bodies both pass through `sanitizePiiInText`.
 
 ---
 
@@ -622,10 +621,26 @@ COPY --from=ui-build /app/apps/ui/dist /app/apps/ui/dist
 
 ## Human-in-the-Loop Consensus & Two-Step Dual-Sign Confirmation
 
-To enforce **The Prime Invariant** (*A human approves. No autonomous underwriting.*), the UI implements a strict **Two-Step Dual-Sign Confirmation Protocol** in [`ReviewActionModal.tsx`](file:///c:/Users/bhanu/mycodes/cognizant-hackathon/apps/ui/src/components/review/ReviewActionModal.tsx):
+To enforce **The Prime Invariant** (*A human approves. No autonomous underwriting.*), the UI implements a strict **Two-Step Dual-Sign Confirmation Protocol** in [`ReviewActionModal.tsx`](../apps/ui/src/components/review/ReviewActionModal.tsx):
 
 ### Friction Protocol Against Accidental Loan Dispositions
 Underwriters reviewing dozens of applications per day face motor fatigue and accidental click risks. A simple misclick must never approve or deny a loan application.
+
+0. **Step 0 — Sign-off gate (before any modal can open):**
+   - Decisions unlock **only** when the dossier is `READY_FOR_REVIEW` *and* has
+     at least one finding. A dossier still in `UPLOADED` / `QUEUED` /
+     `PROCESSING`, or one with zero findings, cannot be signed at all.
+   - The backend enforces the same rule (409 unless `READY_FOR_REVIEW`); the UI
+     mirrors it so the underwriter is never offered an action the server will
+     reject, and can never authorise a loan before verification has run.
+   - Enforced in **two places that must stay in sync** — the buttons in
+     `RightInspectorPane.tsx` and the `[A]`/`[R]`/`[N]` hotkeys in `App.tsx`:
+     ```tsx
+     const canSignOff =
+       application.status === 'READY_FOR_REVIEW' && application.findings.length > 0;
+     ```
+     A hotkey path that skips this check silently re-opens the hole, since it
+     bypasses the disabled button entirely.
 
 1. **Step 1 — Intent Selection:**
    - Underwriter presses tactile buttons (`[A] Approve`, `[R] Reject`, `[N] Need Info`) or hotkeys.
@@ -637,24 +652,106 @@ Underwriters reviewing dozens of applications per day face motor fatigue and acc
 3. **Step 3 — Dual-Sign Identifier Challenge:**
    - The underwriter must explicitly type the exact dossier identifier (e.g. `APP-25195`) into the confirmation challenge field.
    - The `Confirm & Authorize` action button is strictly disabled until the typed string matches the application ID.
+   - The match **must also be non-empty**:
+     ```tsx
+     const confirmMatches =
+       confirmText.trim() !== '' && confirmText.trim() === applicationId;
+     ```
+     Without the first clause the protocol defeats itself: `''.trim() === ''` is
+     `true`, so whenever `applicationId` is empty the seal button unlocks on a
+     *freshly opened, untouched* modal — one stray Enter away from an
+     authorisation. This has regressed once; it is the single most important
+     line in the file.
    - Once confirmed, the review decision and rationale are atomically posted to the backend API (`POST /review/{id}/decision`) and sealed.
+
+### Regression watchlist
+
+These five behaviours have each been silently reverted at least once by a merge
+from a stale base. They produce no build error and no visible symptom in a happy-path
+demo — check them explicitly before any release:
+
+| Guard | Location | Symptom when lost |
+|-------|----------|-------------------|
+| Sign-off gate | `RightInspectorPane.tsx`, `App.tsx` | Loans signable before verification runs |
+| Non-empty dual-sign | `ReviewActionModal.tsx` | Seal button unlocked on a fresh modal |
+| `sanitizePiiInText` on evidence spans | `EvidenceBox.tsx`, `PdfViewer.tsx` | Raw PAN / Aadhaar / account numbers on screen and in `aria-label` |
+| Derived `is_grounded` | `PolicyQaTab.tsx` | Fabricated answers labelled "Authoritative Citation" |
+| Unevidenced-finding warning | `FindingCard.tsx` | Findings with no `EvidenceRef` render as confirmed |
 
 ---
 
-## Financial Design System & Theme Engine
+## Financial Design System — Archival Swiss Ledger
 
-The UI provides a live, 3-in-1 institutional theme switcher powered by [`ThemeContext.tsx`](file:///c:/Users/bhanu/mycodes/cognizant-hackathon/apps/ui/src/context/ThemeContext.tsx) with persistent `localStorage`:
+The product ships **one** theme. An earlier 3-in-1 switcher (Slate / Obsidian)
+with `localStorage` persistence was removed once the product committed to a
+single look; its palettes were unreachable dead CSS and its provider had no
+consumers. [`ThemeContext.tsx`](../apps/ui/src/context/ThemeContext.tsx) now
+only stamps `data-theme="ledger"`, and `index.html` stamps it too so the palette
+lands on first paint instead of after React mounts.
 
-1. **Archival Swiss Ledger (Default):**
-   - Palette: Warm parchment desk (`#F8F6F1`, `#F5F2EB`), British racing green (`#14532D`), Bordeaux claret (`#991B1B`), and tobacco amber (`#92400E`).
-   - Typography: Editorial serif display headers (`Newsreader` / `Georgia`) paired with JetBrains Mono.
-   - Purpose: Evokes the trust, rigor, and heritage of Swiss private banking and formal credit audit desks.
-2. **Modern FinTech Slate:**
-   - Palette: Cool slate (`#F8FAFC`), deep navy headers (`#0F172A`), and indigo/cobalt accents (`#4F46E5`).
-   - Purpose: Modern enterprise fintech aesthetic modeled after Ramp, Linear, and Stripe Terminal.
-3. **Obsidian Command Cockpit:**
-   - Palette: Deep obsidian slate (`#0B0F19`, `#111827`), glowing neon emerald (`#10B981`), radiant rose (`#F43F5E`), and electric amber.
-   - Purpose: High-contrast dark mode for low-light underwriting sessions and multi-monitor workstations.
+- **Palette:** warm parchment desk (`#F8F6F1`, `#F5F2EB`), British racing green
+  (`#14532D`), Bordeaux claret (`#991B1B`), tobacco amber (`#92400E`).
+- **Typography:** editorial serif headers (`Newsreader` / Georgia) against
+  `JetBrains Mono` for every figure and identifier.
+- **Intent:** the trust and rigour of a Swiss private-banking credit audit desk.
 
-All themes strictly adhere to `font-feature-settings: 'tnum' 1` (`tabular-nums`) to ensure flawless vertical digit alignment across all financial comparisons.
+`font-feature-settings: 'tnum' 1` (`tabular-nums`) is set on `body` so digits
+align vertically in every financial comparison.
+
+### The token contract
+
+Colour lives in exactly one place: CSS custom properties on `:root` in
+[`index.css`](../apps/ui/src/index.css), surfaced as Tailwind `theme-*` colours
+in `tailwind.config.js`.
+
+**No component may hardcode a Tailwind palette colour** (`bg-emerald-500`,
+`text-slate-900`, …). There are currently zero such usages; keep it that way.
+Beyond consistency this has bitten us concretely — several hardcoded values were
+*dark-theme* colours left stranded on the light parchment ground, so the SLA
+timer, the masked-PII pill and the pipeline panel were rendering pale text on a
+light background.
+
+| Semantic | Token | Use for |
+|----------|-------|---------|
+| Verified / approved | `theme-pass`, `theme-pass-bg`, `theme-pass-border` | PASS verdicts, sign-off confirmation |
+| Discrepancy / rejected | `theme-flag`, `theme-flag-bg`, `theme-flag-border` | FLAG verdicts, failures, destructive actions |
+| Unverified / attention | `theme-unknown`, `theme-unknown-bg`, `theme-unknown-border` | UNKNOWN verdicts, evidence highlights, pending pipeline |
+| Surfaces | `theme-app`, `theme-card`, `theme-panel`, `theme-panel-hover` | backgrounds, in that nesting order |
+| Text | `theme-primary`, `theme-secondary`, `theme-muted` | body copy by emphasis |
+| Structure | `theme-border`, `theme-border-card` | hairlines and card edges |
+| Brand | `theme-brand` | navigation accents, focus states |
+
+Note that `theme-brand` and `theme-pass` are both `#14532D`. Do not use
+`theme-brand` to signal approval — an "in progress" state tinted brand green is
+indistinguishable from a signed-off one. Transient states use the neutral panel
+plus a spinner; see `StatusPill`'s `PROCESSING` entry.
+
+### Tokens are RGB channels, not hex
+
+Each token is a **space-separated RGB triplet**, and `tailwind.config.js` wraps
+it with `<alpha-value>`:
+
+```css
+/* index.css */
+--accent-pass: 20 83 45;          /* NOT #14532D */
+```
+```js
+/* tailwind.config.js */
+pass: 'rgb(var(--accent-pass) / <alpha-value>)',
+```
+
+This is load-bearing. Tailwind **cannot apply an alpha modifier to a plain
+`var()` colour** — it silently generates no class at all, with no build error
+and no console warning. While the tokens were hex, every one of the 27
+`/alpha` utilities in the app was dead: `bg-theme-panel/50` throughout
+`FactsTab`, the focus rings in `FindingCard` and `LeftDossierPane`, both modal
+tints. They looked correct in source and did nothing in the browser.
+
+If you add a token, add the channel triplet **and** the `<alpha-value>` wrapper.
+To verify a suspect utility actually compiled:
+
+```bash
+cd apps/ui && npm run build
+grep -o 'bg-theme-panel\\/50{[^}]*}' dist/assets/*.css   # empty output = not generated
+```
 

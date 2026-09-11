@@ -100,19 +100,70 @@ FinScan AI has achieved **100% implementation completion** across all 8 team mem
 
 ### 4. Sravanthi — Deterministic Rules Engine & Synthetic Data
 
-| Deliverable | Status | Location |
-|-------------|--------|----------|
-| RULE-COMP-01 (Completeness) | ✅ | `core/rules/completeness.py` |
-| RULE-INC-01 (Salary Audit) | ✅ | `core/rules/salary_audit.py` |
-| RULE-TAX-01 (Tax Audit) | ✅ | `core/rules/tax_audit.py` |
-| RULE-ID-01 (Identity) | ✅ | `core/rules/identity.py` |
-| RULE-BANK-01 (Bank Arithmetic) | ✅ | `core/rules/bank_arithmetic.py` |
-| Synthetic Dossier Generator | ✅ | `scripts/generate_dossiers.py` |
-| CAM Builder | ✅ | `core/reporting/memo_builder.py` |
+> ⚠️ **This section was audited against `main` on 2026-09-11 and corrected.**
+> Three deliverables previously marked ✅ are not implemented on `main`. See
+> [Rules engine: real status](#rules-engine-real-status) below for why this
+> matters more than an ordinary gap. These are tracked as **P0** items in
+> [`AGENTS.md` §9](../AGENTS.md#9-pending-production-readiness-items), which
+> carries the owners and priorities; this page describes the current state.
 
-**Lines of Code:** ~900 LOC
+| Deliverable | Status | Location (on `main`) |
+|-------------|--------|----------------------|
+| RULE-COMP-01 (Completeness) | ✅ Implemented | `core/rules/completeness.py` (26 LOC) |
+| RULE-INC-01 (Salary Audit) | ✅ Implemented | `core/rules/salary_audit.py` (39 LOC) |
+| RULE-TAX-01 (Tax Audit) | ⚠️ **Stub — returns PASS** | `core/rules/tax_audit.py` (24 LOC) |
+| RULE-ID-01 (Identity) | ⚠️ **Stub — returns PASS** | `core/rules/identity.py` (24 LOC) |
+| RULE-BANK-01 (Bank Arithmetic) | ❌ **File does not exist** | — (was listed as `core/rules/bank_arithmetic.py`) |
+| Synthetic Dossier Generator | 🟡 Partial | `scripts/generate_dossiers.py` (147 LOC; 815-LOC version unmerged) |
+| CAM Builder | ⚠️ **Stub — returns placeholder** | `core/reporting/memo_builder.py` (10 LOC) |
+| CAM Exporter | ⚠️ **Stub** | `core/reporting/exporter.py` (10 LOC) |
 
-**Key Features:**
+**Legend:** ✅ implemented and exercised · 🟡 partial · ⚠️ stub present but not
+computing · ❌ absent.
+
+#### Rules engine: real status
+
+Two of the five rules do not evaluate their inputs. Both accept the facts they
+are meant to cross-check and then return a hardcoded `pass`:
+
+```python
+# core/rules/identity.py on main — payslip_name and bank_name are never read
+def audit_identity_consistency(applicant, payslip_name, bank_name) -> Finding:
+    if applicant is None:
+        return Finding(..., verdict="unknown", ...)
+    # TODO: Member 4 implement fuzzy name matching (RapidFuzz token_sort_ratio)
+    return Finding(..., verdict="pass",
+                   reason=f"Identity confirmed across documents for {applicant.full_name}.")
+```
+
+`audit_tax_vs_income` has the same shape: it takes `stated_annual_income` and
+`itr_gross_income`, compares neither, and returns `pass`.
+
+This is worth stating plainly because it inverts the project's first doctrine.
+[`AGENTS.md`](../AGENTS.md) §1 says *"No total, net salary, DTI ratio,
+disposition, pass/flag verdict, or monetary value may originate from an LLM.
+Pure deterministic code computes them."* These two verdicts do not come from an
+LLM — they come from a `return "pass"`, which is the same failure with a
+shorter stack trace. The reviewer SPA renders them with a green PASS pill and a
+"Deterministic Rule" footer, so the UI presents a fabricated verdict as a
+verified one. Neither rule has a `flag` branch, so **no dossier can ever fail an
+identity or tax check.**
+
+Working implementations exist but are stranded on unmerged branches:
+
+| Branch | `identity.py` | `tax_audit.py` | `memo_builder.py` | Notes |
+|--------|---------------|----------------|-------------------|-------|
+| `fix/graph-rules-reporting-remediation` | 114 LOC | 66 LOC | 51 LOC | + `exporter.py` 93 LOC, graph fixes |
+| `feat/data-dossiers` | 190 LOC | 163 LOC | 558 LOC | + RULE-BANK-01, 50 dossiers, ~2k LOC tests |
+
+The two branches are **competing implementations** and conflict on seven files
+(`core/rules/{identity,tax_audit,__init__}.py`,
+`core/reporting/{memo_builder,__init__}.py`,
+`tests/unit/test_{rules,reporting}.py`). Landing the rules engine requires
+choosing one as the base — an open decision for Member 4 (Sravanthi) and the
+Lead Integrator, since `core/rules/` is a HUMAN-ONLY ZONE.
+
+**Key Features** *(target design — implemented only where marked ✅ above)*:
 - Decimal arithmetic (floating-point immune)
 - 5% tolerance thresholds
 - Fuzzy name matching with difflib
@@ -179,14 +230,27 @@ FinScan AI has achieved **100% implementation completion** across all 8 team mem
 | Bounding Box Overlay | ✅ | `apps/ui/src/components/viewer/BoundingBoxOverlay.tsx` |
 | Evidence Box | ✅ | `apps/ui/src/components/viewer/EvidenceBox.tsx` |
 | Finding Cards | ✅ | `apps/ui/src/components/review/FindingCard.tsx` |
-| Q&A Panel | ✅ | `apps/ui/src/components/qa/QaPanel.tsx` |
+| Policy Q&A | ✅ | `apps/ui/src/components/review/PolicyQaTab.tsx` |
 | Review Action Modal | ✅ | `apps/ui/src/components/review/ReviewActionModal.tsx` |
 | PII Masking | ✅ | `apps/ui/src/utils/pii.ts` |
 | API Client | ✅ | `apps/ui/src/services/api.ts` |
 | Auth Context | ✅ | `apps/ui/src/context/AuthContext.tsx` |
 | Evidence Navigation | ✅ | `apps/ui/src/context/EvidenceNavigationContext.tsx` |
+| Document viewing (end to end) | ❌ **Blocked** | UI requests `GET /applications/{id}/documents/{doc_id}`; the route is not on `main` (see below) |
 
 **Lines of Code:** ~2,500 LOC
+
+> **Blocked on `main`:** the SPA builds document URLs for pdf.js, but
+> `apps/api/routes/documents.py` on `main` exposes upload only — no GET route —
+> so every document request 404s and the viewer falls through to its
+> `unavailable` empty state. The route exists at
+> `feat/ui-backend-truth:apps/api/routes/documents.py:268` and is the smallest
+> unblocking merge available.
+
+> **Note:** `components/qa/QaPanel.tsx` was removed (superseded by
+> `review/PolicyQaTab.tsx`), along with 14 other unreferenced modules, in
+> `77baa1d`. See [frontend_architecture.md](./frontend_architecture.md) for the
+> current tree.
 
 **Key Features:**
 - pdf.js canvas rendering
@@ -251,7 +315,7 @@ FinScan AI has achieved **100% implementation completion** across all 8 team mem
 | OCR Routing | ✅ | Native → PaddleOCR → Textract |
 | Page Classification | ✅ | TF-IDF + DistilBERT |
 | Fact Extraction | ✅ | 4 extractors with EvidenceRef |
-| Deterministic Rules | ✅ | 5 rules (completeness, salary, tax, identity, bank) |
+| Deterministic Rules | ⚠️ | 2 of 5 implemented (completeness, salary). Tax + identity are stubs returning `pass`; bank arithmetic absent. See [§4](#4-sravanthi--deterministic-rules-engine--synthetic-data). |
 | Hybrid RAG | ✅ | BM25 + BGE + RRF |
 | Grounding Validation | ✅ | Citation gate |
 | Human Review | ✅ | Interrupt checkpoint |

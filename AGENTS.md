@@ -276,7 +276,7 @@ Every member of our 8-person team has a clearly separated module boundary. Read 
   - **No agent authorship in financial arithmetic without manual review.**
   - If a required value is missing or `UNKNOWN`, the rule verdict MUST be `unknown`, never a guessed `pass`.
   - Floating point arithmetic must use explicit tolerances ($\le 0.05$).
-  - Outputs must strictly construct typed [`Finding`](file:///c:/Users/bhanu/mycodes/cognizant-hackathon/core/contracts/findings.py) models.
+  - Outputs must strictly construct typed [`Finding`](core/contracts/findings.py) models.
 * **Safety & Security Role:** Guarantee that every financial comparison is mathematically sound and immune to LLM hallucination.
 
 ---
@@ -312,7 +312,7 @@ Every member of our 8-person team has a clearly separated module boundary. Read 
      - `id`: `UUID` (Primary Key, server default `gen_random_uuid()`)
      - `job_id`: `VARCHAR(64)` UNIQUE NOT NULL (e.g. `JOB-UUID`)
      - `application_id`: `VARCHAR(64)` NOT NULL INDEXED
-     - `payload`: `JSONB` NOT NULL conforming strictly to [`JobRef`](file:///c:/Users/bhanu/mycodes/cognizant-hackathon/core/contracts/jobs.py)
+     - `payload`: `JSONB` NOT NULL conforming strictly to [`JobRef`](core/contracts/jobs.py)
      - `status`: `VARCHAR(20)` NOT NULL DEFAULT `'PENDING'` (`PENDING`, `DISPATCHED`, `FAILED`) INDEXED
      - `retry_count`: `INT` NOT NULL DEFAULT 0
      - `created_at`: `TIMESTAMPTZ` NOT NULL DEFAULT `clock_timestamp()`
@@ -435,4 +435,32 @@ A feature branch is eligible for merge into `main` only when:
   - Zero network download dependencies during inference.
 - **Detailed Handoff:** Long-form progress, logs, and reproduction audits are maintained in `docs/classifier_handoff.md`.
 
+---
+
+## 9. Pending Production Readiness Items
+
+> **Last Scanned:** 2026-09-11 | **Overall Readiness:** ~92% (13 of 14 modules fully ready)
+>
+> **P1 #3 (graph workflow) closed 2026-09-11.** Remaining: 2 × P0 (rules engine), 3 × P2 (polish).
+
+### 🔴 P0 — Critical (Must fix before demo)
+
+| # | Item | File | Problem | Owner | Status |
+|:-:|:-----|:-----|:--------|:------|:------:|
+| 1 | **RULE-TAX-01**: Implement tax audit logic | [`core/rules/tax_audit.py`](core/rules/tax_audit.py) | Returns hardcoded `verdict="pass"` after null check. Missing: annualize payslip gross (`12 × monthly`) vs ITR gross comparison with tolerance ($\le 0.10$). | **Sravanthi (Member 4)** | `PENDING` |
+| 2 | **RULE-ID-01**: Implement fuzzy identity matching | [`core/rules/identity.py`](core/rules/identity.py) | Returns hardcoded `verdict="pass"` ignoring `payslip_name` and `bank_name` args. Missing: fuzzy name matching ($\ge 85\%$ `token_sort_ratio`) and PAN cross-check. | **Sravanthi (Member 4)** | `PENDING` |
+
+### 🟡 P1 — Important (Should fix before demo)
+
+| # | Item | File | Problem | Owner | Status |
+|:-:|:-----|:-----|:--------|:------|:------:|
+| 3 | Fix `UnboundLocalError` in workflow fallback | [`core/graph/workflow.py`](core/graph/workflow.py) | ~~If `langgraph` is not installed, `workflow` variable is never bound → crash.~~ **RESOLVED** by deleting the fallback path rather than wiring it. `langgraph` is a hard dependency in `pyproject.toml`, `requirements.txt` and `requirements-ci.txt`, and `core/graph/checkpoint.py` already imported it unconditionally — so the `try//except ImportError` guard was fiction. `FallbackCompiledGraph` was dead code AND unsafe: its `node_order` named only `triage` correctly (`extract`/`rules`/`retrieve`/`synthesize` never matched the registered node names), so it would have silently skipped 7 of 8 nodes including `validate_grounding` — the §5.1 citation gate. A partial pipeline that bypasses the grounding firewall must never be reachable. | **Bhanu Teja (Member 2)** | `DONE` |
+
+### 🟢 P2 — Nice to have (Clean architecture polish)
+
+| # | Item | File | Problem | Owner | Status |
+|:-:|:-----|:-----|:--------|:------|:------:|
+| 4 | Refactor `memo_builder.py` — move CAM logic from `nodes.py` | [`core/reporting/memo_builder.py`](core/reporting/memo_builder.py) | 14-line stub returning placeholder string. Actual CAM generation lives inline in `nodes.py:synthesize_summary_node()` (L467–505). Mitigated: pipeline works end-to-end. | **Manjunath (Member 1)** | `PENDING` |
+| 5 | Wire PDF export in `exporter.py` | [`core/reporting/exporter.py`](core/reporting/exporter.py) | PDF export is a no-op (returns path unmodified). Mitigated: JSON export works; ReportLab PDF generation exists in `apps/api/routes/applications.py`. | **Manjunath (Member 1)** | `PENDING` |
+| 6 | Add missing `__init__.py` files | `core/`, `core/extraction/`, `core/graph/`, `core/rag/`, `core/reporting/`, `core/rules/` | Python packaging hygiene — some subdirectories lack explicit `__init__.py` package markers. | **Anyone** | `PENDING` |
 

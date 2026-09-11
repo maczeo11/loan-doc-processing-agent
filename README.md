@@ -13,6 +13,92 @@
 
 ---
 
+## ⚡ Quick Start
+
+Runs entirely on your machine — CPU-only OCR, local Postgres queue, no cloud
+account and no paid API key required.
+
+**Prerequisites:** Python 3.11, Node 18+, Docker Desktop.
+
+```bash
+git clone https://github.com/maczeo11/loan-doc-processing-agent.git
+cd loan-doc-processing-agent
+
+python -m venv venv
+venv\Scripts\activate          # Windows PowerShell
+# source venv/bin/activate     # macOS / Linux
+
+make install                   # pip install -e . + requirements.txt
+cp .env.example .env           # defaults are correct for local dev
+```
+
+Then launch the stack. On Windows, one command does everything:
+
+```bash
+make demo-all                  # scripts/demo-local.ps1 — infra, migrate, api, outbox, worker, ui
+```
+
+Or start each piece in its own terminal (any OS):
+
+```bash
+make demo-infra                # 1. PostgreSQL + Redis in Docker
+make demo-migrate              # 2. alembic upgrade head
+make demo-api                  # 3. FastAPI    → http://localhost:8000/docs
+make demo-outbox               # 4. outbox dispatcher
+make demo-worker               # 5. LangGraph worker (ML inference on host)
+make demo-ui                   # 6. Vite dev server → http://localhost:3000
+```
+
+Open **http://localhost:3000**. `make demo-stop` tears the containers down.
+
+### Verifying your setup
+
+```bash
+make test                      # unit tests
+make test-all                  # unit + integration + smoke
+make lint                      # ruff + mypy
+cd apps/ui && npm run build    # typecheck + production build of the SPA
+```
+
+> **Note:** CI (`.github/workflows/ci.yml`) runs `ruff`, the contract gate, and
+> `pytest` — it does **not** build the SPA. A UI break reaches `main` with CI
+> green, so run the `npm run build` above before merging frontend changes.
+
+---
+
+## 📊 Current Status
+
+Honest state of `main` as of **2026-09-11**. Full detail in
+[`docs/implementation_status.md`](docs/implementation_status.md).
+
+| Area | State |
+|------|-------|
+| Contracts, OCR routing, extraction, LangGraph orchestration, worker/queue | ✅ Working |
+| Reviewer SPA (three-pane, evidence overlays, HITL sign-off, PII masking) | ✅ Working |
+| Hybrid RAG + grounding gate | ✅ Working |
+| **Deterministic rules engine** | ⚠️ **2 of 5 rules implemented** |
+| **Document viewing end-to-end** | ❌ **Blocked** — API route missing on `main` |
+
+Prioritised remediation items, with owners, live in
+[`AGENTS.md` §9 — Pending Production Readiness](AGENTS.md#9-pending-production-readiness-items).
+
+**Two known gaps, both blocking a clean demo:**
+
+1. **`GET /applications/{id}/documents/{doc_id}` is not on `main`.** The SPA
+   requests it for pdf.js, so documents 404 and the viewer shows its
+   `unavailable` state. The route exists on `feat/ui-backend-truth` and is a
+   one-commit cherry-pick.
+2. **`RULE-TAX-01` and `RULE-ID-01` are stubs that return `pass` without
+   evaluating their inputs**, and `RULE-BANK-01` does not exist. Working
+   implementations sit on two *competing* unmerged branches
+   (`fix/graph-rules-reporting-remediation` and `feat/data-dossiers`) that
+   conflict on seven files; one must be chosen as the base. Until then, no
+   dossier can fail an identity or tax check — which inverts
+   [The Core Doctrine](#-the-core-doctrine) below, so it is the highest-priority
+   item in the repo.
+
+---
+
 ## 💡 Executive Pitch for Evaluators & Judges
 
 ### 🎙️ The 30-Second Elevator Pitch
@@ -39,11 +125,11 @@ FinScan AI solves this by introducing **Provenance-Grounded Deterministic Verifi
 
 | Evaluation Criteria | How FinScan AI Excels | Where to Inspect |
 | :--- | :--- | :--- |
-| **System Architecture & Rigor** | Modular monolith with Hexagonal Ports & Adapters; LangGraph stateful orchestration; PostgreSQL transactional outbox. | [`adapters/`](file:///c:/Users/bhanu/mycodes/cognizant-hackathon/adapters), [`core/graph/`](file:///c:/Users/bhanu/mycodes/cognizant-hackathon/core/graph) |
-| **Safety, Provenance & Compliance** | Zero autonomous lending decisions; strict bounding-box provenance; prompt-injection firewall; grounding validator drops unverified claims. | [`core/contracts/`](file:///c:/Users/bhanu/mycodes/cognizant-hackathon/core/contracts), [`core/rag/grounding.py`](file:///c:/Users/bhanu/mycodes/cognizant-hackathon/core/rag/grounding.py) |
-| **Cloud & Cost Engineering** | Runs 100% free locally (CPU OCR, Postgres queue, local Qwen GGUF) and deploys on AWS for under $15 total budget ($25 hard ceiling). | [`infra/`](file:///c:/Users/bhanu/mycodes/cognizant-hackathon/infra), [`AGENTS.md`](file:///c:/Users/bhanu/mycodes/cognizant-hackathon/AGENTS.md) |
-| **Reviewer UX & Productivity** | 3-pane React 18 + Vite dashboard with interactive `pdf.js` canvas highlights, discrepancy badges, and 1-click sign-off. | [`apps/ui/`](file:///c:/Users/bhanu/mycodes/cognizant-hackathon/apps/ui) |
-| **Team Parallelism & CI/CD** | 8 teammates working concurrently across isolated directories with pre-written passing tests and zero merge conflicts. | [`README.md#team`](file:///c:/Users/bhanu/mycodes/cognizant-hackathon/README.md), [`tests/`](file:///c:/Users/bhanu/mycodes/cognizant-hackathon/tests) |
+| **System Architecture & Rigor** | Modular monolith with Hexagonal Ports & Adapters; LangGraph stateful orchestration; PostgreSQL transactional outbox. | [`adapters/`](adapters), [`core/graph/`](core/graph) |
+| **Safety, Provenance & Compliance** | Zero autonomous lending decisions; strict bounding-box provenance; prompt-injection firewall; grounding validator drops unverified claims; sign-off gated on `READY_FOR_REVIEW` + findings behind a dual-sign challenge. See [Current Status](#-current-status) for which rules are live today. | [`core/contracts/`](core/contracts), [`core/rag/grounding.py`](core/rag/grounding.py), [`docs/frontend_architecture.md`](docs/frontend_architecture.md#human-in-the-loop-consensus--two-step-dual-sign-confirmation) |
+| **Cloud & Cost Engineering** | Runs 100% free locally (CPU OCR, Postgres queue, local Qwen GGUF) and deploys on AWS for under $15 total budget ($25 hard ceiling). | [`infra/`](infra), [`AGENTS.md`](AGENTS.md) |
+| **Reviewer UX & Productivity** | 3-pane React 18 + Vite dashboard with interactive `pdf.js` canvas highlights, discrepancy badges, and 1-click sign-off. | [`apps/ui/`](apps/ui) |
+| **Team Parallelism & CI/CD** | 8 teammates working concurrently across isolated module boundaries, each with an assigned branch prefix and pre-written tests; GitHub Actions gates every PR on ruff, contract integrity, and pytest. | [`README.md#-team-work-breakdown--ownership-8-members`](#-team-work-breakdown--ownership-8-members), [`tests/`](tests), [`.github/workflows/ci.yml`](.github/workflows/ci.yml) |
 
 ---
 
@@ -136,7 +222,7 @@ FinScan AI is organized as a **modular monolith with ports and adapters**, ensur
 
 ### 🔒 Object Storage & S3 Security Architecture
 
-All document assets (uploaded PDFs, parsed manifests, generated CAM artifacts) are managed through the abstract [`StoragePort`](file:///c:/Users/bhanu/mycodes/cognizant-hackathon/adapters/storage/base.py) with enterprise banking security defaults:
+All document assets (uploaded PDFs, parsed manifests, generated CAM artifacts) are managed through the abstract [`StoragePort`](adapters/storage/base.py) with enterprise banking security defaults:
 
 1. **Server-Side Encryption at Rest (SSE-S3 / SSE-KMS):** Every object written to S3 is encrypted with mandatory `ServerSideEncryption="AES256"` (or AWS KMS). Unencrypted object writes are blocked at both client adapter and S3 bucket policy levels.
 2. **Tenant & Dossier Partitioning:** Storage keys strictly follow the canonical hierarchy `dossiers/{application_id}/{document_id}_{sanitized_filename}` via `build_storage_key()`. The storage adapter strictly validates that operations cannot escape or manipulate path prefixes.
@@ -375,6 +461,10 @@ loan-doc-processing-agent/
 │       ├── src/            # Underwriter dashboard & pdf.js overlays
 │       └── package.json
 │
+├── docs/                   # Architecture references (see Documentation Map below)
+│
+├── audit/                  # Immutable audit-event records
+│
 ├── core/                   # Pure business logic (NO vendor SDK imports allowed!)
 │   ├── contracts/          # Pydantic schemas: EvidenceRef, MoneyFact, Finding, State
 │   ├── extraction/         # OCR routing & typed extractors (Payslip, Bank, Tax, ID)
@@ -415,6 +505,27 @@ loan-doc-processing-agent/
     ├── smoke/              # Health check & golden-path smoke tests
     └── unit/               # Contract and rule assertion tests
 ```
+
+---
+
+## 📚 Documentation Map
+
+Start with [`AGENTS.md`](AGENTS.md) — it is the system constitution and
+overrides anything here if the two disagree.
+
+| Document | Read it when you need to… |
+|----------|---------------------------|
+| [`AGENTS.md`](AGENTS.md) | Know the non-negotiables, module boundaries, and your ownership |
+| [`docs/system_overview.md`](docs/system_overview.md) | Get the 10,000-ft view before touching anything |
+| [`docs/architecture.md`](docs/architecture.md) | Understand ports/adapters and the module graph |
+| [`docs/implementation_status.md`](docs/implementation_status.md) | **See what actually works today vs. what is a stub** |
+| [`docs/langgraph_workflow.md`](docs/langgraph_workflow.md) | Add or reorder a pipeline node, or touch `interrupt()` |
+| [`docs/worker_queue_architecture.md`](docs/worker_queue_architecture.md) | Work on leases, DLQ, idempotency, or commit-before-ack |
+| [`docs/data_flow_diagrams.md`](docs/data_flow_diagrams.md) | Trace a document from upload to signed decision |
+| [`docs/frontend_architecture.md`](docs/frontend_architecture.md) | Change the SPA — **read the design-token and regression-watchlist sections first** |
+| [`docs/classifier_selection.md`](docs/classifier_selection.md), [`docs/classifier_handoff.md`](docs/classifier_handoff.md) | Work on document classification or swap the model |
+| [`docs/security_architecture.md`](docs/security_architecture.md), [`docs/security_report.md`](docs/security_report.md) | Touch auth, storage keys, PII, or prompt-injection defences |
+| [`docs/deployment_guide.md`](docs/deployment_guide.md) | Deploy to AWS or debug the container stack |
 
 ---
 

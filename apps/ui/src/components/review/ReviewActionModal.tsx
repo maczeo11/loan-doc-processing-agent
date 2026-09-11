@@ -40,24 +40,24 @@ export const ReviewActionModal: React.FC<ReviewActionModalProps> = ({
       case 'APPROVED':
         return {
           title: 'Sign Off & Approve Application',
-          icon: <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />,
-          btnBg: 'bg-emerald-700 hover:bg-emerald-600 text-white',
+          icon: <CheckCircle2 className="w-5 h-5 text-theme-pass" />,
+          btnBg: 'bg-theme-pass hover:opacity-90 text-white',
           desc: 'Confirm that all deterministic verification findings meet credit underwriting standards. This action advances state to REVIEWED.',
           consequence: `Records APPROVED${reviewer} in the immutable audit trail. State transitions to REVIEWED and the thread is sealed.`,
         };
       case 'REJECTED':
         return {
           title: 'Flag Discrepancy & Reject Application',
-          icon: <AlertTriangle className="w-5 h-5 text-rose-600 dark:text-rose-400" />,
-          btnBg: 'bg-rose-700 hover:bg-rose-600 text-white',
+          icon: <AlertTriangle className="w-5 h-5 text-theme-flag" />,
+          btnBg: 'bg-theme-flag hover:opacity-90 text-white',
           desc: 'Flag severe discrepancy (e.g. income inflation, KYC mismatch). Rejection rationale is mandatory for the audit log.',
           consequence: `Records REJECTED${reviewer} in the immutable audit trail. State transitions to REVIEWED and the thread is sealed.`,
         };
       case 'NEEDS_INFO':
         return {
           title: 'Request Supplemental Information',
-          icon: <HelpCircle className="w-5 h-5 text-amber-600 dark:text-amber-400" />,
-          btnBg: 'bg-amber-700 hover:bg-amber-600 text-white',
+          icon: <HelpCircle className="w-5 h-5 text-theme-unknown" />,
+          btnBg: 'bg-theme-unknown hover:opacity-90 text-white',
           desc: 'Request additional documentation from applicant or branch manager. State transitions to NEEDS_INFORMATION.',
           consequence: `Records NEEDS_INFO${reviewer} in the immutable audit trail. State transitions to NEEDS_INFORMATION for follow-up.`,
         };
@@ -65,8 +65,9 @@ export const ReviewActionModal: React.FC<ReviewActionModalProps> = ({
   };
 
   const meta = getDecisionMeta();
-  // Non-empty match required: an empty field must never unlock sign-off
-  // (''.trim() === '' is true, which previously auto-unlocked fresh modals).
+  // Non-empty match required: an empty field must never unlock sign-off.
+  // (''.trim() === '' is true, which auto-unlocks a fresh modal whenever
+  // applicationId is empty — an accidental lending authorization.)
   const confirmMatches =
     confirmText.trim() !== '' && confirmText.trim() === applicationId;
 
@@ -84,7 +85,7 @@ export const ReviewActionModal: React.FC<ReviewActionModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-xs p-4 select-none">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 select-none">
       <div className="w-full max-w-md rounded-xs bg-theme-card border border-theme-border shadow-2xl overflow-hidden flex flex-col transition-colors duration-200">
         {/* Modal Header */}
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-theme-border bg-theme-panel">
@@ -133,8 +134,8 @@ export const ReviewActionModal: React.FC<ReviewActionModalProps> = ({
           </div>
 
           {/* Friction / Dual-Sign Confirmation Box */}
-          <div className="space-y-1.5 p-3 rounded-xs bg-amber-500/10 border border-amber-500/30">
-            <div className="flex items-center gap-1.5 text-amber-700 dark:text-amber-400 font-mono font-bold text-[11px]">
+          <div className="space-y-1.5 p-3 rounded-xs bg-theme-unknown-bg border border-theme-unknown-border">
+            <div className="flex items-center gap-1.5 text-theme-unknown font-mono font-bold text-[11px]">
               <Shield className="w-3.5 h-3.5" />
               <span>Two-Way Authorization Confirmation</span>
             </div>

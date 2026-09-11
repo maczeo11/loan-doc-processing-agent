@@ -13,7 +13,10 @@ export interface AuthContextType {
   user: UnderwriterProfile | null;
   mode: 'google' | 'mock';
   login: (personaId?: string) => Promise<void>;
+  loginWithGoogle: (idToken: string) => Promise<void>;
+  refreshMe: () => Promise<void>;
   logout: () => void;
   isAuthenticated: boolean;
+  isLoading: boolean;
   switchPersona: (role: UnderwriterRole) => void;
 }

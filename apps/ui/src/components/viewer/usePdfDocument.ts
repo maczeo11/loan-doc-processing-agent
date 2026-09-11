@@ -52,7 +52,20 @@ export function usePdfDocument({ docId, pdfSource, isDemoMode }: UsePdfDocumentO
         if (pdfSource) {
           setSourceType('real');
           if (typeof pdfSource === 'string') {
-            loadingTask = pdfjsLib.getDocument(pdfSource);
+            // Fetch bytes first so HTTP errors (404/422) surface distinctly
+            // instead of pdf.js `MissingPDFException: Missing PDF "<url>"`.
+            const res = await fetch(pdfSource, { headers: { Accept: 'application/pdf' } });
+            if (isCancelled) return;
+            if (!res.ok) {
+              const detail = (await res.text()).slice(0, 300);
+              throw new Error(`Document request failed (${res.status}): ${detail || res.statusText}`);
+            }
+            const buf = await res.arrayBuffer();
+            if (isCancelled) return;
+            if (!buf.byteLength) {
+              throw new Error('Document is empty (0 bytes) — re-upload the PDF.');
+            }
+            loadingTask = pdfjsLib.getDocument({ data: buf });
           } else {
             loadingTask = pdfjsLib.getDocument({ data: pdfSource });
           }

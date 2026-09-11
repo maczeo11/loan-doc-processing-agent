@@ -6,18 +6,22 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<UnderwriterProfile | null>(() => AuthService.getStoredUser());
+  const [isLoading, setIsLoading] = useState<boolean>(false);
   const [mode] = useState<'google' | 'mock'>(
     (import.meta.env.VITE_AUTH_MODE as 'google' | 'mock') || 'mock'
   );
 
   useEffect(() => {
-    if (!user) {
-      const defaultUser = AuthService.getStoredUser();
-      if (defaultUser) {
-        setUser(defaultUser);
-      }
+    // Google mode: try server session once on boot (httpOnly cookie + /auth/me).
+    if (mode === 'google' && !user) {
+      setIsLoading(true);
+      AuthService.fetchMe()
+        .then((me) => {
+          if (me) setUser(me);
+        })
+        .finally(() => setIsLoading(false));
     }
-  }, [user]);
+  }, [mode]);
 
   const login = async (personaId?: string): Promise<void> => {
     if (personaId) {
@@ -34,8 +38,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = () => {
-    AuthService.clearUser();
-    setUser(null);
+    AuthService.serverLogout().finally(() => setUser(null));
+    // In mock mode restore seamless demo user after sign-out? No — stay signed out
+    // so LoginPage/Dashboard gating is visible. Mock LoginPage offers 1-click personas.
+  };
+
+  const loginWithGoogle = async (idToken: string): Promise<void> => {
+    setIsLoading(true);
+    try {
+      const profile = await AuthService.exchangeGoogleIdToken(idToken);
+      setUser(profile);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const refreshMe = async (): Promise<void> => {
+    const me = await AuthService.fetchMe();
+    if (me) setUser(me);
   };
 
   const switchPersona = (role: UnderwriterRole) => {
@@ -50,8 +70,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         user,
         mode,
         login,
+        loginWithGoogle,
+        refreshMe,
         logout,
         isAuthenticated: !!user,
+        isLoading,
         switchPersona,
       }}
     >

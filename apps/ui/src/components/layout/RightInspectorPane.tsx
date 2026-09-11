@@ -6,7 +6,7 @@ import { FindingCard } from '../review/FindingCard';
 import { FactsTab } from '../review/FactsTab';
 import { MemoNarrativeTab } from '../review/MemoNarrativeTab';
 import { PolicyQaTab } from '../review/PolicyQaTab';
-import { ShieldCheck, Table, FileText, BookOpen, CheckCircle, AlertTriangle, HelpCircle } from 'lucide-react';
+import { ShieldCheck, Table, FileText, BookOpen, CheckCircle, AlertTriangle, HelpCircle, Play, Loader2 } from 'lucide-react';
 
 interface RightInspectorPaneProps {
   application: LoanApplication;
@@ -15,6 +15,8 @@ interface RightInspectorPaneProps {
   onSelectFindingIndex: (idx: number) => void;
   onSelectEvidence: (ev: EvidenceRef, ruleId?: string) => void;
   onTriggerAction: (decision: ReviewDecision) => void;
+  onProcessDossier?: () => Promise<void>;
+  isProcessing?: boolean;
   inspectedKeys?: Set<string>;
   width: number;
 }
@@ -28,6 +30,8 @@ export const RightInspectorPane: React.FC<RightInspectorPaneProps> = ({
   onSelectFindingIndex,
   onSelectEvidence,
   onTriggerAction,
+  onProcessDossier,
+  isProcessing = false,
   width,
 }) => {
   const [activeTab, setActiveTab] = useState<TabType>('findings');
@@ -63,7 +67,7 @@ export const RightInspectorPane: React.FC<RightInspectorPaneProps> = ({
             <ShieldCheck className="w-3.5 h-3.5 text-theme-brand" />
             <span>Audit Findings</span>
             {flagCount > 0 && (
-              <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold bg-theme-flag-bg text-theme-flag border border-theme-flag-border">
+              <span className="ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-theme-flag-bg text-theme-flag border border-theme-flag-border">
                 {flagCount}
               </span>
             )}
@@ -111,6 +115,51 @@ export const RightInspectorPane: React.FC<RightInspectorPaneProps> = ({
       <div className="flex-1 overflow-y-auto p-3.5 bg-theme-card">
         {activeTab === 'findings' && (
           <div className="space-y-3">
+            {/* Pipeline Trigger Card for newly uploaded or processing applications */}
+            {(application.status === 'UPLOADED' || application.status === 'QUEUED' || application.status === 'PROCESSING') && (
+              <div className="p-3.5 rounded-xs bg-theme-unknown-bg border border-theme-unknown-border space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-mono font-bold uppercase tracking-wider text-theme-unknown">
+                    Dossier Processing Pipeline
+                  </span>
+                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-xs bg-theme-card border border-theme-unknown-border text-theme-unknown">
+                    {application.status}
+                  </span>
+                </div>
+                <p className="text-[11px] text-theme-secondary leading-relaxed">
+                  {application.status === 'UPLOADED'
+                    ? 'Documents have been uploaded. Trigger OCR perception, fact extraction, and deterministic credit rules.'
+                    : 'Pipeline execution in progress. Orchestrating OCR routing, entity extraction, and policy retrieval...'}
+                </p>
+                {application.status === 'UPLOADED' && onProcessDossier && (
+                  <button
+                    type="button"
+                    disabled={isProcessing}
+                    onClick={() => onProcessDossier()}
+                    className="w-full py-2 px-3 rounded-xs text-xs font-mono font-bold bg-theme-unknown hover:opacity-90 text-white flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer disabled:opacity-50"
+                  >
+                    {isProcessing ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        <span>Enqueuing Verification Job...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Play className="w-3.5 h-3.5 fill-current" />
+                        <span>Run FinScan Verification Pipeline</span>
+                      </>
+                    )}
+                  </button>
+                )}
+                {(application.status === 'QUEUED' || application.status === 'PROCESSING') && (
+                  <div className="flex items-center gap-2 text-xs font-mono text-theme-unknown pt-1">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>Worker actively processing pipeline...</span>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Decision summary: answers "can I sign this?" in seconds */}
             <div className="p-3 rounded-xs bg-theme-panel border border-theme-border shadow-2xs">
               <div className="flex items-center gap-2 text-xs font-mono font-bold">
@@ -142,19 +191,35 @@ export const RightInspectorPane: React.FC<RightInspectorPaneProps> = ({
               <span className="text-xs font-serif font-bold text-theme-primary">
                 Deterministic Audit Invariants ({application.findings.length})
               </span>
-              <span className="text-[10px] text-theme-muted font-mono">Navigate: J / K</span>
+              {application.findings.length > 0 && (
+                <span className="text-[10px] text-theme-muted font-mono">Navigate: J / K</span>
+              )}
             </div>
 
-            {application.findings.map((finding, idx) => (
-              <FindingCard
-                key={finding.rule_id}
-                finding={finding}
-                isFocused={focusedFindingIndex === idx}
-                onSelectFinding={() => onSelectFindingIndex(idx)}
-                onSelectEvidence={onSelectEvidence}
-                activeEvidenceKey={activeEvidenceKey}
-              />
-            ))}
+            {application.findings.length === 0 ? (
+              <div className="p-6 text-center border border-dashed border-theme-border rounded-xs bg-theme-panel/30">
+                <ShieldCheck className="w-8 h-8 text-theme-muted mx-auto mb-2 opacity-50" />
+                <p className="text-xs font-serif font-bold text-theme-primary mb-1">
+                  No Audit Invariants Evaluated Yet
+                </p>
+                <p className="text-[11px] text-theme-muted leading-relaxed">
+                  {application.documents.length === 0
+                    ? 'Upload applicant documents to enable deterministic rules evaluation.'
+                    : 'Click "Run FinScan Verification Pipeline" above to execute deterministic audit rules.'}
+                </p>
+              </div>
+            ) : (
+              application.findings.map((finding, idx) => (
+                <FindingCard
+                  key={finding.rule_id}
+                  finding={finding}
+                  isFocused={focusedFindingIndex === idx}
+                  onSelectFinding={() => onSelectFindingIndex(idx)}
+                  onSelectEvidence={onSelectEvidence}
+                  activeEvidenceKey={activeEvidenceKey}
+                />
+              ))
+            )}
           </div>
         )}
 
@@ -188,12 +253,18 @@ export const RightInspectorPane: React.FC<RightInspectorPaneProps> = ({
               <span className="font-mono text-[10px] text-theme-muted">Hotkeys: [A] [R] [N]</span>
             </div>
 
+            {!canSignOff && (
+              <p className="text-[10px] font-mono text-theme-unknown leading-relaxed">
+                Sign-off unlocks when the pipeline reaches READY_FOR_REVIEW with findings present.
+              </p>
+            )}
+
             <div className="grid grid-cols-3 gap-2">
               <button
                 type="button"
                 disabled={isActionDisabled}
                 onClick={() => onTriggerAction('APPROVED')}
-                className="flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xs text-xs font-mono font-bold bg-emerald-700 hover:bg-emerald-600 text-white shadow-sm transition-all cursor-pointer disabled:opacity-50"
+                className="flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xs text-xs font-mono font-bold bg-theme-pass hover:opacity-90 text-white shadow-sm transition-all cursor-pointer disabled:opacity-50"
                 title="Approve Loan Application (A)"
               >
                 <CheckCircle className="w-3.5 h-3.5" />
@@ -204,7 +275,7 @@ export const RightInspectorPane: React.FC<RightInspectorPaneProps> = ({
                 type="button"
                 disabled={isActionDisabled}
                 onClick={() => onTriggerAction('REJECTED')}
-                className="flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xs text-xs font-mono font-bold bg-rose-700 hover:bg-rose-600 text-white shadow-sm transition-all cursor-pointer disabled:opacity-50"
+                className="flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xs text-xs font-mono font-bold bg-theme-flag hover:opacity-90 text-white shadow-sm transition-all cursor-pointer disabled:opacity-50"
                 title="Reject Loan Application (R)"
               >
                 <AlertTriangle className="w-3.5 h-3.5" />
@@ -215,7 +286,7 @@ export const RightInspectorPane: React.FC<RightInspectorPaneProps> = ({
                 type="button"
                 disabled={isActionDisabled}
                 onClick={() => onTriggerAction('NEEDS_INFO')}
-                className="flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xs text-xs font-mono font-bold bg-amber-700 hover:bg-amber-600 text-white shadow-sm transition-all cursor-pointer disabled:opacity-50"
+                className="flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xs text-xs font-mono font-bold bg-theme-unknown hover:opacity-90 text-white shadow-sm transition-all cursor-pointer disabled:opacity-50"
                 title="Request Supplemental Information (N)"
               >
                 <HelpCircle className="w-3.5 h-3.5" />

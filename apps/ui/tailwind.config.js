@@ -1,6 +1,5 @@
 /** @type {import('tailwindcss').Config} */
 export default {
-  darkMode: ['class', '[data-theme="obsidian"]'],
   content: [
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
@@ -8,54 +7,33 @@ export default {
   theme: {
     extend: {
       colors: {
+        // Tokens are RGB channel triplets in index.css, wrapped here with
+        // <alpha-value> so Tailwind's alpha modifiers compose — e.g.
+        // `bg-theme-panel/50` -> rgb(var(--bg-panel) / 0.5).
         theme: {
-          app: 'var(--bg-app)',
-          header: 'var(--bg-header)',
-          panel: 'var(--bg-panel)',
-          'panel-hover': 'var(--bg-panel-hover)',
-          card: 'var(--bg-card)',
-          'card-subtle': 'var(--bg-card-subtle)',
-          desk: 'var(--bg-desk)',
-          border: 'var(--border-subtle)',
-          'border-card': 'var(--border-card)',
-          'border-active': 'var(--border-active)',
-          primary: 'var(--text-primary)',
-          secondary: 'var(--text-secondary)',
-          muted: 'var(--text-muted)',
-          brand: 'var(--accent-brand)',
-          pass: 'var(--accent-pass)',
-          'pass-bg': 'var(--accent-pass-bg)',
-          'pass-border': 'var(--accent-pass-border)',
-          flag: 'var(--accent-flag)',
-          'flag-bg': 'var(--accent-flag-bg)',
-          'flag-border': 'var(--accent-flag-border)',
-          unknown: 'var(--accent-unknown)',
-          'unknown-bg': 'var(--accent-unknown-bg)',
-          'unknown-border': 'var(--accent-unknown-border)',
-        },
-        parchment: {
-          50: '#FBF9F5',
-          100: '#F8F6F1',
-          200: '#F2EDE4',
-          300: '#E3DDD3',
-          400: '#D5CFC5',
-        },
-        desk: '#F5F2EB',
-        racing: {
-          DEFAULT: '#14532D',
-          light: '#F0FDF4',
-          border: '#BBF7D0',
-        },
-        claret: {
-          DEFAULT: '#991B1B',
-          light: '#FEF2F2',
-        },
-        tobacco: {
-          DEFAULT: '#92400E',
-          light: '#FDF8EE',
-        },
-        terminal: {
-          border: '#E3DDD3',
+          app: 'rgb(var(--bg-app) / <alpha-value>)',
+          header: 'rgb(var(--bg-header) / <alpha-value>)',
+          panel: 'rgb(var(--bg-panel) / <alpha-value>)',
+          'panel-hover': 'rgb(var(--bg-panel-hover) / <alpha-value>)',
+          card: 'rgb(var(--bg-card) / <alpha-value>)',
+          'card-subtle': 'rgb(var(--bg-card-subtle) / <alpha-value>)',
+          desk: 'rgb(var(--bg-desk) / <alpha-value>)',
+          border: 'rgb(var(--border-subtle) / <alpha-value>)',
+          'border-card': 'rgb(var(--border-card) / <alpha-value>)',
+          'border-active': 'rgb(var(--border-active) / <alpha-value>)',
+          primary: 'rgb(var(--text-primary) / <alpha-value>)',
+          secondary: 'rgb(var(--text-secondary) / <alpha-value>)',
+          muted: 'rgb(var(--text-muted) / <alpha-value>)',
+          brand: 'rgb(var(--accent-brand) / <alpha-value>)',
+          pass: 'rgb(var(--accent-pass) / <alpha-value>)',
+          'pass-bg': 'rgb(var(--accent-pass-bg) / <alpha-value>)',
+          'pass-border': 'rgb(var(--accent-pass-border) / <alpha-value>)',
+          flag: 'rgb(var(--accent-flag) / <alpha-value>)',
+          'flag-bg': 'rgb(var(--accent-flag-bg) / <alpha-value>)',
+          'flag-border': 'rgb(var(--accent-flag-border) / <alpha-value>)',
+          unknown: 'rgb(var(--accent-unknown) / <alpha-value>)',
+          'unknown-bg': 'rgb(var(--accent-unknown-bg) / <alpha-value>)',
+          'unknown-border': 'rgb(var(--accent-unknown-border) / <alpha-value>)',
         },
       },
       fontFamily: {

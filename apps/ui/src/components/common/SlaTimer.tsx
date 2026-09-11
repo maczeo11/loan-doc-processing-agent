@@ -36,14 +36,15 @@ export const SlaTimer: React.FC<SlaTimerProps> = ({
 
   const pad = (n: number) => n.toString().padStart(2, '0');
 
-  // Color dynamics
-  let colorClasses = 'text-emerald-400 bg-emerald-950/40 border-emerald-800/60';
+  // Color dynamics: green while comfortable, tobacco as the SLA nears,
+  // claret once inside 3 minutes or breached.
+  let colorClasses = 'text-theme-pass bg-theme-pass-bg border-theme-pass-border';
   if (isBreached) {
-    colorClasses = 'text-rose-400 bg-rose-950/60 border-rose-800 animate-pulse';
+    colorClasses = 'text-theme-flag bg-theme-flag-bg border-theme-flag-border animate-pulse';
   } else if (remM < 3) {
-    colorClasses = 'text-rose-400 bg-rose-950/40 border-rose-800/60';
+    colorClasses = 'text-theme-flag bg-theme-flag-bg border-theme-flag-border';
   } else if (remM < 7) {
-    colorClasses = 'text-amber-400 bg-amber-950/40 border-amber-800/60';
+    colorClasses = 'text-theme-unknown bg-theme-unknown-bg border-theme-unknown-border';
   }
 
   const createdDisplay = isNaN(parsedTime) ? 'Recent' : new Date(parsedTime).toLocaleTimeString();

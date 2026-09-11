@@ -39,8 +39,94 @@ export class AuthService {
     } catch {
       // Ignore sessionStorage parsing errors
     }
-    // Default fallback to Senior Underwriter for seamless demo
+    // Google mode: no auto-login (real loan-app start requires explicit sign-in).
+    // Mock mode: seamless demo fallback preserves viva/offline flow.
+    try {
+      const mode = (import.meta as unknown as { env: Record<string, string> }).env?.VITE_AUTH_MODE;
+      if (mode === 'google') return null;
+    } catch {
+      /* ignore */
+    }
     return UNDERWRITER_PERSONAS.SENIOR_UNDERWRITER;
+  }
+
+  /** Session JWT (memory + sessionStorage; httpOnly cookie is primary server-side). */
+  static getSessionToken(): string | null {
+    try {
+      return sessionStorage.getItem('finscan_session_jwt');
+    } catch {
+      return null;
+    }
+  }
+
+  static storeSessionToken(token: string): void {
+    try {
+      sessionStorage.setItem('finscan_session_jwt', token);
+    } catch {
+      /* ignore */
+    }
+  }
+
+  /** POST /auth/google {id_token} -> {user, session_jwt}. Throws with status on 403/401. */
+  static async exchangeGoogleIdToken(idToken: string): Promise<UnderwriterProfile> {
+    const res = await fetch('/auth/google', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ id_token: idToken }),
+    });
+    if (!res.ok) {
+      const detail = (await res.text()).slice(0, 200);
+      const err = new Error(res.status === 403 ? `Access restricted — ${detail || 'account not allowlisted'}` : `Google sign-in failed (${res.status}): ${detail}`);
+      (err as unknown as { status: number }).status = res.status;
+      throw err;
+    }
+    const data = await res.json();
+    if (data.session_jwt) AuthService.storeSessionToken(data.session_jwt);
+    const profile: UnderwriterProfile = {
+      id: data.user?.email || 'google-user',
+      name: data.user?.name || 'Underwriter',
+      email: data.user?.email || '',
+      role: (data.user?.role as UnderwriterRole) || 'SENIOR_UNDERWRITER',
+      token: data.session_jwt || 'google-session',
+      avatarUrl: data.user?.picture_url,
+    };
+    AuthService.storeUser(profile);
+    return profile;
+  }
+
+  static async fetchMe(): Promise<UnderwriterProfile | null> {
+    try {
+      const headers: Record<string, string> = {};
+      const tok = AuthService.getSessionToken();
+      if (tok) headers.Authorization = `Bearer ${tok}`;
+      const res = await fetch('/auth/me', { headers, credentials: 'include' });
+      if (!res.ok) return null;
+      const data = await res.json();
+      const profile: UnderwriterProfile = {
+        id: data.email, name: data.name || 'Underwriter', email: data.email,
+        role: (data.role as UnderwriterRole) || 'SENIOR_UNDERWRITER',
+        token: tok || 'google-session', avatarUrl: data.picture_url,
+      };
+      AuthService.storeUser(profile);
+      return profile;
+    } catch {
+      return null;
+    }
+  }
+
+  static async serverLogout(): Promise<void> {
+    try {
+      await fetch('/auth/logout', { method: 'POST', credentials: 'include' });
+    } catch {
+      /* ignore */
+    }
+    try {
+      sessionStorage.removeItem('finscan_session_jwt');
+    } catch {
+      /* ignore */
+    }
+    AuthService.clearUser();
   }
 
   static storeUser(user: UnderwriterProfile): void {

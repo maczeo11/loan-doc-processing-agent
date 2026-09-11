@@ -197,6 +197,8 @@ export interface Citation {
   section?: string;
   title?: string;
   text?: string;
+  excerpt?: string;
+  score?: number;
   [key: string]: unknown;
 }
 

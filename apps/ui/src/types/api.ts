@@ -1,3 +1,5 @@
+import type { BoundingBox } from './evidence';
+
 export type ReviewDecision = 'APPROVED' | 'REJECTED' | 'NEEDS_INFO';
 
 export interface ReviewDecisionRequest {
@@ -20,6 +22,12 @@ export interface PolicyCitation {
   section: string;
   text: string;
   score: number;
+  // Present only when the citation points at an uploaded document rather than
+  // a policy-corpus chunk; enables jump-to-evidence on the PDF canvas.
+  document_id?: string;
+  document_type?: string;
+  page_number?: number;
+  bounding_box?: BoundingBox | null;
 }
 
 export interface PolicyQaResponse {

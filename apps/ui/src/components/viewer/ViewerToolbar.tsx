@@ -41,7 +41,7 @@ export const ViewerToolbar: React.FC<ViewerToolbarProps> = ({
         );
       case 'demo':
         return (
-          <span className="px-2 py-0.5 rounded-xs text-[10px] font-bold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/40 shrink-0">
+          <span className="px-2 py-0.5 rounded-xs text-[10px] font-bold bg-theme-unknown-bg text-theme-unknown border border-theme-unknown-border shrink-0">
             DEMO PDF (SYNTHETIC)
           </span>
         );

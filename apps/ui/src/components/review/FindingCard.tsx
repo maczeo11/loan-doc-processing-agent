@@ -72,13 +72,13 @@ export const FindingCard: React.FC<FindingCardProps> = ({
                   }}
                   className={`text-left p-2 rounded-xs border text-[11px] transition-all flex items-start justify-between gap-2 ${
                     isActive
-                      ? 'bg-amber-500/15 border-amber-500/50 text-theme-primary shadow-xs ring-1 ring-amber-500/30'
+                      ? 'bg-theme-unknown-bg border-theme-unknown-border text-theme-primary shadow-xs ring-1 ring-theme-unknown/30'
                       : 'bg-theme-panel hover:bg-theme-card border-theme-border hover:border-theme-border-card text-theme-secondary'
                   }`}
                   title="Click to jump and highlight on PDF canvas"
                 >
                   <div className="min-w-0 flex-1">
-                    <span className="font-mono font-semibold text-amber-600 dark:text-amber-400 mr-1.5">
+                    <span className="font-mono font-semibold text-theme-unknown mr-1.5">
                       [{ev.document_type} • P.{ev.page_number}]
                     </span>
                     <span className="font-mono truncate block text-theme-primary mt-0.5 font-medium">
@@ -92,7 +92,9 @@ export const FindingCard: React.FC<FindingCardProps> = ({
           </div>
         </div>
       ) : (
-        <div className="mt-2 p-2 rounded bg-[#FFFBEB] border border-[#D97706] text-[11px] font-mono text-[#92400E]">
+        /* Mandatory Provenance: a finding with no EvidenceRef is never
+           presentable as verified — say so rather than render it silently. */
+        <div className="mt-2 p-2 rounded-xs bg-theme-unknown-bg border border-theme-unknown-border text-[11px] font-mono text-theme-unknown">
           No supporting evidence attached — treat as UNVERIFIED and confirm manually.
         </div>
       )}

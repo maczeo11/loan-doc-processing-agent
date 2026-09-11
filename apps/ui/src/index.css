@@ -3,87 +3,38 @@
 @tailwind utilities;
 
 @layer base {
+  /* Swiss Ledger — the product's single palette. Every component colour
+     resolves through these tokens (see tailwind.config.js `theme.*`); no
+     component should hardcode a Tailwind palette colour.
+     Values are space-separated RGB CHANNELS, not hex, so that Tailwind's
+     alpha modifiers compose: `bg-theme-panel/50` becomes
+     rgb(var(--bg-panel) / 0.5). A hex here silently breaks every `/alpha`
+     utility — the class is simply never generated. */
   :root,
   [data-theme="ledger"] {
-    --bg-app: #F8F6F1;
-    --bg-header: #FFFFFF;
-    --bg-panel: #FBF9F5;
-    --bg-panel-hover: #F2EDE4;
-    --bg-card: #FFFFFF;
-    --bg-card-subtle: #F8F6F1;
-    --bg-desk: #F5F2EB;
-    --border-subtle: #E3DDD3;
-    --border-card: #D5CFC5;
-    --border-active: #14532D;
-    --text-primary: #1C1917;
-    --text-secondary: #44403C;
-    --text-muted: #78716C;
-    --accent-brand: #14532D;
-    --accent-pass: #14532D;
-    --accent-pass-bg: #F0FDF4;
-    --accent-pass-border: #BBF7D0;
-    --accent-flag: #991B1B;
-    --accent-flag-bg: #FEF2F2;
-    --accent-flag-border: #FECACA;
-    --accent-unknown: #92400E;
-    --accent-unknown-bg: #FDF8EE;
-    --accent-unknown-border: #FDE68A;
-    --highlight-glow: rgba(180, 83, 9, 0.15);
-  }
-
-  [data-theme="slate"] {
-    --bg-app: #F8FAFC;
-    --bg-header: #FFFFFF;
-    --bg-panel: #F1F5F9;
-    --bg-panel-hover: #E2E8F0;
-    --bg-card: #FFFFFF;
-    --bg-card-subtle: #F8FAFC;
-    --bg-desk: #E2E8F0;
-    --border-subtle: #E2E8F0;
-    --border-card: #CBD5E1;
-    --border-active: #0F172A;
-    --text-primary: #0F172A;
-    --text-secondary: #334155;
-    --text-muted: #64748B;
-    --accent-brand: #4F46E5;
-    --accent-pass: #059669;
-    --accent-pass-bg: #ECFDF5;
-    --accent-pass-border: #A7F3D0;
-    --accent-flag: #DC2626;
-    --accent-flag-bg: #FEF2F2;
-    --accent-flag-border: #FECACA;
-    --accent-unknown: #D97706;
-    --accent-unknown-bg: #FFFBEB;
-    --accent-unknown-border: #FDE68A;
-    --highlight-glow: rgba(79, 70, 229, 0.15);
-  }
-
-  [data-theme="obsidian"],
-  .dark {
-    --bg-app: #0B0F19;
-    --bg-header: #111827;
-    --bg-panel: #111827;
-    --bg-panel-hover: #1F2937;
-    --bg-card: #1E293B;
-    --bg-card-subtle: #0F172A;
-    --bg-desk: #090D16;
-    --border-subtle: #1F2937;
-    --border-card: #334155;
-    --border-active: #38BDF8;
-    --text-primary: #F8FAFC;
-    --text-secondary: #CBD5E1;
-    --text-muted: #94A3B8;
-    --accent-brand: #38BDF8;
-    --accent-pass: #10B981;
-    --accent-pass-bg: rgba(16, 185, 129, 0.15);
-    --accent-pass-border: rgba(16, 185, 129, 0.4);
-    --accent-flag: #F43F5E;
-    --accent-flag-bg: rgba(244, 63, 94, 0.15);
-    --accent-flag-border: rgba(244, 63, 94, 0.4);
-    --accent-unknown: #F59E0B;
-    --accent-unknown-bg: rgba(245, 158, 11, 0.15);
-    --accent-unknown-border: rgba(245, 158, 11, 0.4);
-    --highlight-glow: rgba(56, 189, 248, 0.2);
+    --bg-app: 248 246 241;          /* #F8F6F1 parchment */
+    --bg-header: 255 255 255;       /* #FFFFFF */
+    --bg-panel: 251 249 245;        /* #FBF9F5 */
+    --bg-panel-hover: 242 237 228;  /* #F2EDE4 */
+    --bg-card: 255 255 255;         /* #FFFFFF */
+    --bg-card-subtle: 248 246 241;  /* #F8F6F1 */
+    --bg-desk: 245 242 235;         /* #F5F2EB */
+    --border-subtle: 227 221 211;   /* #E3DDD3 */
+    --border-card: 213 207 197;     /* #D5CFC5 */
+    --border-active: 20 83 45;      /* #14532D racing green */
+    --text-primary: 28 25 23;       /* #1C1917 */
+    --text-secondary: 68 64 60;     /* #44403C */
+    --text-muted: 120 113 108;      /* #78716C */
+    --accent-brand: 20 83 45;       /* #14532D racing green */
+    --accent-pass: 20 83 45;        /* #14532D racing green */
+    --accent-pass-bg: 240 253 244;  /* #F0FDF4 */
+    --accent-pass-border: 187 247 208; /* #BBF7D0 */
+    --accent-flag: 153 27 27;       /* #991B1B claret */
+    --accent-flag-bg: 254 242 242;  /* #FEF2F2 */
+    --accent-flag-border: 254 202 202; /* #FECACA */
+    --accent-unknown: 146 64 14;    /* #92400E tobacco */
+    --accent-unknown-bg: 253 248 238;  /* #FDF8EE */
+    --accent-unknown-border: 253 230 138; /* #FDE68A */
   }
 
   html {
@@ -91,8 +42,8 @@
   }
 
   body {
-    background-color: var(--bg-app);
-    color: var(--text-primary);
+    background-color: rgb(var(--bg-app));
+    color: rgb(var(--text-primary));
     @apply h-full antialiased font-sans transition-colors duration-200;
     font-feature-settings: 'tnum' 1, 'cv05' 1;
   }
@@ -102,8 +53,8 @@
   }
 
   ::selection {
-    background-color: #FDE68A;
-    color: #1C1917;
+    background-color: rgb(var(--accent-unknown-border));
+    color: rgb(var(--text-primary));
   }
 
   /* Custom scrollbars matching theme */
@@ -115,11 +66,11 @@
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background: var(--border-card);
+    background: rgb(var(--border-card));
     border-radius: 4px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: var(--text-muted);
+    background: rgb(var(--text-muted));
   }
 
   kbd {
@@ -128,49 +79,6 @@
 
   select {
     @apply font-mono;
-  }
-}
-
-@layer components {
-  /* Evidence bounding-box overlays on PDF canvas */
-  .evidence-overlay-box {
-    @apply absolute border-2 rounded-xs cursor-pointer pointer-events-auto transition-all;
-  }
-
-  .evidence-box-pass {
-    border-color: var(--accent-pass);
-    background-color: var(--accent-pass-bg);
-  }
-
-  .evidence-box-flag {
-    border-color: var(--accent-flag);
-    background-color: var(--accent-flag-bg);
-  }
-
-  .evidence-box-unknown {
-    border-color: var(--accent-unknown);
-    background-color: var(--accent-unknown-bg);
-  }
-
-  .evidence-box-active {
-    ring-width: 2px;
-    ring-color: var(--accent-brand);
-    border-color: var(--accent-brand);
-    background-color: var(--highlight-glow);
-    @apply ring-2 shadow-md z-20;
-  }
-
-  /* Theme card */
-  .theme-card {
-    background-color: var(--bg-card);
-    border: 1px solid var(--border-subtle);
-    border-radius: 4px;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
-  }
-
-  .theme-panel {
-    background-color: var(--bg-panel);
-    border-color: var(--border-subtle);
   }
 }
 

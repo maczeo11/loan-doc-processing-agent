@@ -1,5 +1,5 @@
-﻿import React, { useState } from 'react';
-import { X, UploadCloud, FileText, CheckCircle2, AlertCircle } from 'lucide-react';
+import React, { useState } from 'react';
+import { X, UploadCloud, FileText, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
 
 interface DocumentUploadModalProps {
   isOpen: boolean;
@@ -14,36 +14,55 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
   onUpload,
   applicationId,
 }) => {
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [docTypeHint, setDocTypeHint] = useState<string>('payslip');
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [docTypeHint, setDocTypeHint] = useState<string>('auto');
   const [isUploading, setIsUploading] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [uploadSuccess, setUploadSuccess] = useState<boolean>(false);
+  const [uploadedCount, setUploadedCount] = useState<number>(0);
 
   if (!isOpen) return null;
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
-      setSelectedFile(e.target.files[0]);
+      setSelectedFiles(Array.from(e.target.files));
       setErrorMessage(null);
     }
   };
 
+  const autoDetectHint = (filename: string): string | undefined => {
+    const f = filename.toLowerCase();
+    if (f.includes('payslip') || f.includes('salary')) return 'payslip';
+    if (f.includes('bank') || f.includes('statement')) return 'bank_statement';
+    if (f.includes('tax') || f.includes('itr')) return 'tax_return';
+    if (f.includes('pan') || f.includes('aadhaar') || f.includes('id')) return 'id_card';
+    if (f.includes('app') || f.includes('form')) return 'application_form';
+    return undefined;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedFile) {
-      setErrorMessage('Please select a PDF document to upload.');
+    if (selectedFiles.length === 0) {
+      setErrorMessage('Please select at least one PDF file to upload.');
       return;
     }
 
     setIsUploading(true);
     setErrorMessage(null);
+    setUploadedCount(0);
+
     try {
-      await onUpload(selectedFile, docTypeHint);
+      for (let i = 0; i < selectedFiles.length; i++) {
+        const file = selectedFiles[i];
+        const hint = docTypeHint === 'auto' ? autoDetectHint(file.name) : docTypeHint;
+        await onUpload(file, hint);
+        setUploadedCount(i + 1);
+      }
+
       setUploadSuccess(true);
       setTimeout(() => {
         setUploadSuccess(false);
-        setSelectedFile(null);
+        setSelectedFiles([]);
         onClose();
       }, 1200);
     } catch (err) {
@@ -54,68 +73,93 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4">
-      <div className="bg-white rounded-xl shadow-xl border border-slate-200 w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-        {/* Modal Header */}
-        <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <UploadCloud className="w-5 h-5 text-indigo-600" />
-            <h3 className="text-sm font-bold text-slate-900">Upload Dossier Document</h3>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 select-none">
+      <div className="w-full max-w-md rounded-xs bg-theme-card border border-theme-border shadow-2xl overflow-hidden flex flex-col transition-colors duration-200 animate-in fade-in zoom-in-95 duration-150">
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-theme-border bg-theme-panel">
+          <div className="flex items-center gap-2.5">
+            <div className="w-7 h-7 rounded-xs bg-theme-brand/10 border border-theme-brand/20 flex items-center justify-center text-theme-brand">
+              <UploadCloud className="w-4 h-4" />
+            </div>
+            <div>
+              <h3 className="text-sm font-serif font-bold text-theme-primary">
+                Upload Dossier Documents
+              </h3>
+              <p className="text-[10px] text-theme-muted font-mono uppercase tracking-wider">
+                Container: {applicationId}
+              </p>
+            </div>
           </div>
           <button
+            type="button"
             onClick={onClose}
-            className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100"
+            disabled={isUploading}
+            className="p-1 rounded-xs text-theme-muted hover:text-theme-primary hover:bg-theme-panel-hover transition-colors cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        {/* Modal Body / Form */}
-        <form onSubmit={handleSubmit} className="p-5 space-y-4">
-          <div className="text-xs text-slate-500">
-            Upload document to application container <span className="font-mono font-semibold text-slate-700">{applicationId}</span> via <code className="bg-slate-100 px-1 py-0.5 rounded text-indigo-700">POST /applications/{'{id}'}/documents</code>.
-          </div>
+        {/* Form Body */}
+        <form onSubmit={handleSubmit} className="p-5 space-y-4 text-xs">
+          {errorMessage && (
+            <div className="p-2.5 rounded-xs bg-theme-flag-bg border border-theme-flag-border text-theme-flag flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <span>{errorMessage}</span>
+            </div>
+          )}
 
-          {/* File Selector */}
+          {uploadSuccess && (
+            <div className="p-2.5 rounded-xs bg-theme-pass-bg border border-theme-pass-border text-theme-pass flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 shrink-0" />
+              <span>
+                {selectedFiles.length} {selectedFiles.length === 1 ? 'document' : 'documents'} uploaded successfully to {applicationId}.
+              </span>
+            </div>
+          )}
+
+          {/* File Picker */}
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
-              Select Document File (.pdf)
+            <label className="block font-mono font-bold text-theme-primary mb-1.5">
+              Select Dossier PDF(s) *
             </label>
-            <div className="border-2 border-dashed border-slate-300 rounded-lg p-4 text-center hover:border-indigo-400 transition-colors bg-slate-50">
+            <div className="border-2 border-dashed border-theme-border rounded-xs p-4 text-center hover:border-theme-brand transition-colors bg-theme-panel">
               <input
                 type="file"
                 accept=".pdf,application/pdf"
+                multiple
                 onChange={handleFileChange}
                 className="hidden"
-                id="dossier-file-input"
+                id="dossier-batch-file-input"
               />
               <label
-                htmlFor="dossier-file-input"
+                htmlFor="dossier-batch-file-input"
                 className="cursor-pointer flex flex-col items-center justify-center gap-1.5"
               >
-                <FileText className="w-8 h-8 text-slate-400" />
-                <span className="text-xs font-medium text-indigo-600 hover:underline">
-                  {selectedFile ? selectedFile.name : 'Choose a PDF file'}
+                <FileText className="w-8 h-8 text-theme-muted" />
+                <span className="text-xs font-mono font-semibold text-theme-brand hover:underline">
+                  {selectedFiles.length > 0
+                    ? `${selectedFiles.length} file(s) selected: ${selectedFiles.map((f) => f.name).join(', ')}`
+                    : 'Choose one or more PDF files (multi-select supported)'}
                 </span>
-                <span className="text-[11px] text-slate-400">
-                  {selectedFile
-                    ? `${(selectedFile.size / 1024).toFixed(1)} KB`
-                    : 'Maximum 10 MB per file'}
+                <span className="text-[10px] text-theme-muted font-mono">
+                  Standard institutional PDFs (Max 10 MB each)
                 </span>
               </label>
             </div>
           </div>
 
-          {/* Document Type Hint */}
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
+          {/* Category Classification Hint */}
+          <div className="space-y-1">
+            <label className="font-mono font-bold text-theme-primary block">
               Document Category Hint
             </label>
             <select
               value={docTypeHint}
               onChange={(e) => setDocTypeHint(e.target.value)}
-              className="w-full text-xs border border-slate-300 rounded-lg p-2.5 bg-white text-slate-800 focus:ring-2 focus:ring-indigo-400 focus:outline-none"
+              className="w-full bg-theme-panel border border-theme-border rounded-xs px-3 py-2 text-xs font-sans text-theme-primary focus:outline-none focus:border-theme-brand shadow-2xs cursor-pointer"
             >
+              <option value="auto">✨ Auto-Detect from Filename & Content</option>
               <option value="payslip">Salary Payslip</option>
               <option value="bank_statement">Bank Account Statement</option>
               <option value="tax_return">ITR Income Tax Return</option>
@@ -124,45 +168,34 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
             </select>
           </div>
 
-          {/* Error / Success Feedback */}
-          {errorMessage && (
-            <div className="p-2.5 rounded-lg bg-rose-50 border border-rose-200 text-xs text-rose-700 flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
-              <span>{errorMessage}</span>
-            </div>
-          )}
-
-          {uploadSuccess && (
-            <div className="p-2.5 rounded-lg bg-emerald-50 border border-emerald-200 text-xs text-emerald-700 flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
-              <span>Document registered and uploaded successfully.</span>
-            </div>
-          )}
-
-          {/* Modal Actions */}
-          <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+          {/* Actions */}
+          <div className="pt-2 flex items-center justify-end gap-2 border-t border-theme-border">
             <button
               type="button"
               onClick={onClose}
               disabled={isUploading}
-              className="px-3 py-2 rounded-lg border border-slate-300 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+              className="px-3 py-2 rounded-xs border border-theme-border bg-theme-panel hover:bg-theme-panel-hover text-theme-secondary text-xs font-mono font-semibold transition-colors cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
-              disabled={!selectedFile || isUploading || uploadSuccess}
-              className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+              disabled={selectedFiles.length === 0 || isUploading || uploadSuccess}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xs text-xs font-mono font-bold bg-theme-brand hover:opacity-90 text-white shadow-sm transition-all cursor-pointer disabled:opacity-50"
             >
               {isUploading ? (
                 <>
-                  <span className="animate-spin text-sm">⟳</span>
-                  <span>Uploading...</span>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <span>
+                    Uploading ({uploadedCount}/{selectedFiles.length})...
+                  </span>
                 </>
               ) : (
                 <>
                   <UploadCloud className="w-4 h-4" />
-                  <span>Upload Document</span>
+                  <span>
+                    Upload {selectedFiles.length > 0 ? `(${selectedFiles.length})` : 'Documents'}
+                  </span>
                 </>
               )}
             </button>

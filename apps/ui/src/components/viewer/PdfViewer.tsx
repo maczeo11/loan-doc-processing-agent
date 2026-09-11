@@ -4,6 +4,7 @@ import { usePdfDocument } from './usePdfDocument';
 import { ViewerToolbar } from './ViewerToolbar';
 import { BoundingBoxOverlay } from './BoundingBoxOverlay';
 import { useEvidenceNavigation } from '../../context/EvidenceNavigationContext';
+import { sanitizePiiInText } from '../../utils/pii';
 
 interface PdfViewerProps {
   docId: string;
@@ -100,16 +101,16 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({
 
       {/* Active Evidence Notification Bar */}
       {hasActiveEvidenceOnCurrentPage && (
-        <div className="bg-amber-500/15 border-b border-amber-500/40 px-4 py-1.5 flex items-center justify-between text-xs text-amber-700 dark:text-amber-300 shadow-2xs shrink-0 backdrop-blur-xs">
+        <div className="bg-theme-unknown-bg border-b border-theme-unknown-border px-4 py-1.5 flex items-center justify-between text-xs text-theme-unknown shadow-2xs shrink-0">
           <div className="flex items-center gap-2 truncate">
-            <CheckCircle className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
-            <span className="font-bold text-[11px] uppercase tracking-wider bg-amber-500/30 text-amber-800 dark:text-amber-200 px-1.5 py-0.2 rounded-xs font-mono">
+            <CheckCircle className="w-3.5 h-3.5 shrink-0" />
+            <span className="font-bold text-[11px] uppercase tracking-wider bg-theme-card border border-theme-unknown-border px-1.5 py-0.5 rounded-xs font-mono">
               Verified Evidence
             </span>
-            <span className="italic font-medium truncate font-mono">
-              &ldquo;{activeEvidence.quoted_span}&rdquo;
+            <span className="italic font-medium truncate font-mono text-theme-secondary">
+              &ldquo;{sanitizePiiInText(activeEvidence.quoted_span || '')}&rdquo;
             </span>
-            <span className="text-[10px] text-amber-700 dark:text-amber-400 font-mono hidden sm:inline">
+            <span className="text-[10px] font-mono hidden sm:inline">
               ({Math.round((activeEvidence.confidence ?? 1) * 100)}% conf |{' '}
               {activeEvidence.extraction_method || 'pymupdf_native'})
             </span>
@@ -117,7 +118,7 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({
           <button
             type="button"
             onClick={clearActiveEvidence}
-            className="text-amber-700 dark:text-amber-300 hover:text-amber-950 dark:hover:text-white p-1 rounded hover:bg-amber-500/20 shrink-0 ml-2 cursor-pointer"
+            className="text-theme-unknown hover:text-theme-primary p-1 rounded-xs hover:bg-theme-panel shrink-0 ml-2 cursor-pointer"
             title="Clear active evidence highlight"
           >
             <X className="w-3.5 h-3.5" />
@@ -126,7 +127,7 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({
       )}
 
       {/* Main Viewport */}
-      <div className="flex-1 overflow-auto p-6 flex justify-center items-start bg-theme-desk transition-colors duration-200">
+      <div className="flex-1 overflow-auto p-3 sm:p-6 flex justify-center items-start bg-theme-desk transition-colors duration-200">
         {isLoading ? (
           <div className="flex flex-col items-center justify-center p-16 text-center">
             <Loader2 className="w-8 h-8 text-theme-muted animate-spin mb-3" />
@@ -158,32 +159,35 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({
               <FileX className="w-6 h-6" />
             </div>
             <h3 className="text-sm font-serif font-bold text-theme-primary mb-1">
-              Document Source Unavailable
+              {docId ? 'Document Ready for Viewing' : 'No Document Selected'}
             </h3>
-            <p className="text-xs text-theme-secondary mb-3">
-              The live backend does not currently expose a GET document download endpoint. Toggle to{' '}
-              <strong className="text-theme-primary">Demo Dossier</strong> to view synthetic client-rendered documents.
+            <p className="text-xs text-theme-secondary mb-3 leading-relaxed">
+              {docId
+                ? 'Select a document from the left index or upload files to view real PDF pages with bounding-box coordinate highlights.'
+                : 'Upload retail loan dossier documents via "+ New" or the Upload File button on the left pane.'}
             </p>
-            <div className="bg-theme-panel border border-theme-border rounded-xs p-2 text-[11px] text-theme-primary font-mono">
-              Document ID: {docId}
-            </div>
+            {docId && (
+              <div className="bg-theme-panel border border-theme-border rounded-xs p-2 text-[11px] text-theme-primary font-mono">
+                Document: {docId}
+              </div>
+            )}
           </div>
         ) : (
           <div className="flex flex-col items-center relative shadow-xl">
             {/* Watermark header banner */}
             <div
               style={{ width: `${canvasDimensions.width}px` }}
-              className="bg-amber-500/15 border border-amber-500/30 rounded-t px-4 py-1 text-center shadow-xs transition-all backdrop-blur-xs"
+              className="bg-theme-unknown-bg border border-theme-unknown-border rounded-t px-4 py-1 text-center shadow-xs transition-all"
             >
-              <span className="text-[10px] font-bold font-mono tracking-wider text-amber-700 dark:text-amber-300 uppercase">
+              <span className="text-[10px] font-bold font-mono tracking-wider text-theme-unknown uppercase">
                 SYNTHETIC DEMO — NOT VALID (FinScan AI)
               </span>
             </div>
 
             {/* Rendering Indicator */}
             {isRendering && (
-              <div className="absolute top-10 right-4 z-30 bg-slate-900/85 text-white text-[10px] font-mono px-2.5 py-1 rounded-full flex items-center gap-1.5 shadow">
-                <Loader2 className="w-3 h-3 animate-spin text-amber-300" />
+              <div className="absolute top-10 right-4 z-30 bg-theme-card border border-theme-border-card text-theme-primary text-[10px] font-mono px-2.5 py-1 rounded-full flex items-center gap-1.5 shadow">
+                <Loader2 className="w-3 h-3 animate-spin text-theme-unknown" />
                 <span>Rendering canvas...</span>
               </div>
             )}

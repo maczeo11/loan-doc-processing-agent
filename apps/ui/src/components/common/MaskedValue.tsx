@@ -15,7 +15,7 @@ export const MaskedValue: React.FC<MaskedValueProps> = ({
   className = '',
 }) => {
   if (!value) {
-    return <span className="text-slate-500 font-mono">—</span>;
+    return <span className="text-theme-muted font-mono">—</span>;
   }
 
   let formatted = '';
@@ -25,10 +25,10 @@ export const MaskedValue: React.FC<MaskedValueProps> = ({
 
   return (
     <span
-      className={`inline-flex items-center gap-1.5 font-mono text-xs px-2 py-0.5 rounded bg-slate-900/80 border border-slate-700/60 tabular-nums ${className}`}
+      className={`inline-flex items-center gap-1.5 font-mono text-xs px-2 py-0.5 rounded-xs bg-theme-panel border border-theme-border text-theme-primary tabular-nums ${className}`}
       title="PII Masked per Security Invariant"
     >
-      <Lock className="w-3 h-3 text-slate-400 flex-shrink-0" />
+      <Lock className="w-3 h-3 text-theme-muted flex-shrink-0" />
       <span className="tracking-wider">{formatted}</span>
     </span>
   );

@@ -87,8 +87,8 @@ export const BoundingBoxOverlay: React.FC<BoundingBoxOverlayProps> = ({
   if (!activeEvidence.bounding_box) {
     return (
       <div className="absolute top-2 left-2 z-30 pointer-events-auto">
-        <div className="bg-slate-900/90 text-amber-300 text-[11px] px-3 py-1.5 rounded-lg border border-amber-500/40 shadow-lg flex items-center gap-1.5 backdrop-blur-xs">
-          <AlertCircle className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+        <div className="bg-theme-card text-theme-unknown text-[11px] px-3 py-1.5 rounded-xs border border-theme-unknown-border shadow-lg flex items-center gap-1.5">
+          <AlertCircle className="w-3.5 h-3.5 shrink-0" />
           <span>Evidence cited on Page {currentPage} — Precise coordinates unavailable</span>
         </div>
       </div>

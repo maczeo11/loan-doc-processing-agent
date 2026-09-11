@@ -31,14 +31,28 @@ export const MemoNarrativeTab: React.FC<MemoNarrativeTabProps> = ({ application 
             Credit Appraisal Memo (CAM)
           </span>
         </div>
-        <button
-          type="button"
-          onClick={handleExport}
-          className="flex items-center gap-1.5 px-2.5 py-1 rounded-xs bg-theme-card hover:bg-theme-panel text-theme-primary border border-theme-border text-xs font-serif font-semibold transition-colors cursor-pointer"
-        >
-          <Download className="w-3.5 h-3.5" />
-          <span>Export CAM</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <a
+            href={`/applications/${encodeURIComponent(application.id)}/export?format=pdf`}
+            target="_blank"
+            rel="noopener noreferrer"
+            download={`CAM_${application.id}.pdf`}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-xs bg-theme-panel hover:bg-theme-card text-theme-primary border border-theme-border text-xs font-serif font-semibold transition-colors cursor-pointer"
+            title="Download Official ReportLab PDF CAM Memo"
+          >
+            <Download className="w-3.5 h-3.5 text-theme-unknown" />
+            <span>PDF CAM</span>
+          </a>
+          <button
+            type="button"
+            onClick={handleExport}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-xs bg-theme-card hover:bg-theme-panel text-theme-primary border border-theme-border text-xs font-serif font-semibold transition-colors cursor-pointer"
+            title="Export Markdown Memo"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>Markdown</span>
+          </button>
+        </div>
       </div>
 
       {/* Memo Content Card - Editorial Paper Aesthetic */}

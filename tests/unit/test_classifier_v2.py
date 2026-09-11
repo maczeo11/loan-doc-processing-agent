@@ -14,6 +14,7 @@ Verifies:
 
 import json
 import hashlib
+import os
 from pathlib import Path
 
 from ml.data.v2.dataset_generator_v2 import (
@@ -254,7 +255,49 @@ def test_v2_baseline_held_out_test_target_performance():
     assert metrics["macro_f1"] >= 0.90, f"Held-out Macro-F1 {metrics['macro_f1']} below target 0.90!"
     assert metrics["accuracy"] >= 0.90, f"Held-out Accuracy {metrics['accuracy']} below target 0.90!"
     assert metrics["p50_latency_ms"] < 20.0, f"p50 latency {metrics['p50_latency_ms']}ms exceeds target 20ms!"
-    assert metrics["process_rss_mb"] < 500.0, f"Process RSS {metrics['process_rss_mb']}MB exceeds target 500MB!"
+    # NOTE: the memory gate lives in test_v2_classifier_standalone_memory_footprint below.
+    # metrics["process_rss_mb"] measures whole-process RSS, which under a full pytest
+    # session already includes torch/faiss/langgraph resident from other test modules —
+    # it reports the suite's footprint, not the classifier's.
+
+
+def test_v2_classifier_standalone_memory_footprint():
+    """
+    Release Gate: classifier inference footprint must fit the t4g.medium target (AGENTS.md §8.4).
+
+    Measured in a clean subprocess that loads only the classifier, so the result is
+    the deployable footprint and is independent of pytest module ordering.
+    """
+    import subprocess
+    import sys
+    import textwrap
+
+    probe = textwrap.dedent(
+        """
+        from ml.classifier.baseline_tfidf import load_v2_classifier
+        from ml.classifier.evaluate import get_process_rss_mb
+
+        clf = load_v2_classifier()
+        # Warm the full inference path so lazily-built structures are resident.
+        clf.predict_with_confidence("Permanent Account Number PAN Card Income Tax Department")
+        print(get_process_rss_mb())
+        """
+    )
+
+    env = dict(os.environ)
+    env["PYTHONPATH"] = str(REPO_ROOT)
+    result = subprocess.run(
+        [sys.executable, "-c", probe],
+        cwd=str(REPO_ROOT),
+        capture_output=True,
+        text=True,
+        timeout=300,
+        env=env,
+    )
+    assert result.returncode == 0, f"Footprint probe failed:\n{result.stderr}"
+
+    rss_mb = float(result.stdout.strip().splitlines()[-1])
+    assert rss_mb < 500.0, f"Standalone classifier RSS {rss_mb}MB exceeds target 500MB!"
 
 
 def test_classifier_adapter_integration():

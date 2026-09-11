@@ -1,0 +1,84 @@
+{
+  "application_id": "APP-00048",
+  "seed": 48,
+  "scenario": "bank_mismatch",
+  "split": "demo",
+  "expected_documents": [
+    "application.pdf",
+    "payslip_1.pdf",
+    "payslip_2.pdf",
+    "payslip_3.pdf",
+    "bank_statement.pdf",
+    "itr.pdf",
+    "kyc.pdf"
+  ],
+  "generated_document_names": [
+    "application.pdf",
+    "payslip_1.pdf",
+    "payslip_2.pdf",
+    "payslip_3.pdf",
+    "bank_statement.pdf",
+    "itr.pdf",
+    "kyc.pdf"
+  ],
+  "applicant_facts": {
+    "full_name": "Aarav Sharma",
+    "dob": "1992-06-15",
+    "pan_number": "ABCDE2776F",
+    "aadhaar_masked": "XXXX-XXXX-3544",
+    "employer_name": "Tech Mahindra Ltd"
+  },
+  "financial_ground_truth": {
+    "gross_monthly_salary": 160000.0,
+    "net_monthly_salary": 136000.0,
+    "deductions_total": 24000.0,
+    "annualized_gross_income": 1920000.0,
+    "bank_monthly_salary_credit": 61200.0,
+    "bank_opening_balance": 50000.0,
+    "bank_total_credits": 183600.0,
+    "bank_total_debits": 128520.0,
+    "bank_closing_balance": 105080.0,
+    "itr_gross_total_income": 1920000.0,
+    "total_tax_paid": 192000.0
+  },
+  "expected_rule_outcomes": {
+    "RULE-COMP-01": "pass",
+    "RULE-INC-01": "flag",
+    "RULE-TAX-01": "pass",
+    "RULE-ID-01": "pass"
+  },
+  "applicant_name": "Aarav Sharma",
+  "injected_anomaly": "bank_mismatch",
+  "payslip": {
+    "employee_name": "Aarav Sharma",
+    "employer_name": "Tech Mahindra Ltd",
+    "gross_salary": 160000.0,
+    "net_salary": 136000.0,
+    "epf_deduction": 12800.0,
+    "tds_deduction": 11200.0
+  },
+  "bank_statement": {
+    "account_holder": "Aarav Sharma",
+    "bank_name": "HDFC Bank",
+    "account_number": "501001004368",
+    "monthly_salary_credits": [
+      61200.0,
+      61200.0,
+      61200.0
+    ],
+    "average_balance": 47286.0,
+    "bounced_transactions": 0
+  },
+  "tax_return": {
+    "assessee_name": "Aarav Sharma",
+    "pan_number": "ABCDE2776F",
+    "gross_total_income": 1920000.0,
+    "total_tax_paid": 192000.0
+  },
+  "kyc": {
+    "full_name": "Aarav Sharma",
+    "pan_number": "ABCDE2776F",
+    "dob": "1992-06-15",
+    "aadhaar_masked": "XXXX-XXXX-3544"
+  }
+}

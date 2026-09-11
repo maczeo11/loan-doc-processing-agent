@@ -14,79 +14,163 @@ from core.contracts.findings import Finding
 
 # AGENTS.md RULE-ID-01: fuzzy name match must score >= 85 token_sort_ratio.
 NAME_MATCH_THRESHOLD = 85.0
+NAME_VARIATION_THRESHOLD = 70.0
+
+COMMON_TITLES = {"mr", "mrs", "ms", "miss", "dr", "shri", "smt", "prof"}
 
 _WHITESPACE = re.compile(r"\s+")
-_NAME_NOISE = re.compile(r"[^A-Z\s]")
+_NAME_NOISE = re.compile(r"[^\w\s]")
 
 
-def _normalize_name(value: Optional[str]) -> str:
-    """Uppercase, strip punctuation/honorific dots, and collapse whitespace."""
-    if not value:
+def normalize_pan(pan: Optional[str]) -> Optional[str]:
+    """
+    Normalizes a PAN string by stripping whitespace, hyphens, underscores,
+    and converting to uppercase.
+    Returns None if pan is None, empty, or 'UNKNOWN'.
+    """
+    if not pan:
+        return None
+    cleaned = re.sub(r"[\s\-_]", "", str(pan).strip()).upper()
+    if not cleaned or cleaned == "UNKNOWN":
+        return None
+    return cleaned
+
+
+def normalize_name_tokens(name: Optional[str]) -> str:
+    """
+    Normalizes a name string by stripping non-alphanumeric characters,
+    lowercasing, removing standard honorific titles, and sorting tokens.
+    """
+    if not name:
         return ""
-    cleaned = _NAME_NOISE.sub(" ", value.upper())
-    return _WHITESPACE.sub(" ", cleaned).strip()
+    cleaned = _NAME_NOISE.sub(" ", str(name).lower())
+    tokens = [t for t in cleaned.split() if t]
+    if len(tokens) > 1:
+        filtered = [t for t in tokens if t not in COMMON_TITLES]
+        if filtered:
+            tokens = filtered
+    return " ".join(sorted(tokens))
 
 
-def _normalize_pan(value: Optional[str]) -> str:
-    if not value:
-        return ""
-    return _WHITESPACE.sub("", value.upper())
+def compute_name_similarity(name1: str, name2: str) -> float:
+    """
+    Computes deterministic token-sorted fuzzy similarity in [0.0, 1.0].
+    Uses RapidFuzz token_sort_ratio for high-performance Levenshtein matching.
+    """
+    norm1 = normalize_name_tokens(name1)
+    norm2 = normalize_name_tokens(name2)
+    if not norm1 or not norm2:
+        return 0.0
+    if norm1 == norm2:
+        return 1.0
+    return float(fuzz.token_sort_ratio(norm1, norm2)) / 100.0
 
 
 def audit_identity_consistency(
     applicant: Optional[ApplicantFact],
-    payslip_name: Optional[str],
-    bank_name: Optional[str],
+    payslip_name: Optional[str] = None,
+    bank_name: Optional[str] = None,
     tax_pan: Optional[str] = None,
+    *,
+    tax_name: Optional[str] = None,
+    pan_to_compare: Optional[str] = None,
+    pan_evidence: Optional[EvidenceRef] = None,
 ) -> Finding:
     """
-    Verifies the KYC applicant identity holds across payslip, bank statement, and ITR.
+    RULE-ID-01: Cross-checks applicant name and PAN number across KYC, payslip,
+    bank statement, and tax records.
+    Deterministic Python only. No LLM involvement.
 
-    Names are compared with RapidFuzz token_sort_ratio so word order and middle-name
-    variation do not cause false flags. PAN is compared exactly after normalisation.
-    If the KYC document or every comparison source is missing, verdict MUST be 'unknown'.
+    Policy thresholds (per kyc_guidelines_v1.md):
+      - Fuzzy match >= 85%: pass
+      - Fuzzy match 70% - 84%: flag ("Reviewer verification required for name variation")
+      - Fuzzy match < 70%: flag ("Critical identity mismatch")
+      - PAN mismatch: flag ("Critical identity mismatch")
+      - Missing applicant, missing readable name, or missing compared PAN: unknown
     """
+    # 1. Check primary applicant KYC document presence
     if applicant is None:
         return Finding(
             rule_id="RULE-ID-01",
             rule_name="Cross-Document Identity Consistency",
             verdict="unknown",
             reason="Missing primary applicant KYC document.",
+            supporting_evidence=[],
             policy_version="v1.0",
         )
 
-    kyc_name = _normalize_name(applicant.full_name)
-    if not kyc_name:
+    # 2. Validate that applicant has a readable name
+    applicant_name = applicant.full_name.strip() if applicant.full_name else ""
+    if not applicant_name or applicant_name.upper() == "UNKNOWN":
+        evidence: List[EvidenceRef] = [applicant.source_name] if applicant.source_name else []
         return Finding(
             rule_id="RULE-ID-01",
             rule_name="Cross-Document Identity Consistency",
             verdict="unknown",
             reason="KYC document carries no readable applicant name.",
-            supporting_evidence=[applicant.source_name],
+            supporting_evidence=evidence,
             policy_version="v1.0",
         )
 
-    evidence: List[EvidenceRef] = [applicant.source_name]
+    # 3. Collect supporting evidence from KYC
+    evidence: List[EvidenceRef] = []
+    if getattr(applicant, "source_name", None):
+        evidence.append(applicant.source_name)
+    if getattr(applicant, "source_pan", None):
+        evidence.append(applicant.source_pan)
+    if pan_evidence:
+        evidence.append(pan_evidence)
 
-    # 1. Fuzzy name comparison against every available secondary document.
-    scored: List[Tuple[str, str, float]] = []
-    for label, candidate in (("payslip", payslip_name), ("bank statement", bank_name)):
-        normalized = _normalize_name(candidate)
-        if normalized:
-            scored.append((label, candidate.strip(), fuzz.token_sort_ratio(kyc_name, normalized)))
-
-    # 2. PAN cross-check against the ITR filing.
+    # 4. PAN consistency verification (if PAN comparison requested)
+    target_pan = tax_pan if tax_pan is not None else pan_to_compare
     pan_checked = False
     pan_matches = True
-    kyc_pan = _normalize_pan(applicant.pan_number)
-    itr_pan = _normalize_pan(tax_pan)
-    if kyc_pan and itr_pan:
-        pan_checked = True
-        pan_matches = kyc_pan == itr_pan
-        if applicant.source_pan is not None:
-            evidence.append(applicant.source_pan)
+    norm_kyc_pan = normalize_pan(applicant.pan_number)
+    norm_doc_pan = normalize_pan(target_pan) if target_pan is not None else None
 
-    if not scored and not pan_checked:
+    if target_pan is not None and target_pan.strip():
+        pan_checked = True
+        if norm_kyc_pan is None:
+            return Finding(
+                rule_id="RULE-ID-01",
+                rule_name="Cross-Document Identity Consistency",
+                verdict="unknown",
+                reason="Cannot verify PAN consistency: KYC PAN is missing or unknown.",
+                supporting_evidence=evidence,
+                policy_version="v1.0",
+            )
+
+        if norm_doc_pan is None:
+            return Finding(
+                rule_id="RULE-ID-01",
+                rule_name="Cross-Document Identity Consistency",
+                verdict="unknown",
+                reason="Cannot verify PAN consistency: Comparison document PAN is missing or unknown.",
+                supporting_evidence=evidence,
+                policy_version="v1.0",
+            )
+
+        pan_matches = norm_kyc_pan == norm_doc_pan
+        if not pan_matches:
+            return Finding(
+                rule_id="RULE-ID-01",
+                rule_name="Cross-Document Identity Consistency",
+                verdict="flag",
+                reason=f"Critical identity mismatch: KYC PAN '{applicant.pan_number}' does not match document PAN '{target_pan}'.",
+                supporting_evidence=evidence,
+                policy_version="v1.0",
+            )
+
+    # 5. Collect document names to cross-check
+    docs_to_compare: List[Tuple[str, str]] = []
+    if payslip_name and str(payslip_name).strip().upper() != "UNKNOWN":
+        docs_to_compare.append(("payslip", str(payslip_name).strip()))
+    if bank_name and str(bank_name).strip().upper() != "UNKNOWN":
+        docs_to_compare.append(("bank statement", str(bank_name).strip()))
+    if tax_name and str(tax_name).strip().upper() != "UNKNOWN":
+        docs_to_compare.append(("tax return", str(tax_name).strip()))
+
+    if not docs_to_compare and not pan_checked:
         return Finding(
             rule_id="RULE-ID-01",
             rule_name="Cross-Document Identity Consistency",
@@ -99,36 +183,54 @@ def audit_identity_consistency(
             policy_version="v1.0",
         )
 
-    problems: List[str] = []
-    for label, raw, score in scored:
-        if score < NAME_MATCH_THRESHOLD:
-            problems.append(f"{label} names '{raw}' ({score:.0f}% match, below {NAME_MATCH_THRESHOLD:.0f}%)")
-    if pan_checked and not pan_matches:
-        problems.append(f"ITR PAN {itr_pan} does not match KYC PAN {kyc_pan}")
+    # 6. Evaluate fuzzy similarity per policy thresholds
+    flag_critical: List[str] = []
+    flag_variation: List[str] = []
+    verified_matches: List[str] = []
+    scores: List[float] = []
 
-    if problems:
+    for doc_label, doc_val in docs_to_compare:
+        sim = compute_name_similarity(applicant_name, doc_val)
+        score_pct = sim * 100.0
+        scores.append(score_pct)
+
+        if score_pct < NAME_VARIATION_THRESHOLD:
+            flag_critical.append(f"{doc_label} names '{doc_val}' ({score_pct:.0f}% match, below {NAME_MATCH_THRESHOLD:.0f}%)")
+        elif score_pct < NAME_MATCH_THRESHOLD:
+            flag_variation.append(f"{doc_label} names '{doc_val}' ({score_pct:.0f}% match, below {NAME_MATCH_THRESHOLD:.0f}%)")
+        else:
+            verified_matches.append(doc_label)
+
+    if flag_critical:
         return Finding(
             rule_id="RULE-ID-01",
             rule_name="Cross-Document Identity Consistency",
             verdict="flag",
-            reason=(
-                f"Identity mismatch against KYC applicant '{applicant.full_name}': " + "; ".join(problems) + "."
-            ),
+            reason=f"Critical identity mismatch against KYC applicant '{applicant_name}': {'; '.join(flag_critical)}.",
             supporting_evidence=evidence,
             policy_version="v1.0",
         )
 
-    verified = [label for label, _, _ in scored]
-    if pan_checked:
+    if flag_variation:
+        return Finding(
+            rule_id="RULE-ID-01",
+            rule_name="Cross-Document Identity Consistency",
+            verdict="flag",
+            reason=f"Reviewer verification required for name variation against KYC applicant '{applicant_name}': {'; '.join(flag_variation)}.",
+            supporting_evidence=evidence,
+            policy_version="v1.0",
+        )
+
+    verified = list(verified_matches)
+    if pan_checked and pan_matches:
         verified.append("ITR PAN")
+
+    lowest_str = f" (lowest name match {min(scores):.0f}%)" if scores else ""
     return Finding(
         rule_id="RULE-ID-01",
         rule_name="Cross-Document Identity Consistency",
         verdict="pass",
-        reason=(
-            f"Identity confirmed for {applicant.full_name} across {', '.join(verified)}"
-            + (f" (lowest name match {min(s for _, _, s in scored):.0f}%)." if scored else ".")
-        ),
+        reason=f"Identity confirmed for {applicant_name} across {', '.join(verified)}{lowest_str}.",
         supporting_evidence=evidence,
         policy_version="v1.0",
     )

@@ -111,6 +111,7 @@ def filter_grounded_claims(
 def sanitize_summary_text(
     summary_text: str,
     authorized_chunk_ids: List[str],
+    known_doc_ids: Optional[Set[str]] = None,
 ) -> str:
     """
     Strips ungrounded statements citing unauthorized chunk IDs and inserts
@@ -123,6 +124,7 @@ def sanitize_summary_text(
         return summary_text + "\n\n> ⚠️ [ABSTENTION: Mandatory supporting evidence missing or unverified.]"
 
     authorized_set = _expand_authorized_ids(authorized_chunk_ids)
+    doc_set = {d.upper() for d in (known_doc_ids or set())}
     lines = summary_text.splitlines()
     sanitized_lines: List[str] = []
     has_dropped_claim = False
@@ -131,7 +133,12 @@ def sanitize_summary_text(
         # Search for citation tags like [DOC_p1] or [credit_policy_v1_p1]
         citation_matches = re.findall(r"\[([a-zA-Z0-9_\-]+)\]", line)
         if citation_matches:
-            unauthorized = [c for c in citation_matches if c not in authorized_set and not c.startswith("PASS") and not c.startswith("FLAG") and not c.startswith("UNKNOWN") and not c.startswith("ABSTENTION")]
+            unauthorized = [
+                c for c in citation_matches
+                if c not in authorized_set
+                and not c.upper().startswith(("PASS", "FLAG", "UNKNOWN", "ABSTENTION", "DOC", "APP"))
+                and c.upper() not in doc_set
+            ]
             if unauthorized:
                 has_dropped_claim = True
                 sanitized_lines.append(f"> ⚠️ [UNGROUNDED CLAIM DROPPED - Unauthorized citations: {', '.join(unauthorized)}]")

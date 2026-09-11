@@ -1,0 +1,84 @@
+{
+  "application_id": "APP-00025",
+  "seed": 25,
+  "scenario": "clean",
+  "split": "dev",
+  "expected_documents": [
+    "application.pdf",
+    "payslip_1.pdf",
+    "payslip_2.pdf",
+    "payslip_3.pdf",
+    "bank_statement.pdf",
+    "itr.pdf",
+    "kyc.pdf"
+  ],
+  "generated_document_names": [
+    "application.pdf",
+    "payslip_1.pdf",
+    "payslip_2.pdf",
+    "payslip_3.pdf",
+    "bank_statement.pdf",
+    "itr.pdf",
+    "kyc.pdf"
+  ],
+  "applicant_facts": {
+    "full_name": "Priya Patel",
+    "dob": "1992-06-15",
+    "pan_number": "ABCDE1925F",
+    "aadhaar_masked": "XXXX-XXXX-2325",
+    "employer_name": "Tata Consultancy Services Ltd"
+  },
+  "financial_ground_truth": {
+    "gross_monthly_salary": 130000.0,
+    "net_monthly_salary": 110500.0,
+    "deductions_total": 19500.0,
+    "annualized_gross_income": 1560000.0,
+    "bank_monthly_salary_credit": 110500.0,
+    "bank_opening_balance": 50000.0,
+    "bank_total_credits": 331500.0,
+    "bank_total_debits": 232050.0,
+    "bank_closing_balance": 149450.0,
+    "itr_gross_total_income": 1560000.0,
+    "total_tax_paid": 156000.0
+  },
+  "expected_rule_outcomes": {
+    "RULE-COMP-01": "pass",
+    "RULE-INC-01": "pass",
+    "RULE-TAX-01": "pass",
+    "RULE-ID-01": "pass"
+  },
+  "applicant_name": "Priya Patel",
+  "injected_anomaly": null,
+  "payslip": {
+    "employee_name": "Priya Patel",
+    "employer_name": "Tata Consultancy Services Ltd",
+    "gross_salary": 130000.0,
+    "net_salary": 110500.0,
+    "epf_deduction": 10400.0,
+    "tds_deduction": 9100.0
+  },
+  "bank_statement": {
+    "account_holder": "Priya Patel",
+    "bank_name": "State Bank of India",
+    "account_number": "501001002275",
+    "monthly_salary_credits": [
+      110500.0,
+      110500.0,
+      110500.0
+    ],
+    "average_balance": 67252.5,
+    "bounced_transactions": 0
+  },
+  "tax_return": {
+    "assessee_name": "Priya Patel",
+    "pan_number": "ABCDE1925F",
+    "gross_total_income": 1560000.0,
+    "total_tax_paid": 156000.0
+  },
+  "kyc": {
+    "full_name": "Priya Patel",
+    "pan_number": "ABCDE1925F",
+    "dob": "1992-06-15",
+    "aadhaar_masked": "XXXX-XXXX-2325"
+  }
+}

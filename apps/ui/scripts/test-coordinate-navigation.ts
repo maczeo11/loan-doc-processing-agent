@@ -1,7 +1,7 @@
 import assert from 'node:assert';
 import { computeBoundingBoxPercent, getEvidenceKey } from '../src/utils/coordinates.ts';
-import { BoundingBox, EvidenceRef } from '../src/types/evidence.ts';
-import { MOCK_APPLICATIONS } from '../src/services/api.ts';
+import type { BoundingBox, EvidenceRef } from '../src/types/contracts.ts';
+import { DEMO_DOSSIERS } from '../src/data/mockDossier.ts';
 
 interface TestResult {
   suite: string;
@@ -429,12 +429,12 @@ recordTest('MockDataIntegrity', 'Validate all evidence citations across mock app
   let totalEvidenceChecked = 0;
 
   for (const appId of appIds) {
-    const app = MOCK_APPLICATIONS[appId];
+    const app = DEMO_DOSSIERS[appId];
     assert(app, `Mock application ${appId} must exist`);
 
-    const docMap = new Map(app.documents.map((d) => [d.id, d]));
+    const docSet = new Set(app.document_ids || []);
 
-    for (const finding of app.findings) {
+    for (const finding of (app.findings || [])) {
       totalFindingsChecked++;
       assert(finding.rule_id, `Finding in ${appId} must have rule_id`);
       assert(['pass', 'flag', 'unknown'].includes(finding.verdict), `Finding ${finding.rule_id} invalid verdict`);
@@ -442,20 +442,21 @@ recordTest('MockDataIntegrity', 'Validate all evidence citations across mock app
       // If supporting evidence exists, validate every EvidenceRef
       for (const ev of finding.supporting_evidence) {
         totalEvidenceChecked++;
-        assert(docMap.has(ev.document_id), `Evidence doc ${ev.document_id} must exist in application ${appId}`);
-        const doc = docMap.get(ev.document_id)!;
-        assert(ev.page_number >= 1 && ev.page_number <= doc.page_count, `Page ${ev.page_number} out of range for ${doc.id}`);
+        assert(docSet.has(ev.document_id), `Evidence doc ${ev.document_id} must exist in application ${appId}`);
+        assert(ev.page_number >= 1, `Page ${ev.page_number} must be >= 1 for ${ev.document_id}`);
         assert(ev.quoted_span.length > 0, 'Quoted span must not be empty');
 
         const bbox = ev.bounding_box;
-        assert(bbox.x0 >= 0 && bbox.x1 <= 1.05, `BBox x coords out of bounds in ${ev.document_id}`);
-        assert(bbox.y0 >= 0 && bbox.y1 <= 1.05, `BBox y coords out of bounds in ${ev.document_id}`);
+        if (bbox) {
+          assert(bbox.x0 >= 0 && bbox.x1 <= 1.05, `BBox x coords out of bounds in ${ev.document_id}`);
+          assert(bbox.y0 >= 0 && bbox.y1 <= 1.05, `BBox y coords out of bounds in ${ev.document_id}`);
 
-        const percent = computeBoundingBoxPercent(bbox);
-        assert(!isNaN(percent.left) && !isNaN(percent.top));
-        assert(percent.left >= 0 && percent.top >= 0);
-        assert(percent.left + percent.width <= 100.0001, `Overflow in mock evidence for ${finding.rule_id}`);
-        assert(percent.top + percent.height <= 100.0001, `Overflow in mock evidence for ${finding.rule_id}`);
+          const percent = computeBoundingBoxPercent(bbox);
+          assert(!isNaN(percent.left) && !isNaN(percent.top));
+          assert(percent.left >= 0 && percent.top >= 0);
+          assert(percent.left + percent.width <= 100.0001, `Overflow in mock evidence for ${finding.rule_id}`);
+          assert(percent.top + percent.height <= 100.0001, `Overflow in mock evidence for ${finding.rule_id}`);
+        }
       }
     }
   }

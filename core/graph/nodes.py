@@ -484,14 +484,19 @@ def synthesize_summary_node(state: LoanApplicationState) -> Dict[str, Any]:
 # Bracket citations parsed from memo markdown. Status badges ([PASS]/[FLAG]/...)
 # and abstention markers are NOT citations and are excluded.
 _CITATION_RE = re.compile(r"\[([A-Za-z0-9_\-]+)\]")
-_NON_CITATION_PREFIXES = ("PASS", "FLAG", "UNKNOWN", "ABSTENTION")
+_NON_CITATION_PREFIXES = ("PASS", "FLAG", "UNKNOWN", "ABSTENTION", "DOC", "APP")
 
 
-def _parse_memo_citations(summary_markdown: str) -> List[str]:
+def _parse_memo_citations(summary_markdown: str, known_doc_ids: Optional[Set[str]] = None) -> List[str]:
     """Extracts machine-verifiable [chunk_id] citations from the memo."""
     if not summary_markdown:
         return []
-    return [c for c in _CITATION_RE.findall(summary_markdown) if not c.upper().startswith(_NON_CITATION_PREFIXES)]
+    doc_set = {d.upper() for d in (known_doc_ids or set())}
+    return [
+        c for c in _CITATION_RE.findall(summary_markdown)
+        if not c.upper().startswith(_NON_CITATION_PREFIXES)
+        and c.upper() not in doc_set
+    ]
 
 
 def validate_grounding_node(state: LoanApplicationState) -> Dict[str, Any]:
@@ -504,12 +509,13 @@ def validate_grounding_node(state: LoanApplicationState) -> Dict[str, Any]:
     """
     summary = state.get("summary_markdown", "") or ""
     retrieved_chunks = list(state.get("retrieved_chunk_ids", []) or [])
+    doc_ids = set(state.get("document_ids", []) or [])
 
-    parsed_citations = _parse_memo_citations(summary)
+    parsed_citations = _parse_memo_citations(summary, known_doc_ids=doc_ids)
     claims = [{"text": summary, "citations": parsed_citations}]
     is_grounded = validate_citations(claims, retrieved_chunks)
 
-    sanitized_summary = sanitize_summary_text(summary, retrieved_chunks)
+    sanitized_summary = sanitize_summary_text(summary, retrieved_chunks, known_doc_ids=doc_ids)
     _, dropped = filter_grounded_claims(claims, retrieved_chunks)
     if dropped:
         logger.warning(

@@ -3,8 +3,9 @@ Unit tests for deterministic financial and completeness rules.
 Human-authored assertions ensuring money and completeness logic behaves deterministically.
 """
 
-from core.contracts.evidence import EvidenceRef, BoundingBox
+from core.contracts.evidence import BoundingBox, EvidenceRef
 from core.contracts.facts import ApplicantFact, MoneyFact
+from core.rules.bank_arithmetic import validate_bank_statement_arithmetic
 from core.rules.completeness import evaluate_completeness
 from core.rules.identity import audit_identity_consistency
 from core.rules.salary_audit import audit_salary_vs_bank
@@ -53,6 +54,43 @@ def test_salary_reconciliation_missing_bank_returns_unknown():
     payslip_net = MoneyFact(amount=50000, currency="INR", source=ev_pay)
 
     finding = audit_salary_vs_bank(payslip_net, None)
+    assert finding.verdict == "unknown"
+
+
+def test_salary_reconciliation_within_5_percent_default_tolerance():
+    ev_pay = make_dummy_evidence("DOC-PAY", "100000.00")
+    ev_bank = make_dummy_evidence("DOC-BANK", "97000.00")
+
+    payslip_net = MoneyFact(amount=100000.00, currency="INR", source=ev_pay)
+    bank_credit = MoneyFact(amount=97000.00, currency="INR", source=ev_bank)
+
+    # 3% variance <= 5% default tolerance -> PASS
+    finding = audit_salary_vs_bank(payslip_net, bank_credit)
+    assert finding.verdict == "pass"
+    assert "Salary verified" in finding.reason
+
+
+def test_salary_reconciliation_exceeding_5_percent_tolerance():
+    ev_pay = make_dummy_evidence("DOC-PAY", "100000.00")
+    ev_bank = make_dummy_evidence("DOC-BANK", "90000.00")
+
+    payslip_net = MoneyFact(amount=100000.00, currency="INR", source=ev_pay)
+    bank_credit = MoneyFact(amount=90000.00, currency="INR", source=ev_bank)
+
+    # 10% variance > 5% default tolerance -> FLAG
+    finding = audit_salary_vs_bank(payslip_net, bank_credit)
+    assert finding.verdict == "flag"
+    assert "Salary discrepancy detected" in finding.reason
+
+
+def test_salary_reconciliation_zero_or_negative_amount_returns_unknown():
+    ev_pay = make_dummy_evidence("DOC-PAY", "0.00")
+    ev_bank = make_dummy_evidence("DOC-BANK", "50000.00")
+
+    payslip_zero = MoneyFact(amount=0.00, currency="INR", source=ev_pay)
+    bank_credit = MoneyFact(amount=50000.00, currency="INR", source=ev_bank)
+
+    finding = audit_salary_vs_bank(payslip_zero, bank_credit)
     assert finding.verdict == "unknown"
 
 
@@ -171,3 +209,213 @@ def test_identity_ignores_the_spoofable_pass_shortcut():
     # while ignoring both name arguments entirely.
     finding = audit_identity_consistency(make_applicant("Rajesh Kumar Sharma"), "Completely Different Name", "Another Person")
     assert finding.verdict != "pass"
+
+
+# ── RULE-BANK-01: Bank Statement Arithmetic Validation ────────────────────────
+
+
+def test_bank_arithmetic_exact_match_passes():
+    ev_open = make_dummy_evidence("DOC-BANK", "10000.00")
+    ev_cred = make_dummy_evidence("DOC-BANK", "5000.00")
+    ev_deb = make_dummy_evidence("DOC-BANK", "2000.00")
+    ev_close = make_dummy_evidence("DOC-BANK", "13000.00")
+
+    open_fact = MoneyFact(amount=10000.00, currency="INR", basis="balance", source=ev_open)
+    cred_fact = MoneyFact(amount=5000.00, currency="INR", basis="net", source=ev_cred)
+    deb_fact = MoneyFact(amount=2000.00, currency="INR", basis="deduction", source=ev_deb)
+    close_fact = MoneyFact(amount=13000.00, currency="INR", basis="balance", source=ev_close)
+
+    finding = validate_bank_statement_arithmetic(
+        opening_balance=open_fact,
+        closing_balance=close_fact,
+        credits=cred_fact,
+        debits=deb_fact,
+    )
+
+    assert finding.rule_id == "RULE-BANK-01"
+    assert finding.verdict == "pass"
+    assert "Bank statement arithmetic verified" in finding.reason
+    assert len(finding.supporting_evidence) == 4
+
+
+def test_bank_arithmetic_mismatch_flags():
+    ev_open = make_dummy_evidence("DOC-BANK", "10000.00")
+    ev_cred = make_dummy_evidence("DOC-BANK", "5000.00")
+    ev_deb = make_dummy_evidence("DOC-BANK", "2000.00")
+    ev_close = make_dummy_evidence("DOC-BANK", "12000.00")
+
+    open_fact = MoneyFact(amount=10000.00, currency="INR", basis="balance", source=ev_open)
+    cred_fact = MoneyFact(amount=5000.00, currency="INR", basis="net", source=ev_cred)
+    deb_fact = MoneyFact(amount=2000.00, currency="INR", basis="deduction", source=ev_deb)
+    close_fact = MoneyFact(amount=12000.00, currency="INR", basis="balance", source=ev_close)
+
+    finding = validate_bank_statement_arithmetic(
+        opening_balance=open_fact,
+        closing_balance=close_fact,
+        credits=cred_fact,
+        debits=deb_fact,
+    )
+
+    assert finding.verdict == "flag"
+    assert "Bank statement arithmetic discrepancy" in finding.reason
+    assert len(finding.supporting_evidence) == 4
+
+
+def test_bank_arithmetic_multiple_credits_and_debits_passes():
+    ev_open = make_dummy_evidence("DOC-BANK", "25000.00")
+    ev_close = make_dummy_evidence("DOC-BANK", "42500.00")
+
+    open_fact = MoneyFact(amount=25000.00, currency="INR", basis="balance", source=ev_open)
+    close_fact = MoneyFact(amount=42500.00, currency="INR", basis="balance", source=ev_close)
+
+    credits = [
+        MoneyFact(amount=30000.00, currency="INR", source=make_dummy_evidence("DOC-BANK", "30000")),
+        MoneyFact(amount=5000.00, currency="INR", source=make_dummy_evidence("DOC-BANK", "5000")),
+        MoneyFact(amount=2500.00, currency="INR", source=make_dummy_evidence("DOC-BANK", "2500")),
+    ]
+
+    debits = [
+        MoneyFact(amount=12000.00, currency="INR", source=make_dummy_evidence("DOC-BANK", "12000")),
+        MoneyFact(amount=8000.00, currency="INR", source=make_dummy_evidence("DOC-BANK", "8000")),
+    ]
+
+    finding = validate_bank_statement_arithmetic(
+        opening_balance=open_fact,
+        closing_balance=close_fact,
+        credits=credits,
+        debits=debits,
+    )
+
+    assert finding.verdict == "pass"
+    assert "Total Credits ₹37,500.00" in finding.reason
+    assert "Total Debits ₹20,000.00" in finding.reason
+    assert len(finding.supporting_evidence) == 7
+
+
+def test_bank_arithmetic_zero_transactions_opening_equals_closing():
+    ev_open = make_dummy_evidence("DOC-BANK", "15000.00")
+    ev_close = make_dummy_evidence("DOC-BANK", "15000.00")
+
+    open_fact = MoneyFact(amount=15000.00, currency="INR", basis="balance", source=ev_open)
+    close_fact = MoneyFact(amount=15000.00, currency="INR", basis="balance", source=ev_close)
+
+    f_pass = validate_bank_statement_arithmetic(
+        opening_balance=open_fact,
+        closing_balance=close_fact,
+        credits=[],
+        debits=[],
+    )
+    assert f_pass.verdict == "pass"
+
+    diff_close = MoneyFact(amount=14000.00, currency="INR", basis="balance", source=ev_close)
+    f_flag = validate_bank_statement_arithmetic(
+        opening_balance=open_fact,
+        closing_balance=diff_close,
+        credits=[],
+        debits=[],
+    )
+    assert f_flag.verdict == "flag"
+
+
+def test_bank_arithmetic_missing_opening_balance_returns_unknown():
+    ev_close = make_dummy_evidence("DOC-BANK", "10000.00")
+    close_fact = MoneyFact(amount=10000.00, currency="INR", basis="balance", source=ev_close)
+
+    finding = validate_bank_statement_arithmetic(
+        opening_balance=None,
+        closing_balance=close_fact,
+        credits=[],
+        debits=[],
+    )
+    assert finding.verdict == "unknown"
+
+
+def test_bank_arithmetic_missing_closing_balance_returns_unknown():
+    ev_open = make_dummy_evidence("DOC-BANK", "10000.00")
+    open_fact = MoneyFact(amount=10000.00, currency="INR", basis="balance", source=ev_open)
+
+    finding = validate_bank_statement_arithmetic(
+        opening_balance=open_fact,
+        closing_balance=None,
+        credits=[],
+        debits=[],
+    )
+    assert finding.verdict == "unknown"
+
+
+def test_bank_arithmetic_missing_transaction_amount_returns_unknown():
+    ev_open = make_dummy_evidence("DOC-BANK", "10000.00")
+    ev_close = make_dummy_evidence("DOC-BANK", "15000.00")
+    open_fact = MoneyFact(amount=10000.00, currency="INR", basis="balance", source=ev_open)
+    close_fact = MoneyFact(amount=15000.00, currency="INR", basis="balance", source=ev_close)
+
+    bad_credit = {"amount": None, "source": make_dummy_evidence("DOC-BANK", "missing")}
+
+    finding = validate_bank_statement_arithmetic(
+        opening_balance=open_fact,
+        closing_balance=close_fact,
+        credits=[bad_credit],
+        debits=[],
+    )
+    assert finding.verdict == "unknown"
+
+
+def test_bank_arithmetic_invalid_transaction_amount_returns_unknown():
+    ev_open = make_dummy_evidence("DOC-BANK", "10000.00")
+    ev_close = make_dummy_evidence("DOC-BANK", "15000.00")
+    open_fact = MoneyFact(amount=10000.00, currency="INR", basis="balance", source=ev_open)
+    close_fact = MoneyFact(amount=15000.00, currency="INR", basis="balance", source=ev_close)
+
+    bad_credit = {"amount": "not_a_number", "source": make_dummy_evidence("DOC-BANK", "bad")}
+    f1 = validate_bank_statement_arithmetic(
+        opening_balance=open_fact,
+        closing_balance=close_fact,
+        credits=[bad_credit],
+        debits=[],
+    )
+    assert f1.verdict == "unknown"
+
+    negative_debit = {"amount": -250.00, "source": make_dummy_evidence("DOC-BANK", "-250")}
+    f2 = validate_bank_statement_arithmetic(
+        opening_balance=open_fact,
+        closing_balance=close_fact,
+        credits=[],
+        debits=[negative_debit],
+    )
+    assert f2.verdict == "unknown"
+
+
+def test_bank_arithmetic_rounding_tolerance_boundary():
+    ev = make_dummy_evidence("DOC-BANK", "test")
+    open_fact = MoneyFact(amount=1000.00, currency="INR", basis="balance", source=ev)
+    cred_fact = MoneyFact(amount=250.33, currency="INR", source=ev)
+    deb_fact = MoneyFact(amount=100.28, currency="INR", source=ev)
+
+    close_at_boundary = MoneyFact(amount=1150.10, currency="INR", basis="balance", source=ev)
+    f_bound = validate_bank_statement_arithmetic(
+        opening_balance=open_fact,
+        closing_balance=close_at_boundary,
+        credits=cred_fact,
+        debits=deb_fact,
+        tolerance=0.05,
+    )
+    assert f_bound.verdict == "pass"
+
+    close_exceeding = MoneyFact(amount=1150.11, currency="INR", basis="balance", source=ev)
+    f_exceed = validate_bank_statement_arithmetic(
+        opening_balance=open_fact,
+        closing_balance=close_exceeding,
+        credits=cred_fact,
+        debits=deb_fact,
+        tolerance=0.05,
+    )
+    assert f_exceed.verdict == "flag"
+
+    f_custom = validate_bank_statement_arithmetic(
+        opening_balance=open_fact,
+        closing_balance=close_exceeding,
+        credits=cred_fact,
+        debits=deb_fact,
+        tolerance=0.10,
+    )
+    assert f_custom.verdict == "pass"

@@ -1,0 +1,83 @@
+{
+  "application_id": "APP-00014",
+  "seed": 14,
+  "scenario": "missing_itr",
+  "split": "dev",
+  "expected_documents": [
+    "application.pdf",
+    "payslip_1.pdf",
+    "payslip_2.pdf",
+    "payslip_3.pdf",
+    "bank_statement.pdf",
+    "itr.pdf",
+    "kyc.pdf"
+  ],
+  "generated_document_names": [
+    "application.pdf",
+    "payslip_1.pdf",
+    "payslip_2.pdf",
+    "payslip_3.pdf",
+    "bank_statement.pdf",
+    "kyc.pdf"
+  ],
+  "applicant_facts": {
+    "full_name": "Kavita Iyer",
+    "dob": "1992-06-15",
+    "pan_number": "ABCDE1518F",
+    "aadhaar_masked": "XXXX-XXXX-1742",
+    "employer_name": "HCL Technologies Ltd"
+  },
+  "financial_ground_truth": {
+    "gross_monthly_salary": 120000.0,
+    "net_monthly_salary": 102000.0,
+    "deductions_total": 18000.0,
+    "annualized_gross_income": 1440000.0,
+    "bank_monthly_salary_credit": 102000.0,
+    "bank_opening_balance": 50000.0,
+    "bank_total_credits": 306000.0,
+    "bank_total_debits": 214200.0,
+    "bank_closing_balance": 141800.0,
+    "itr_gross_total_income": 1440000.0,
+    "total_tax_paid": 144000.0
+  },
+  "expected_rule_outcomes": {
+    "RULE-COMP-01": "flag",
+    "RULE-INC-01": "pass",
+    "RULE-TAX-01": "unknown",
+    "RULE-ID-01": "pass"
+  },
+  "applicant_name": "Kavita Iyer",
+  "injected_anomaly": "missing_itr",
+  "payslip": {
+    "employee_name": "Kavita Iyer",
+    "employer_name": "HCL Technologies Ltd",
+    "gross_salary": 120000.0,
+    "net_salary": 102000.0,
+    "epf_deduction": 9600.0,
+    "tds_deduction": 8400.0
+  },
+  "bank_statement": {
+    "account_holder": "Kavita Iyer",
+    "bank_name": "ICICI Bank",
+    "account_number": "501001001274",
+    "monthly_salary_credits": [
+      102000.0,
+      102000.0,
+      102000.0
+    ],
+    "average_balance": 63810.0,
+    "bounced_transactions": 0
+  },
+  "tax_return": {
+    "assessee_name": "Kavita Iyer",
+    "pan_number": "ABCDE1518F",
+    "gross_total_income": 1440000.0,
+    "total_tax_paid": 144000.0
+  },
+  "kyc": {
+    "full_name": "Kavita Iyer",
+    "pan_number": "ABCDE1518F",
+    "dob": "1992-06-15",
+    "aadhaar_masked": "XXXX-XXXX-1742"
+  }
+}

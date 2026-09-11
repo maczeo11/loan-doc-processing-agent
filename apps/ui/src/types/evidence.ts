@@ -1,32 +1,9 @@
-export interface BoundingBox {
-  x0: number; // PDF points or normalized 0..1
-  y0: number;
-  x1: number;
-  y1: number;
-  page_width?: number | null;
-  page_height?: number | null;
-}
-
-export interface EvidenceRef {
-  document_id: string;
-  document_type: string;
-  page_number: number; // 1-indexed
-  quoted_span: string;
-  bounding_box?: BoundingBox | null;
-  extraction_method?: string;
-  confidence?: number;
-}
-
-export type RuleVerdict = 'pass' | 'flag' | 'unknown';
-
-export interface Finding {
-  rule_id: string;
-  rule_name: string;
-  verdict: RuleVerdict;
-  reason: string;
-  supporting_evidence: EvidenceRef[];
-  policy_version: string;
-}
+/**
+ * Re-exports canonical contract models from contracts.ts (Single Source of Truth)
+ * and defines UI-specific navigation targets.
+ */
+export type { BoundingBox, EvidenceRef, RuleVerdict, Finding } from './contracts';
+import type { BoundingBox } from './contracts';
 
 export interface CitationNavigationTarget {
   documentId: string;

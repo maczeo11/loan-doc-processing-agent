@@ -75,6 +75,9 @@ def audit_identity_consistency(
     tax_name: Optional[str] = None,
     pan_to_compare: Optional[str] = None,
     pan_evidence: Optional[EvidenceRef] = None,
+    payslip_name_evidence: Optional[EvidenceRef] = None,
+    bank_name_evidence: Optional[EvidenceRef] = None,
+    tax_name_evidence: Optional[EvidenceRef] = None,
 ) -> Finding:
     """
     RULE-ID-01: Cross-checks applicant name and PAN number across KYC, payslip,
@@ -114,10 +117,12 @@ def audit_identity_consistency(
 
     # 3. Collect supporting evidence from KYC
     evidence: List[EvidenceRef] = []
-    if getattr(applicant, "source_name", None):
-        evidence.append(applicant.source_name)
-    if getattr(applicant, "source_pan", None):
-        evidence.append(applicant.source_pan)
+    src_name = getattr(applicant, "source_name", None)
+    if isinstance(src_name, EvidenceRef):
+        evidence.append(src_name)
+    src_pan = getattr(applicant, "source_pan", None)
+    if isinstance(src_pan, EvidenceRef):
+        evidence.append(src_pan)
     if pan_evidence:
         evidence.append(pan_evidence)
 
@@ -161,14 +166,19 @@ def audit_identity_consistency(
                 policy_version="v1.0",
             )
 
-    # 5. Collect document names to cross-check
-    docs_to_compare: List[Tuple[str, str]] = []
+    # 5. Collect document names to cross-check, keeping each side's own
+    # page evidence. A finding that names a document in prose MUST cite that
+    # document's page, otherwise cross-document evidence shows KYC twice.
+    docs_to_compare: List[Tuple[str, str, Optional[EvidenceRef]]] = []
     if payslip_name and str(payslip_name).strip().upper() != "UNKNOWN":
-        docs_to_compare.append(("payslip", str(payslip_name).strip()))
+        docs_to_compare.append(("payslip", str(payslip_name).strip(), payslip_name_evidence))
     if bank_name and str(bank_name).strip().upper() != "UNKNOWN":
-        docs_to_compare.append(("bank statement", str(bank_name).strip()))
+        docs_to_compare.append(("bank statement", str(bank_name).strip(), bank_name_evidence))
     if tax_name and str(tax_name).strip().upper() != "UNKNOWN":
-        docs_to_compare.append(("tax return", str(tax_name).strip()))
+        docs_to_compare.append(("tax return", str(tax_name).strip(), tax_name_evidence))
+    for _, _, doc_ev in docs_to_compare:
+        if isinstance(doc_ev, EvidenceRef):
+            evidence.append(doc_ev)
 
     if not docs_to_compare and not pan_checked:
         return Finding(
@@ -189,7 +199,7 @@ def audit_identity_consistency(
     verified_matches: List[str] = []
     scores: List[float] = []
 
-    for doc_label, doc_val in docs_to_compare:
+    for doc_label, doc_val, _doc_ev in docs_to_compare:
         sim = compute_name_similarity(applicant_name, doc_val)
         score_pct = sim * 100.0
         scores.append(score_pct)

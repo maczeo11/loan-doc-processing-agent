@@ -173,6 +173,35 @@ def test_identity_different_person_flags():
     assert "payslip" in finding.reason
 
 
+def test_identity_flag_cites_both_compared_documents():
+    """Regression: a cross-document mismatch must cite the compared document's
+    own page, not KYC twice (same-doc evidence illusion)."""
+    finding = audit_identity_consistency(
+        make_applicant("Sneha Kulkarni"),
+        "Sneha Joshi",
+        None,
+        payslip_name_evidence=make_dummy_evidence("DOC-PAY-01", "Employee Name: Sneha Joshi"),
+    )
+    assert finding.verdict == "flag"
+    assert "Sneha Joshi" in finding.reason
+    doc_ids = {ev.document_id for ev in finding.supporting_evidence}
+    assert "DOC-KYC" in doc_ids
+    assert "DOC-PAY-01" in doc_ids
+
+
+def test_identity_pass_cites_compared_document_pages():
+    """A pass must also carry both sides so the reviewer can click through."""
+    finding = audit_identity_consistency(
+        make_applicant("Rajesh Kumar Sharma"),
+        "Rajesh Kumar Sharma",
+        None,
+        payslip_name_evidence=make_dummy_evidence("DOC-PAY-01", "Employee Name: Rajesh Kumar Sharma"),
+    )
+    assert finding.verdict == "pass"
+    doc_ids = {ev.document_id for ev in finding.supporting_evidence}
+    assert {"DOC-KYC", "DOC-PAY-01"} <= doc_ids
+
+
 def test_identity_pan_mismatch_flags_even_when_names_agree():
     finding = audit_identity_consistency(
         make_applicant("Rajesh Kumar Sharma", pan="ABCDE1234F"),

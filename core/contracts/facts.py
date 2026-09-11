@@ -30,6 +30,9 @@ class ApplicantFact(BaseModel):
 class PayslipFacts(BaseModel):
     employee_name: str
     employer_name: str
+    # Provenance for the compared name: RULE-ID-01 must cite the payslip page
+    # itself, not just the KYC side (else cross-doc evidence shows one doc).
+    employee_name_evidence: Optional[EvidenceRef] = None
     gross_salary: MoneyFact
     net_salary: MoneyFact
     deductions_total: Optional[MoneyFact] = None
@@ -38,6 +41,8 @@ class PayslipFacts(BaseModel):
 
 class BankStatementFacts(BaseModel):
     account_holder: str
+    # Provenance for the compared holder name (see PayslipFacts above).
+    account_holder_evidence: Optional[EvidenceRef] = None
     bank_name: str
     account_number_masked: str
     salary_credits: List[MoneyFact] = Field(default_factory=list)
@@ -51,7 +56,10 @@ class BankStatementFacts(BaseModel):
 
 class TaxReturnFacts(BaseModel):
     assessee_name: str
+    # Provenance for the compared assessee name and PAN (see above).
+    assessee_name_evidence: Optional[EvidenceRef] = None
     pan_number: str
+    pan_evidence: Optional[EvidenceRef] = None
     assessment_year: str
     gross_total_income: MoneyFact
     total_tax_paid: Optional[MoneyFact] = None

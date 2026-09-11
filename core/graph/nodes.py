@@ -461,7 +461,22 @@ def evaluate_rules_node(state: LoanApplicationState) -> Dict[str, Any]:
     payslip_emp_name = payslip.employee_name if payslip else None
     bank_holder_name = bank.account_holder if bank else None
     itr_pan = tax_return.pan_number if tax_return else None
-    id_finding = audit_identity_consistency(applicant, payslip_emp_name, bank_holder_name, tax_pan=itr_pan)
+    # Cross-document provenance: every compared name/PAN must cite its own
+    # page, otherwise the finding shows KYC evidence twice (same-doc illusion).
+    tax_assessee_name = _fact_field(tax_return, "assessee_name", None)
+    if isinstance(tax_assessee_name, str) and tax_assessee_name.strip().upper() == "UNKNOWN":
+        tax_assessee_name = None
+    id_finding = audit_identity_consistency(
+        applicant,
+        payslip_emp_name,
+        bank_holder_name,
+        tax_pan=itr_pan,
+        tax_name=tax_assessee_name,
+        payslip_name_evidence=_fact_field(payslip, "employee_name_evidence", None),
+        bank_name_evidence=_fact_field(bank, "account_holder_evidence", None),
+        tax_name_evidence=_fact_field(tax_return, "assessee_name_evidence", None),
+        pan_evidence=_fact_field(tax_return, "pan_evidence", None),
+    )
     findings.append(id_finding)
 
     # 5. Bank Statement Arithmetic Validation (RULE-BANK-01)
@@ -493,6 +508,15 @@ def _finding_field(finding: Any, name: str, default: Any = None) -> Any:
     if isinstance(finding, dict):
         return finding.get(name, default)
     return getattr(finding, name, default)
+
+
+def _fact_field(fact: Any, name: str, default: Any = None) -> Any:
+    """Reads a fact field whether the state carries a model or a plain dict (post-checkpoint serde)."""
+    if fact is None:
+        return default
+    if isinstance(fact, dict):
+        return fact.get(name, default)
+    return getattr(fact, name, default)
 
 
 def _resolve_policy_dir() -> str:

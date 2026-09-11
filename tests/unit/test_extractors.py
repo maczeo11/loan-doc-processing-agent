@@ -46,6 +46,37 @@ def test_payslip_extractor_standard():
     assert facts.pay_period_str == "August 2024"
 
 
+def test_extractors_keep_compared_name_evidence():
+    """RULE-ID-01 provenance: every compared name must retain its own page ref."""
+    payslip_pages = [
+        {"page_number": 1, "text": "Employee Name: Rajesh Sharma\nNet Salary: ₹85,000.00\n",
+         "page_width": 600.0, "page_height": 800.0}
+    ]
+    pay = PayslipExtractor().extract(doc_id="DOC-PAY-01", pages=payslip_pages)
+    assert pay.employee_name_evidence is not None
+    assert pay.employee_name_evidence.document_id == "DOC-PAY-01"
+    assert "Rajesh Sharma" in pay.employee_name_evidence.quoted_span
+
+    bank_pages = [
+        {"page_number": 1, "text": "Account Holder: Rajesh Sharma\nClosing Balance: ₹42,150.75\n",
+         "page_width": 600.0, "page_height": 800.0}
+    ]
+    bank = BankStatementExtractor().extract(doc_id="DOC-BANK-01", pages=bank_pages)
+    assert bank.account_holder_evidence is not None
+    assert bank.account_holder_evidence.document_id == "DOC-BANK-01"
+    assert "Rajesh Sharma" in bank.account_holder_evidence.quoted_span
+
+    itr_pages = [
+        {"page_number": 1, "text": "Name of Assessee: Rajesh Sharma\nPAN: ABCDE1234F\n",
+         "page_width": 600.0, "page_height": 800.0}
+    ]
+    itr = TaxReturnExtractor().extract(doc_id="DOC-ITR-01", pages=itr_pages)
+    assert itr.assessee_name_evidence is not None
+    assert itr.assessee_name_evidence.document_id == "DOC-ITR-01"
+    assert itr.pan_evidence is not None
+    assert itr.pan_evidence.document_id == "DOC-ITR-01"
+
+
 def test_payslip_extractor_missing_fallback():
     pages = [{"page_number": 1, "text": "", "page_width": 600.0, "page_height": 800.0}]
 

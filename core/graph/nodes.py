@@ -27,6 +27,7 @@ from core.extraction.extractors.payslip import PayslipExtractor
 from core.extraction.extractors.bank_statement import BankStatementExtractor
 from core.extraction.extractors.tax_return import TaxReturnExtractor
 from core.extraction.extractors.id_card import IdCardExtractor
+from core.reporting.memo_builder import build_appraisal_memo
 from core.rag.grounding import (
     detect_prompt_injection,
     filter_grounded_claims,
@@ -340,6 +341,8 @@ def evaluate_rules_node(state: LoanApplicationState) -> Dict[str, Any]:
         MoneyFact(
             amount=payslip.gross_salary.amount * 12,
             currency=payslip.gross_salary.currency,
+            period="annual",
+            basis="gross",
             source=payslip.gross_salary.source,
         )
         if payslip and payslip.gross_salary
@@ -351,7 +354,8 @@ def evaluate_rules_node(state: LoanApplicationState) -> Dict[str, Any]:
     # 4. Identity & KYC Consistency
     payslip_emp_name = payslip.employee_name if payslip else None
     bank_holder_name = bank.account_holder if bank else None
-    id_finding = audit_identity_consistency(applicant, payslip_emp_name, bank_holder_name)
+    itr_pan = tax_return.pan_number if tax_return else None
+    id_finding = audit_identity_consistency(applicant, payslip_emp_name, bank_holder_name, tax_pan=itr_pan)
     findings.append(id_finding)
     logger.info(f"Rules evaluation completed: generated {len(findings)} findings.")
 
@@ -443,38 +447,11 @@ def synthesize_summary_node(state: LoanApplicationState) -> Dict[str, Any]:
     Node 6: Synthesizes Credit Appraisal Memo (CAM) narrative with citations.
     Zero hallucinated numbers: Narrative only reflects deterministic findings.
     """
-    app_id = state.get("application_id", "APP-UNKNOWN")
-    applicant = state.get("applicant")
-    applicant_name = applicant.full_name if applicant else "Unknown Applicant"
-    findings = state.get("findings", [])
-    chunks = state.get("retrieved_chunk_ids", [])
-    missing_docs = state.get("missing_documents", [])
-
-    # Build memo narrative
-    summary_lines = [
-        f"### Credit Appraisal Memo — {app_id}",
-        f"**Applicant Name:** {applicant_name}",
-        "",
-        "#### Deterministic Verification Summary",
-    ]
-    for finding in findings:
-        status_badge = (
-            "✅ PASS" if finding.verdict == "pass" else ("⚠️ FLAG" if finding.verdict == "flag" else "❓ UNKNOWN")
-        )
-        summary_lines.append(f"- **{finding.rule_name}** ({finding.rule_id}) [{status_badge}]: {finding.reason}")
-
-    if missing_docs:
-        summary_lines.append("")
-        summary_lines.append(f"**Missing Mandatory Documents:** {', '.join(missing_docs)}")
-
-    summary_lines.append("")
-    summary_lines.append("#### Authoritative Policy Citations")
-    # Bracketed IDs are machine-parseable: validate_grounding_node extracts them
-    # and rejects any citation outside retrieved_chunk_ids.
-    summary_lines.append(f"Referenced guidelines: {', '.join(f'[{c}]' for c in chunks) if chunks else 'None'}")
-
+    # CAM assembly lives in core/reporting/memo_builder.py so the narrative format
+    # is owned in one place (AGENTS.md §9 P2 #4). Bracketed policy IDs it emits are
+    # parsed back out by validate_grounding_node below.
     return {
-        "summary_markdown": "\n".join(summary_lines),
+        "summary_markdown": build_appraisal_memo(state),
     }
 
 

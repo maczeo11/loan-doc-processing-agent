@@ -369,9 +369,9 @@ graph TB
     end
     
     subgraph "Alerting"
-        Query1 --> Alert1[Error Rate > 5%]
-        Query2 --> Alert2[Processing > 120s]
-        Query3 --> Alert3[p95 Latency > 1s]
+        Query1 --> Alert1["Error Rate > 5%"]
+        Query2 --> Alert2["Processing > 120s"]
+        Query3 --> Alert3["p95 Latency > 1s"]
     end
     
     style CW fill:#FF9800
@@ -418,15 +418,15 @@ sequenceDiagram
 graph TB
     subgraph "Rollback Triggers"
         A[Health Check Failure] --> Rollback[Initiate Rollback]
-        B[Error Rate Spike > 10%] --> Rollback
-        C[Latency p95 > 2s] --> Rollback
+        B["Error Rate Spike > 10%"] --> Rollback
+        C["Latency p95 > 2s"] --> Rollback
         D[Manual Decision] --> Rollback
     end
     
     subgraph "Rollback Procedure"
         Rollback --> Stop[Stop Current Containers]
         Stop --> Identify[Identify Previous Version<br/>git log --oneline -n 10]
-        Identify --> Checkout[git checkout <previous-commit>]
+        Identify --> Checkout["git checkout &lt;previous-commit&gt;"]
         Checkout --> Rebuild[Rebuild Images<br/>docker-compose build]
         Rebuild --> Restart[Start Containers<br/>docker-compose up -d]
         Restart --> Verify[Health Check]

@@ -115,7 +115,7 @@ graph TB
     end
     
     subgraph "Node 8: Human Review (INTERRUPT)"
-        H1[human_review_node] --> H2[interrupt() HALT]
+        H1[human_review_node] --> H2["interrupt() HALT"]
         H2 --> H3{Wait for Resume}
         H3 -->|APPROVED| H4[State: REVIEWED]
         H3 -->|REJECTED| H5[State: FAILED]
@@ -325,7 +325,7 @@ graph TB
     end
     
     subgraph "Recovery Strategies"
-        H --> L{Retry Count <= 3?}
+        H --> L{"Retry Count <= 3?"}
         L -->|Yes| A
         L -->|No| M[Route to DLQ]
         

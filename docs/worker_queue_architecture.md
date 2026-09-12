@@ -45,7 +45,7 @@ graph TB
         CommitResult --> Ack[Acknowledge Message]
         Fail --> Nack[Fail Message]
         
-        Nack --> Retry{attempt_count <= 3?}
+        Nack --> Retry{"attempt_count <= 3?"}
         Retry -->|Yes| Requeue[Requeue for Retry]
         Retry -->|No| DLQ[Route to DLQ]
     end
@@ -81,7 +81,7 @@ sequenceDiagram
     loop Polling Loop
         W->>Q: receive(max_n=10)
         Q->>Q: SELECT ... FOR UPDATE SKIP LOCKED
-        Q-->>W: [Delivery(handle, JobRef)]
+        Q-->>W: Delivery(handle, JobRef)
     end
     
     W->>W: Start Lease Heartbeat (10s interval)
@@ -180,10 +180,10 @@ graph TB
     Process -->|Exception| Catch[Catch Exception]
     Catch --> Classify{Error Type?}
     
-    Classify -->|Transient<br/>(Network, Timeout)| Retryable[retryable = True]
-    Classify -->|Permanent<br/>(Invalid Data, Corrupted File)| Permanent[retryable = False]
+    Classify -->|"Transient<br/>(Network, Timeout)"| Retryable[retryable = True]
+    Classify -->|"Permanent<br/>(Invalid Data, Corrupted File)"| Permanent[retryable = False]
     
-    Retryable --> CheckCount{attempt_count <= 3?}
+    Retryable --> CheckCount{"attempt_count <= 3?"}
     
     CheckCount -->|Yes| Increment[attempt_count++]
     Increment --> Requeue[Requeue with Delay]
@@ -462,9 +462,9 @@ graph TB
     
     subgraph "Alerting"
         Metrics --> AlertManager[Alert Manager]
-        AlertManager --> A1[DLQ Not Empty > 5min]
-        AlertManager --> A2[Processing Time > 120s]
-        AlertManager --> A3[Retry Rate > 10%]
+        AlertManager --> A1["DLQ Not Empty > 5min"]
+        AlertManager --> A2["Processing Time > 120s"]
+        AlertManager --> A3["Retry Rate > 10%"]
         AlertManager --> A4[Worker Crashes]
     end
     
@@ -511,7 +511,7 @@ graph TB
     end
     
     subgraph "Scenario 4: LLM Timeout"
-        D1[LLM Generation] --> D2[Timeout > 60s]
+        D1[LLM Generation] --> D2["Timeout > 60s"]
         D2 --> D3[Extend Lease Failed]
         D3 --> D4[Message Redelivered]
         D4 --> D5[Retry with Fresh Lease]

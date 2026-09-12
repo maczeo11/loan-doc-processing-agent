@@ -197,7 +197,7 @@ sequenceDiagram
 ```mermaid
 graph LR
     subgraph "Document Upload"
-        A[Upload Request] --> B[Validate File Size <10MB]
+        A[Upload Request] --> B["Validate File Size < 10MB"]
         B --> C[SHA-256 Deduplication]
         C --> D{Duplicate?}
         D -->|Yes| E[Return Existing ID]
@@ -262,7 +262,7 @@ graph TB
     subgraph "Inference Phase"
         Page[Page Text] --> Model[Trained Classifier]
         Model --> Pred[Prediction + Confidence]
-        Pred --> Threshold{Confidence > T?}
+        Pred --> Threshold{"Confidence > T?"}
         Threshold -->|Yes| Class[Return Document Type]
         Threshold -->|No| Unknown[Return UNKNOWN]
     end
@@ -325,7 +325,7 @@ graph TB
     subgraph "R2: Salary Audit"
         R2 --> S1{Payslip Net vs Bank Credit}
         S1 --> S2[Calculate Delta %]
-        S2 --> S3{Delta <= 5%?}
+        S2 --> S3{"Delta <= 5%?"}
         S3 -->|Yes| S4[verdict: pass]
         S3 -->|No| S5[verdict: flag]
         S3 -->|UNKNOWN| S6[verdict: unknown]

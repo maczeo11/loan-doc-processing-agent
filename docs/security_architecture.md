@@ -155,7 +155,7 @@ graph LR
 
 ```mermaid
 graph TB
-    A[File Upload Request] --> B{File Size <= 10MB?}
+    A[File Upload Request] --> B{"File Size <= 10MB?"}
     
     B -->|No| Reject1[Reject: File too large]
     B -->|Yes| C{File Type Allowed?}
@@ -471,7 +471,7 @@ graph TB
     end
     
     subgraph "Enforcement"
-        C --> F{Normalized Path Starts With<br/>Expected Prefix?}
+        C --> F{"Normalized Path Starts With<br/>Expected Prefix?"}
         E --> F
         F -->|No| G[Reject: Path Traversal Attempt<br/>Log Security Event]
         F -->|Yes| H[Allow Access]
@@ -550,10 +550,10 @@ erDiagram
 ```mermaid
 graph TB
     subgraph "Monitoring Signals"
-        A[Failed Login Attempts] --> A1[> 5 failures in 5 min]
-        B[Rate Limit Violations] --> B1[> 10 violations in 1 min]
+        A[Failed Login Attempts] --> A1["> 5 failures in 5 min"]
+        B[Rate Limit Violations] --> B1["> 10 violations in 1 min"]
         C[Unusual Access Patterns] --> C1[Access outside work hours]
-        D[Large File Uploads] --> D1[> 10MB or > 30 pages]
+        D[Large File Uploads] --> D1["> 10MB or > 30 pages"]
         E[Injection Attempts] --> E1[SQL/XSS patterns in input]
     end
     

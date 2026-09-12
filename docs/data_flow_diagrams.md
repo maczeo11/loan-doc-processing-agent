@@ -187,7 +187,7 @@ graph TB
         C1 --> Model[Trained Classifier<br/>.joblib Model]
         Model --> Pred[Prediction + Confidence]
         
-        Pred --> Threshold{Confidence > T?}
+        Pred --> Threshold{"Confidence > T?"}
         Threshold -->|Yes| Label[Document Type:<br/>payslip, bank_statement, etc.]
         Threshold -->|No| Unknown[Label: UNKNOWN]
     end
@@ -289,7 +289,7 @@ graph TB
         S1 --> S2[Extract Bank Salary Credits]
         S2 --> S3[Calculate Average Bank Credit]
         S3 --> S4[Compare: |payslip - bank| / payslip]
-        S4 --> S5{Delta <= 5%?}
+        S4 --> S5{"Delta <= 5%?"}
         
         S5 -->|Yes| S6[Finding: verdict=pass]
         S5 -->|No| S7[Finding: verdict=flag<br/>reason=Salary mismatch]
@@ -366,7 +366,7 @@ graph TB
         BM25 --> R1[Results Set 1<br/>with BM25 Scores]
         Dense --> R2[Results Set 2<br/>with Dense Scores]
         
-        R1 --> RRF[Reciprocal Rank Fusion<br/>Score = Σ 1/(60 + rank)]
+        R1 --> RRF["Reciprocal Rank Fusion<br/>Score = Σ 1/(60 + rank)"]
         R2 --> RRF
         
         RRF --> Ranked[Ranked Results<br/>with Final Scores]

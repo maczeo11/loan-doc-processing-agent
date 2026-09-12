@@ -28,6 +28,20 @@ http://{$DOMAIN_NAME:localhost} {
         -Server
     }
 
+    # Cache the SPA correctly: hashed asset filenames (Vite's default
+    # dist/assets/*-<hash>.js|css) are safe to cache forever, but index.html
+    # is NOT - it's what references those hashed filenames. Without this,
+    # browsers heuristically cache index.html too, so after a redeploy some
+    # visitors keep loading a stale index.html pointing at JS/CSS chunks that
+    # no longer exist (404s) or, worse, an older build (e.g. one predating a
+    # VITE_AUTH_MODE change) - intermittently showing a broken or outdated
+    # login screen instead of the current one.
+    @immutable_assets path /assets/*
+    header @immutable_assets Cache-Control "public, max-age=31536000, immutable"
+
+    @app_shell path / /index.html
+    header @app_shell Cache-Control "no-cache, must-revalidate"
+
     # Reverse proxy to FastAPI application container
     reverse_proxy api:8000 {
         header_up Host {host}

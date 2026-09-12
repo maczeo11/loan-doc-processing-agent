@@ -54,7 +54,7 @@ def main():
         from adapters.storage.s3 import S3Storage
         bucket = os.getenv("S3_BUCKET", "finscan-dossiers-production")
         region = os.getenv("AWS_REGION", "us-east-1")
-        storage_adapter = S3Storage(bucket_name=bucket, region_name=region)
+        storage_adapter = S3Storage(bucket_name=bucket, region=region)
     else:
         from adapters.storage.local_fs import LocalFileSystemStorage
         base_dir = os.getenv("STORAGE_BASE_DIR", "data/storage")

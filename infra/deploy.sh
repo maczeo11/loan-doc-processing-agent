@@ -90,6 +90,16 @@ done
 if [ ${HEALTHY} -eq 1 ]; then
     echo "${TARGET_REF}" > "${CURRENT_RELEASE_FILE}"
     HEALTH_OUTPUT=$(curl -s "${HEALTH_URL}")
+
+    # 7. Reclaim disk: every `--build` leaves the prior image generation
+    # dangling (untagged) plus growing BuildKit cache - unbounded over repeated
+    # deploys, it eventually fills the EBS volume. Safe post-deploy: rollback.sh
+    # always rebuilds fresh from git rather than reusing a cached image tag, so
+    # nothing here is needed for a later rollback to work.
+    echo "[6/6] Pruning dangling images and capping build cache..."
+    docker image prune -f || true
+    docker builder prune -f --keep-storage 5GB || true
+
     echo "=================================================================="
     echo "SUCCESS: Deployment completed and verified healthy!"
     echo "Active Release: ${TARGET_REF}"

@@ -81,6 +81,12 @@ done
 if [ ${HEALTHY} -eq 1 ]; then
     echo "${ROLLBACK_REF}" > "${CURRENT_RELEASE_FILE}"
     HEALTH_OUTPUT=$(curl -s "${HEALTH_URL}")
+
+    # Reclaim disk from the just-superseded image generation (see deploy.sh).
+    echo "Pruning dangling images and capping build cache..."
+    docker image prune -f || true
+    docker builder prune -f --keep-storage 5GB || true
+
     echo "=================================================================="
     echo "SUCCESS: Rollback completed and verified healthy!"
     echo "Active Release: ${ROLLBACK_REF}"

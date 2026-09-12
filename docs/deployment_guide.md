@@ -106,6 +106,41 @@ reusing a cached image tag), there's no cached image to fall back to anymore
 Acceptable for a rarely-used break-glass path — correctness (the rollback
 ref's actually-pinned dependency versions) matters more than speed here.
 
+## Frontend on Vercel (optional)
+
+The React SPA can also be deployed to Vercel instead of (or in addition to)
+being served same-origin from EC2/Caddy — useful since the box is only
+powered on for demos/testing, not always-on. `apps/ui/vercel.json` proxies
+API paths (`/auth/*`, `/applications/*`, `/jobs/*`, `/health*`) to the EC2
+Elastic IP (`13.207.15.137` — confirmed a real Elastic IP, so this survives
+the instance stopping/starting) **server-side, at Vercel's edge**. The
+browser only ever talks to `https://<your-app>.vercel.app` — this is why no
+CORS changes, no cookie `SameSite`/`Secure` changes, and no TLS/domain setup
+on EC2 itself are needed: the browser sees one same-origin HTTPS site, even
+though the API calls are actually served by the plain-HTTP EC2 box behind
+the scenes.
+
+**Vercel project setup:**
+1. Import this repo, set **Root Directory** to `apps/ui` (framework preset
+   Vite is auto-detected; build command/output directory need no override).
+2. Add one build-time environment variable: `VITE_AUTH_MODE=google` (defaults
+   to `mock` otherwise — see `apps/ui/src/context/AuthContext.tsx`). Leave
+   `VITE_API_BASE_URL` unset — `vercel.json`'s rewrites make relative paths
+   (`/applications`, `/auth/google`, etc.) resolve correctly already.
+3. Deploy. Note the resulting production domain (e.g.
+   `finscan-ai.vercel.app`).
+
+**One manual step this doc can't do for you** — Google's OAuth 2.0 policy
+rejects sign-in requests from an origin that isn't an authorized HTTPS
+domain (this is also why Google Sign-In doesn't work against the bare EC2 IP
+today): go to **Firebase Console → Authentication → Settings → Authorized
+domains** and add your Vercel production domain. Test Google Sign-In against
+that fixed production domain, not a Vercel preview-deployment URL — preview
+URLs are randomly generated per-deploy and aren't practical to pre-authorize.
+
+Email/password sign-in is unaffected by any of this (no OAuth origin check)
+and works on Vercel, EC2, or both immediately.
+
 ## Operational cheat sheet
 
 ```bash

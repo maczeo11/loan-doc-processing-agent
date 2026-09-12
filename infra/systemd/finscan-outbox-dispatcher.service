@@ -1,0 +1,19 @@
+[Unit]
+Description=FinScan AI - Outbox Dispatcher
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/opt/finscan/app
+EnvironmentFile=/opt/finscan/app/.env
+ExecStart=/opt/finscan/app/.venv/bin/python -m apps.api.outbox_dispatcher
+Restart=on-failure
+RestartSec=3
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

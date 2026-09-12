@@ -7,6 +7,7 @@ and starts consumer.
 """
 
 import os
+import signal
 import sys
 import logging
 from adapters.queue.pg_queue import PostgresQueueAdapter
@@ -69,6 +70,18 @@ def main():
         checkpointer=checkpointer,
         db_url=db_url,
     )
+
+    # ApplicationWorker.start()'s poll loop only exits via self.running=False
+    # (set by .stop()), checked once per poll cycle and before each delivery -
+    # a clean, safe stop signal. But Python only raises KeyboardInterrupt for
+    # SIGINT, never SIGTERM, so without this handler `systemctl stop`/`restart`
+    # (which sends SIGTERM by default) would hard-kill the worker mid-job with
+    # no graceful shutdown at all, every single deploy under systemd.
+    def _handle_sigterm(signum, frame):
+        logger.info("Worker received SIGTERM, shutting down...")
+        worker.stop()
+
+    signal.signal(signal.SIGTERM, _handle_sigterm)
 
     try:
         worker.start()

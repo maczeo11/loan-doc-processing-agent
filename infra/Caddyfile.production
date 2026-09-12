@@ -42,8 +42,11 @@ http://{$DOMAIN_NAME:localhost} {
     @app_shell path / /index.html
     header @app_shell Cache-Control "no-cache, must-revalidate"
 
-    # Reverse proxy to FastAPI application container
-    reverse_proxy api:8000 {
+    # Reverse proxy to the native FastAPI process (systemd, not Docker - see
+    # docs/deployment_guide.md). Caddy runs with network_mode: host
+    # (infra/docker-compose.yml) specifically so 127.0.0.1 here resolves to
+    # the HOST's loopback, reaching the api unit bound to 0.0.0.0:8000.
+    reverse_proxy 127.0.0.1:8000 {
         header_up Host {host}
         header_up X-Real-IP {remote_host}
         header_up X-Forwarded-For {remote_host}

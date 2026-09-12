@@ -1,0 +1,23 @@
+[Unit]
+Description=FinScan AI - API (uvicorn)
+# db/redis are Docker containers with restart:unless-stopped; docker.service
+# starting does not guarantee THEY are healthy yet, but Restart=on-failure
+# below absorbs the race (uvicorn crash-loops a few seconds until Postgres/
+# Redis accept connections, then settles) - acceptable for a hackathon.
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/opt/finscan/app
+EnvironmentFile=/opt/finscan/app/.env
+ExecStart=/opt/finscan/app/.venv/bin/uvicorn apps.api.main:app --host 0.0.0.0 --port 8000
+Restart=on-failure
+RestartSec=3
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

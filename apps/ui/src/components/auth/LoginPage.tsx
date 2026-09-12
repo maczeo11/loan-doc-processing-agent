@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ShieldCheck } from 'lucide-react';
+import { ShieldCheck, Loader2, AlertTriangle } from 'lucide-react';
 
 /** Official Google "G" mark, inline so no extra asset/network fetch is needed. */
 const GoogleIcon: React.FC = () => (
@@ -78,7 +78,7 @@ export const LoginPage: React.FC<{ onLoggedIn?: () => void }> = ({ onLoggedIn })
 
   return (
     <div className="min-h-screen w-screen flex items-center justify-center bg-theme-app px-4">
-      <div className="w-full max-w-md bg-theme-card border border-theme-border rounded-xs shadow-md p-8">
+      <div className="w-full max-w-md bg-theme-card border border-theme-border rounded-xs shadow-md p-8 sm:p-10 animate-fade-in">
         <div className="flex items-center gap-3 mb-2">
           <div className="w-10 h-10 rounded-sm bg-theme-brand flex items-center justify-center text-white">
             <ShieldCheck className="w-6 h-6" />
@@ -100,8 +100,8 @@ export const LoginPage: React.FC<{ onLoggedIn?: () => void }> = ({ onLoggedIn })
               onClick={handleGooglePopup}
               className="w-full flex items-center justify-center gap-2.5 px-3 py-2.5 rounded-xs border border-theme-border bg-white hover:bg-theme-panel transition-colors disabled:opacity-50 text-xs font-semibold text-gray-700 shadow-2xs"
             >
-              <GoogleIcon />
-              Sign in with Google
+              {busy || isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <GoogleIcon />}
+              {busy || isLoading ? 'Signing in…' : 'Sign in with Google'}
             </button>
 
             <div className="flex items-center gap-2 text-[10px] text-theme-muted uppercase tracking-wider">
@@ -117,7 +117,7 @@ export const LoginPage: React.FC<{ onLoggedIn?: () => void }> = ({ onLoggedIn })
                 placeholder="Email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-3 py-2 text-xs rounded-xs bg-theme-panel border border-theme-border text-theme-primary placeholder:text-theme-muted focus:outline-none focus:border-theme-brand"
+                className="w-full px-3 py-2 text-xs rounded-xs bg-theme-panel border border-theme-border text-theme-primary placeholder:text-theme-muted focus:outline-none focus:border-theme-brand focus:ring-1 focus:ring-theme-brand/30"
               />
               <input
                 type="password"
@@ -126,14 +126,15 @@ export const LoginPage: React.FC<{ onLoggedIn?: () => void }> = ({ onLoggedIn })
                 placeholder="Password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-3 py-2 text-xs rounded-xs bg-theme-panel border border-theme-border text-theme-primary placeholder:text-theme-muted focus:outline-none focus:border-theme-brand"
+                className="w-full px-3 py-2 text-xs rounded-xs bg-theme-panel border border-theme-border text-theme-primary placeholder:text-theme-muted focus:outline-none focus:border-theme-brand focus:ring-1 focus:ring-theme-brand/30"
               />
               <button
                 type="submit"
                 disabled={busy || isLoading}
-                className="w-full px-3 py-2.5 rounded-xs bg-theme-brand text-white text-xs font-semibold disabled:opacity-50"
+                className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xs border border-theme-brand text-theme-brand bg-transparent hover:bg-theme-brand/5 transition-colors text-xs font-semibold disabled:opacity-50"
               >
-                {isSignUp ? 'Create account' : 'Sign in'}
+                {(busy || isLoading) && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                {busy || isLoading ? (isSignUp ? 'Creating account…' : 'Signing in…') : isSignUp ? 'Create account' : 'Sign in'}
               </button>
               <button
                 type="button"
@@ -144,8 +145,12 @@ export const LoginPage: React.FC<{ onLoggedIn?: () => void }> = ({ onLoggedIn })
               </button>
             </form>
 
-            {(isLoading || busy) && <p className="text-xs text-theme-muted text-center">Verifying with server…</p>}
-            {error && <div className="text-xs bg-theme-flag-bg border border-theme-flag-border text-theme-flag rounded-xs p-2.5 break-words">{error}</div>}
+            {error && (
+              <div className="flex items-start gap-2 text-xs bg-theme-flag-bg border border-theme-flag-border text-theme-flag rounded-xs p-2.5">
+                <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                <span className="break-words">{error}</span>
+              </div>
+            )}
             <div className="text-[11px] text-theme-muted text-center">
               Only allowlisted accounts can sign in. Contact admin with your @work email if denied.
             </div>
@@ -170,7 +175,12 @@ export const LoginPage: React.FC<{ onLoggedIn?: () => void }> = ({ onLoggedIn })
                 </span>
               </button>
             ))}
-            {error && <div className="text-xs text-theme-flag">{error}</div>}
+            {error && (
+              <div className="flex items-start gap-2 text-xs bg-theme-flag-bg border border-theme-flag-border text-theme-flag rounded-xs p-2.5">
+                <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                <span className="break-words">{error}</span>
+              </div>
+            )}
             <p className="text-[11px] text-theme-muted">Mock JWT for demo only. Set <code>VITE_AUTH_MODE=google</code> + backend <code>AUTH_MODE=google</code> for prod.</p>
           </div>
         )}

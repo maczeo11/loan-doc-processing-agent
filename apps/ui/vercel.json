@@ -1,0 +1,11 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "rewrites": [
+    { "source": "/health/ready", "destination": "http://13.207.15.137/health/ready" },
+    { "source": "/health", "destination": "http://13.207.15.137/health" },
+    { "source": "/auth/:path*", "destination": "http://13.207.15.137/auth/:path*" },
+    { "source": "/applications", "destination": "http://13.207.15.137/applications" },
+    { "source": "/applications/:path*", "destination": "http://13.207.15.137/applications/:path*" },
+    { "source": "/jobs/:path*", "destination": "http://13.207.15.137/jobs/:path*" }
+  ]
+}

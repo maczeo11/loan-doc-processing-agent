@@ -64,15 +64,23 @@ def extract_native_text_with_coordinates(
     page_number: int,
     document_id: str = "DOC-UNKNOWN",
     document_type: str = "unknown",
+    doc: Any = None,
 ) -> List[EvidenceRef]:
     """
     Extracts text spans with exact bounding-box coordinates from a 1-indexed page.
     Returns a list of EvidenceRef items with 'pymupdf_native' extraction method.
+
+    `doc`: an already-open fitz.Document, when the caller is probing/extracting
+    several pages of the same PDF back-to-back (e.g. the OCR router) and wants to
+    avoid reopening and reparsing the file for every call. Owned by the caller in
+    that case - this function never closes a `doc` it did not open itself.
     """
     if page_number < 1:
         raise ValueError(f"Page numbers must be 1-indexed (got {page_number})")
 
-    doc = open_pdf_document(pdf_input)
+    owns_doc = doc is None
+    if owns_doc:
+        doc = open_pdf_document(pdf_input)
     try:
         if page_number > len(doc):
             return []
@@ -138,21 +146,28 @@ def extract_native_text_with_coordinates(
 
         return evidence_items
     finally:
-        doc.close()
+        if owns_doc:
+            doc.close()
 
 
 def extract_page_content(
     pdf_input: Union[str, bytes],
     page_number: int,
+    doc: Any = None,
 ) -> Dict[str, Any]:
     """
     Extracts rich page layout details including raw text, word count, character count,
     and word-level bounding boxes. Used by OCR router and entity extractors.
+
+    `doc`: an already-open fitz.Document to reuse instead of reopening `pdf_input`
+    (see extract_native_text_with_coordinates). Caller-owned; never closed here.
     """
     if page_number < 1:
         raise ValueError(f"Page numbers must be 1-indexed (got {page_number})")
 
-    doc = open_pdf_document(pdf_input)
+    owns_doc = doc is None
+    if owns_doc:
+        doc = open_pdf_document(pdf_input)
     try:
         if page_number > len(doc):
             return {
@@ -209,7 +224,8 @@ def extract_page_content(
             "words": words_formatted,
         }
     finally:
-        doc.close()
+        if owns_doc:
+            doc.close()
 
 
 def find_phrase_evidence(
@@ -283,15 +299,20 @@ def find_phrase_evidence(
         doc.close()
 
 
-def get_page_image_coverage(pdf_input: Union[str, bytes], page_number: int) -> float:
+def get_page_image_coverage(pdf_input: Union[str, bytes], page_number: int, doc: Any = None) -> float:
     """
     Fraction (0.0-1.0) of page area covered by raster images.
     Used by router to prefer OCR for image-heavy pages even when a small
     native layer exists (e.g. stamp + scan). Pure probe, no OCR.
+
+    `doc`: an already-open fitz.Document to reuse (see extract_page_content).
+    Caller-owned; never closed here.
     """
     if fitz is None:
         return 0.0
-    doc = open_pdf_document(pdf_input)
+    owns_doc = doc is None
+    if owns_doc:
+        doc = open_pdf_document(pdf_input)
     try:
         if page_number > len(doc):
             return 0.0
@@ -310,7 +331,8 @@ def get_page_image_coverage(pdf_input: Union[str, bytes], page_number: int) -> f
             return 0.0
         return max(0.0, min(1.0, img_area / page_area))
     finally:
-        doc.close()
+        if owns_doc:
+            doc.close()
 
 
 def extract_all_pages_content(pdf_input: Union[str, bytes]) -> List[Dict[str, Any]]:

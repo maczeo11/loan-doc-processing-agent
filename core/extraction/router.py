@@ -93,6 +93,7 @@ def inspect_page_route(
     min_char_threshold: Optional[int] = None,
     min_word_threshold: Optional[int] = None,
     max_image_coverage: Optional[float] = None,
+    doc: Any = None,
 ) -> Dict[str, Any]:
     """
     Analyzes NATIVE-ONLY page properties to determine the optimal perception route.
@@ -100,15 +101,19 @@ def inspect_page_route(
     Returns metadata and selected route ('pymupdf_native' or 'tesseract_cpu').
     Unset thresholds resolve from FINSCAN_OCR_MIN_CHARS / FINSCAN_OCR_MIN_WORDS /
     FINSCAN_OCR_MAX_IMAGE_COVERAGE at call time.
+
+    `doc`: an already-open fitz.Document, so probing many pages of one PDF (the
+    common case - a caller walking every page of a document) opens/parses the file
+    once instead of once per probe call. Caller-owned; never closed here.
     """
     min_chars = _default_min_chars() if min_char_threshold is None else min_char_threshold
     min_words = _default_min_words() if min_word_threshold is None else min_word_threshold
     max_img = _default_max_image_coverage() if max_image_coverage is None else max_image_coverage
-    layout = extract_page_content(pdf_input, page_number)
+    layout = extract_page_content(pdf_input, page_number, doc=doc)
     char_count = layout.get("char_count", 0)
     word_count = layout.get("word_count", 0)
     try:
-        image_coverage = get_page_image_coverage(pdf_input, page_number)
+        image_coverage = get_page_image_coverage(pdf_input, page_number, doc=doc)
     except Exception:
         image_coverage = 0.0
 
@@ -145,6 +150,7 @@ def route_page_extraction(
     min_char_threshold: Optional[int] = None,
     min_word_threshold: Optional[int] = None,
     ocr_timeout_s: int = 60,
+    doc: Any = None,
 ) -> List[EvidenceRef]:
     """
     Evaluates page properties and dynamically routes extraction:
@@ -152,6 +158,11 @@ def route_page_extraction(
     2. Scanned / sparse / image-heavy -> Tesseract CPU (dpi 200, retry 300) -> PaddleOCR where available.
     3. If CPU OCR empty and Textract enabled -> AWS Textract DetectDocumentText (hard-capped < 100 pages).
     Emits per-page route/reason/char_count/dpi/latency_ms logs for audit.
+
+    `doc`: an already-open fitz.Document to reuse across the probe and the native
+    extraction call below (see inspect_page_route) - avoids reopening/reparsing the
+    same PDF up to 3x per page when a caller walks every page of one document.
+    Caller-owned; never closed here.
     """
     t0 = time.monotonic()
     decision = inspect_page_route(
@@ -159,6 +170,7 @@ def route_page_extraction(
         page_number=page_number,
         min_char_threshold=min_char_threshold,
         min_word_threshold=min_word_threshold,
+        doc=doc,
     )
 
     route = decision["route"]
@@ -171,6 +183,7 @@ def route_page_extraction(
             page_number=page_number,
             document_id=document_id,
             document_type=document_type,
+            doc=doc,
         )
         if evidence:
             logger.info(

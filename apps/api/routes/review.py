@@ -218,14 +218,86 @@ async def cancel_job(
     return {"job_id": id, "status": "CANCELLED"}
 
 
+def _build_findings_context(state_json: Dict[str, Any]) -> "tuple[str, List[str]]":
+    """
+    Formats this application's OWN deterministic findings (core/rules/) as a
+    trusted context block the Q&A LLM can explain from - this is what actually
+    lets it answer "why was this application flagged/rejected", not just
+    generic policy lookup. These are NOT LLM-generated (Prime Invariant:
+    deterministic code decides, the LLM only narrates), so including their
+    exact text verbatim is safe; the grounding firewall additionally requires
+    the model to bracket-cite [RULE_ID] when explaining one, using the same
+    citation mechanism as policy chunks (see authorized_chunk_ids below) - one
+    consistent grounding check, not a special-cased exception for findings.
+
+    Returns (context_text, rule_ids_present). context_text is "" when the
+    application has no findings yet (e.g. still processing).
+    """
+    findings = state_json.get("findings") or []
+    rule_ids: List[str] = []
+    lines: List[str] = []
+    for f in findings:
+        if not isinstance(f, dict):
+            continue
+        rule_id = str(f.get("rule_id", "UNKNOWN"))
+        rule_ids.append(rule_id)
+        lines.append(
+            f"- [{rule_id}] {f.get('rule_name', '')} (verdict={f.get('verdict', 'unknown')}): {f.get('reason', '')}"
+        )
+    if not lines:
+        return "", []
+    context = "Deterministic Application Findings (already verified - cite as [RULE_ID]):\n" + "\n".join(lines)
+    return context, rule_ids
+
+
+def _finding_evidence_citations(state_json: Dict[str, Any], cited_rule_ids: set) -> List[Dict[str, Any]]:
+    """
+    Turns each ACTUALLY-cited finding's supporting_evidence into jump-to-evidence
+    citations, the same shape the policy-hit citations above use - this is what
+    lets the underwriter click "why was this flagged" straight to the exact
+    page/box on the PDF canvas that produced the finding, not just read the
+    reason as prose. Scoped to rule_ids the model actually cited in its answer
+    (not every finding on the application) so unrelated flags don't clutter an
+    answer about something else.
+    """
+    out: List[Dict[str, Any]] = []
+    for f in state_json.get("findings") or []:
+        if not isinstance(f, dict) or f.get("rule_id") not in cited_rule_ids:
+            continue
+        for ev in f.get("supporting_evidence") or []:
+            if not isinstance(ev, dict):
+                continue
+            text = str(ev.get("quoted_span", "")).strip()
+            out.append(
+                {
+                    "chunk_id": f"FINDING-{f.get('rule_id')}",
+                    "policy_id": None,
+                    "section": f.get("rule_name"),
+                    "page_number": ev.get("page_number"),
+                    "score": None,
+                    "text": text,
+                    "excerpt": text[:400],
+                    "is_policy": False,
+                    "document_id": ev.get("document_id"),
+                    "document_type": ev.get("document_type") or "document",
+                    "bounding_box": ev.get("bounding_box"),
+                }
+            )
+    return out
+
+
 @router.post("/applications/{id}/questions", response_model=QuestionResponse)
 async def ask_question(id: str, payload: QuestionRequest, session: AsyncSession = Depends(get_db)):
     """
-    RAG-grounded question answering over the credit policy corpus.
+    RAG-grounded question answering over the credit policy corpus AND this
+    application's own deterministic findings - the latter is what lets an
+    underwriter ask "why was this flagged/rejected?" and get an explanation
+    grounded in the actual computed reasons, not a generic policy summary.
 
-    Deterministic by design (Prime Invariant): the answer only quotes
-    retrieved policy passages with chunk citations. No LLM generation,
-    so no hallucinated numbers can reach the underwriter.
+    Every answer that reaches the underwriter (agentic or single-shot) is
+    firewalled through core/rag/grounding.py: it must cite at least one real
+    policy chunk or finding rule_id, or it is withheld rather than returned
+    as if it were evidence-backed (Prime Invariant: no hallucinated content).
     """
     from sqlalchemy import select as _select
 
@@ -234,11 +306,13 @@ async def ask_question(id: str, payload: QuestionRequest, session: AsyncSession 
     result = await session.execute(
         _select(_ApplicationModel).where(_ApplicationModel.id == id)
     )
-    if result.scalar_one_or_none() is None:
+    app_model = result.scalar_one_or_none()
+    if app_model is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Application '{id}' not found",
         )
+    findings_context, finding_rule_ids = _build_findings_context(dict(app_model.state_json or {}))
 
     question = (payload.question or "").strip()
     if not question:
@@ -264,7 +338,14 @@ async def ask_question(id: str, payload: QuestionRequest, session: AsyncSession 
         logger.warning(f"Policy retrieval unavailable for question on '{id}': {err}")
         hits = []
 
-    if not hits:
+    # Only abstain immediately when there is truly nothing to answer from:
+    # no policy passages AND no application findings to explain, AND the
+    # agentic path (which can reformulate its own search query via the
+    # search_policy tool) isn't available to try harder. Previously this
+    # short-circuited on empty `hits` unconditionally, which meant the
+    # agent's own tool-driven search never got a chance to retry with a
+    # different query when the caller's exact wording missed on the first pass.
+    if not hits and not findings_context and not settings.AGENTIC_QA_ENABLED:
         return QuestionResponse(
             answer="No relevant policy passages found for this question. I abstain rather than guess.",
             citations=[],
@@ -272,17 +353,26 @@ async def ask_question(id: str, payload: QuestionRequest, session: AsyncSession 
 
     # Experimental: read-only tool-calling agent (apps/api/agent.py), off by
     # default. On success it returns a grounding-firewalled answer already
-    # built from its own tool-call citations; on None (disabled, no LLM
-    # backend, or any failure) we fall through to the existing logic below
-    # untouched - this branch never changes default behavior.
+    # built from its own tool-call citations (plus this application's own
+    # findings, so it can explain a flag/rejection, not just quote policy);
+    # on None (disabled, no LLM backend, or any failure) we fall through to
+    # the existing logic below untouched - this branch never changes default
+    # behavior.
     if settings.AGENTIC_QA_ENABLED:
         from apps.api.agent import answer_question_agentic
 
-        agentic_result = answer_question_agentic(question, retriever)
+        agentic_result = answer_question_agentic(
+            question,
+            retriever,
+            findings_context=findings_context,
+            extra_authorized_ids=finding_rule_ids,
+        )
         if agentic_result is not None:
+            cited_rules = {rid for rid in finding_rule_ids if f"[{rid}]" in agentic_result["answer"]}
             return QuestionResponse(
                 answer=agentic_result["answer"],
-                citations=agentic_result["citations"],
+                citations=agentic_result["citations"]
+                + _finding_evidence_citations(dict(app_model.state_json or {}), cited_rules),
             )
 
     citations: List[Dict[str, Any]] = []
@@ -312,23 +402,48 @@ async def ask_question(id: str, payload: QuestionRequest, session: AsyncSession 
             citation["bounding_box"] = hit.get("bounding_box")
         citations.append(citation)
 
-    # If LLM is configured (e.g. Groq or OpenCode), generate grounded synthesis
+    # If LLM is configured (e.g. Groq, OpenCode, or OpenAI - same 3-way key
+    # resolution OpenCodeZenLLM itself uses), generate grounded synthesis from
+    # BOTH the retrieved policy passages and this application's own findings,
+    # so a "why was this flagged/rejected" question gets a real explanation,
+    # not just a policy quote.
     answer_text = None
-    if os.getenv("GROQ_API_KEY") or os.getenv("OPENCODE_API_KEY"):
+    if os.getenv("GROQ_API_KEY") or os.getenv("OPENCODE_API_KEY") or os.getenv("OPENAI_API_KEY"):
         try:
             from adapters.llm.opencode import OpenCodeZenLLM
+            from core.rag.grounding import sanitize_summary_text
+
             llm = OpenCodeZenLLM()
-            answer_text = llm.answer_question(question, hits)
+            raw_answer = llm.answer_question(question, hits, findings_context=findings_context)
+            # RAG grounding firewall: the agentic path already runs this: apply
+            # it here too so the DEFAULT (non-agentic, AGENTIC_QA_ENABLED=False)
+            # Q&A path - the one actually live in production today - can't
+            # return an ungrounded/hallucinated answer just because agentic
+            # mode happens to be off. Authorized set = retrieved policy chunk
+            # IDs + this application's own finding rule_ids (both trusted,
+            # non-LLM-originated citations).
+            authorized_ids = [h.get("chunk_id") for h in hits if h.get("chunk_id")] + list(finding_rule_ids)
+            answer_text = sanitize_summary_text(raw_answer, authorized_chunk_ids=authorized_ids)
         except Exception as llm_err:
             logger.warning(f"LLM answer_question failed, falling back to passage citations: {llm_err}")
 
     if not answer_text:
-        lines = [f"Top {len(hits)} policy passages relevant to: {question}"]
-        for i, hit in enumerate(hits, start=1):
-            text = str(hit.get("text", "")).strip()
-            excerpt = text[:400] + ("..." if len(text) > 400 else "")
-            lines.append(f"{i}. [{hit.get('chunk_id')}] {excerpt}")
+        lines: List[str] = []
+        if findings_context:
+            lines.append(findings_context)
+        if hits:
+            lines.append(f"Top {len(hits)} policy passages relevant to: {question}")
+            for i, hit in enumerate(hits, start=1):
+                text = str(hit.get("text", "")).strip()
+                excerpt = text[:400] + ("..." if len(text) > 400 else "")
+                lines.append(f"{i}. [{hit.get('chunk_id')}] {excerpt}")
+        if not lines:
+            lines = ["No relevant policy passages or application findings available for this question. I abstain rather than guess."]
         answer_text = "\n".join(lines)
+
+    cited_rules = {rid for rid in finding_rule_ids if f"[{rid}]" in answer_text}
+    if cited_rules:
+        citations = citations + _finding_evidence_citations(dict(app_model.state_json or {}), cited_rules)
 
     return QuestionResponse(answer=answer_text, citations=citations)
 

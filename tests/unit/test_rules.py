@@ -7,7 +7,7 @@ from core.contracts.evidence import BoundingBox, EvidenceRef
 from core.contracts.facts import ApplicantFact, MoneyFact
 from core.rules.bank_arithmetic import validate_bank_statement_arithmetic
 from core.rules.completeness import evaluate_completeness
-from core.rules.identity import audit_identity_consistency
+from core.rules.identity import audit_identity_consistency, audit_identity_documents_consistency
 from core.rules.salary_audit import audit_salary_vs_bank
 from core.rules.tax_audit import audit_tax_vs_income
 
@@ -238,6 +238,63 @@ def test_identity_ignores_the_spoofable_pass_shortcut():
     # while ignoring both name arguments entirely.
     finding = audit_identity_consistency(make_applicant("Rajesh Kumar Sharma"), "Completely Different Name", "Another Person")
     assert finding.verdict != "pass"
+
+
+# ── RULE-ID-02: Cross-Identity-Document Consistency ───────────────────────────
+# Covers what RULE-ID-01 cannot: two SEPARATE identity documents (e.g. an
+# ID/Aadhaar card and a distinct PAN card upload) cross-checked against each
+# other, not just the single KYC doc vs payslip/bank/tax.
+
+
+def test_cross_identity_docs_single_document_returns_none():
+    # Nothing to cross-check with only one identity document - must not
+    # manufacture a permanent "unknown" finding for the common case.
+    finding = audit_identity_documents_consistency([("DOC-ID-1", make_applicant("Rajesh Kumar Sharma"))])
+    assert finding is None
+
+
+def test_cross_identity_docs_matching_pair_passes():
+    docs = [
+        ("DOC-AADHAAR", make_applicant("Rajesh Kumar Sharma", pan="ABCDE1234F")),
+        ("DOC-PAN", make_applicant("Rajesh Kumar Sharma", pan="ABCDE1234F")),
+    ]
+    finding = audit_identity_documents_consistency(docs)
+    assert finding is not None
+    assert finding.rule_id == "RULE-ID-02"
+    assert finding.verdict == "pass"
+    # 2 documents x (source_name + source_pan) = 4 evidence refs.
+    assert len(finding.supporting_evidence) == 4
+
+
+def test_cross_identity_docs_pan_mismatch_flags():
+    docs = [
+        ("DOC-AADHAAR", make_applicant("Rajesh Kumar Sharma", pan="ABCDE1234F")),
+        ("DOC-PAN", make_applicant("Rajesh Kumar Sharma", pan="ZZZZZ9999Z")),
+    ]
+    finding = audit_identity_documents_consistency(docs)
+    assert finding.verdict == "flag"
+    assert "DOC-PAN" in finding.reason
+    assert "DOC-AADHAAR" in finding.reason
+
+
+def test_cross_identity_docs_name_mismatch_flags():
+    docs = [
+        ("DOC-AADHAAR", make_applicant("Rajesh Kumar Sharma")),
+        ("DOC-PAN", make_applicant("Completely Different Person")),
+    ]
+    finding = audit_identity_documents_consistency(docs)
+    assert finding.verdict == "flag"
+
+
+def test_cross_identity_docs_name_variation_flags_for_review():
+    docs = [
+        ("DOC-AADHAAR", make_applicant("Rajesh Kumar Sharma")),
+        ("DOC-PAN", make_applicant("Rajesh K. Sharma")),
+    ]
+    finding = audit_identity_documents_consistency(docs)
+    # Either a pass (fuzzy match clears threshold) or a flag for review -
+    # never silently ignored - assert it never crashes and always resolves.
+    assert finding.verdict in ("pass", "flag")
 
 
 # ── RULE-BANK-01: Bank Statement Arithmetic Validation ────────────────────────

@@ -2,9 +2,11 @@
 .SYNOPSIS
     FinScan AI — Local Demo Launcher
 .DESCRIPTION
-    Starts PostgreSQL + Redis in Docker, runs migrations, then launches
-    API server, outbox dispatcher, worker, and React UI as background jobs.
-    Press Ctrl+C to tear everything down.
+    Starts PostgreSQL + Redis in Docker (nothing else runs in Docker), runs
+    migrations, launches the outbox dispatcher/worker/React UI as background
+    jobs, then runs the FastAPI backend directly in this terminal
+    (foreground, live-reload) so its logs and tracebacks stream immediately.
+    Press Ctrl+C to stop the API and tear everything else down with it.
 .NOTES
     Prerequisites:
       - Docker Desktop running
@@ -85,19 +87,16 @@ if (-not (Test-Path $storageDir)) {
 }
 
 # ------------------------------------------------------------------
-# Step 5: Launch native processes as background jobs
+# Step 5: Launch supporting native processes as background jobs.
+# The API itself is deliberately NOT one of these (see Step 6) - only
+# Postgres/Redis run in Docker; the backend runs directly in this
+# terminal so its logs/reload output/tracebacks are immediate, not
+# buffered behind a job's Receive-Job poll.
 # ------------------------------------------------------------------
 $jobs = @()
 
-# API Server
-Write-Host "[4/6] Starting FastAPI API server (port 8000)..." -ForegroundColor Yellow
-$jobs += Start-Job -Name "finscan-api" -ScriptBlock {
-    Set-Location $using:ProjectRoot
-    uvicorn apps.api.main:app --host 0.0.0.0 --port 8000 --reload
-}
-
 # Outbox Dispatcher
-Write-Host "[5/6] Starting Outbox Dispatcher..." -ForegroundColor Yellow
+Write-Host "[4/6] Starting Outbox Dispatcher..." -ForegroundColor Yellow
 $jobs += Start-Job -Name "finscan-outbox" -ScriptBlock {
     Set-Location $using:ProjectRoot
     python -m apps.api.outbox_dispatcher
@@ -105,18 +104,18 @@ $jobs += Start-Job -Name "finscan-outbox" -ScriptBlock {
 
 # Worker (ML inference)
 if (-not $SkipWorker) {
-    Write-Host "[6/6] Starting Worker (ML inference pipeline)..." -ForegroundColor Yellow
+    Write-Host "[5/6] Starting Worker (ML inference pipeline)..." -ForegroundColor Yellow
     $jobs += Start-Job -Name "finscan-worker" -ScriptBlock {
         Set-Location $using:ProjectRoot
         python -m worker.main
     }
 } else {
-    Write-Host "[6/6] Skipping worker (--SkipWorker flag)" -ForegroundColor DarkGray
+    Write-Host "[5/6] Skipping worker (--SkipWorker flag)" -ForegroundColor DarkGray
 }
 
 # React UI
 if (-not $SkipUI) {
-    Write-Host "[bonus] Starting React UI dev server (port 3000)..." -ForegroundColor Yellow
+    Write-Host "[6/6] Starting React UI dev server (port 3000)..." -ForegroundColor Yellow
     $jobs += Start-Job -Name "finscan-ui" -ScriptBlock {
         Set-Location (Join-Path $using:ProjectRoot "apps\ui")
         npm run dev
@@ -127,15 +126,18 @@ if (-not $SkipUI) {
 # Print dashboard
 # ------------------------------------------------------------------
 Start-Sleep -Seconds 3
+foreach ($job in $jobs) {
+    Receive-Job -Job $job -ErrorAction SilentlyContinue
+}
 Write-Host "`n" -NoNewline
 Write-Host "╔══════════════════════════════════════════════════════════╗" -ForegroundColor Cyan
 Write-Host "║           FinScan AI — Local Demo Running               ║" -ForegroundColor Cyan
 Write-Host "╠══════════════════════════════════════════════════════════╣" -ForegroundColor Cyan
-Write-Host "║  API Server:     http://localhost:8000                  ║" -ForegroundColor White
+Write-Host "║  API Server:     http://localhost:8000  (this terminal) ║" -ForegroundColor White
 Write-Host "║  API Docs:       http://localhost:8000/docs             ║" -ForegroundColor White
 Write-Host "║  React UI:       http://localhost:3000                  ║" -ForegroundColor White
-Write-Host "║  PostgreSQL:     localhost:5432  (finscan)              ║" -ForegroundColor DarkGray
-Write-Host "║  Redis:          localhost:6379                         ║" -ForegroundColor DarkGray
+Write-Host "║  PostgreSQL:     localhost:5432  (finscan, in Docker)   ║" -ForegroundColor DarkGray
+Write-Host "║  Redis:          localhost:6379  (in Docker)            ║" -ForegroundColor DarkGray
 Write-Host "╠══════════════════════════════════════════════════════════╣" -ForegroundColor Cyan
 Write-Host "║  Press Ctrl+C to stop all services                     ║" -ForegroundColor Yellow
 Write-Host "╚══════════════════════════════════════════════════════════╝" -ForegroundColor Cyan
@@ -145,27 +147,32 @@ if (-not $NoBrowser) {
 }
 
 # ------------------------------------------------------------------
-# Wait for Ctrl+C, then clean up
+# Step 6: Run the API server directly in THIS process (foreground,
+# blocking, live-reload). Ctrl+C here stops uvicorn, which drops into
+# the `finally` block below to clean up the background jobs and the
+# Docker DB/Redis containers - so Ctrl+C still tears down everything,
+# same as before, just with the backend's own logs streaming live
+# instead of hidden inside a job.
 # ------------------------------------------------------------------
 try {
-    Write-Host "`nStreaming logs (Ctrl+C to stop)...`n" -ForegroundColor DarkGray
-    while ($true) {
-        foreach ($job in $jobs) {
-            Receive-Job -Job $job -ErrorAction SilentlyContinue
-        }
-        Start-Sleep -Seconds 2
+    Write-Host "`nStarting FastAPI API server directly (Ctrl+C to stop everything)...`n" -ForegroundColor DarkGray
+    Push-Location $ProjectRoot
+    try {
+        uvicorn apps.api.main:app --host 0.0.0.0 --port 8000 --reload
+    } finally {
+        Pop-Location
     }
 } finally {
     Write-Host "`n`nShutting down..." -ForegroundColor Yellow
 
-    # Stop all PowerShell jobs
+    # Stop all PowerShell jobs (outbox/worker/UI)
     foreach ($job in $jobs) {
         Write-Host "  Stopping $($job.Name)..." -ForegroundColor DarkGray
         Stop-Job -Job $job -ErrorAction SilentlyContinue
         Remove-Job -Job $job -Force -ErrorAction SilentlyContinue
     }
 
-    # Stop Docker containers
+    # Stop Docker containers (db + redis only)
     Write-Host "  Stopping Docker containers..." -ForegroundColor DarkGray
     docker compose -f "$ProjectRoot\infra\docker-compose.local.yml" down
 

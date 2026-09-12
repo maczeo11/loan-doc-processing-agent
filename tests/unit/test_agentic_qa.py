@@ -6,11 +6,28 @@ mocks langgraph.prebuilt.create_react_agent (and the chat model, where used)
 rather than hitting a live Groq/OpenAI endpoint.
 """
 
+import inspect
 import re
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import apps.api.agent as agent_module
+
+
+def test_create_react_agent_signature_has_prompt_kwarg():
+    """
+    Every other test in this file mocks langgraph.prebuilt.create_react_agent
+    entirely (per this module's own docstring: no paid API calls in CI), which
+    means a real signature break in a future langgraph release would never be
+    caught by them - agent.py would just silently, permanently fall back to
+    the non-agentic path (fails safe, but silently). This one test imports the
+    REAL create_react_agent and checks the `prompt` kwarg agent.py relies on
+    still exists, so a break shows up here instead of only in production logs.
+    """
+    from langgraph.prebuilt import create_react_agent
+
+    params = inspect.signature(create_react_agent).parameters
+    assert "prompt" in params
 
 
 def test_get_agentic_chat_model_returns_none_without_api_key(monkeypatch):

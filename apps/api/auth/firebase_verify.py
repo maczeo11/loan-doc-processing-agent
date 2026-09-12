@@ -45,13 +45,18 @@ def verify_firebase_id_token(id_token: str) -> Dict[str, Any]:
         raise ValueError(f"bad issuer {info.get('iss')}")
 
     email = (info.get("email") or "").lower().strip()
-    if not email or not info.get("email_verified", False):
-        # Email/password sign-up defaults to unverified until the user clicks
-        # a confirmation link - accept it for this internal allowlisted tool
-        # rather than force email verification flows for a hackathon demo,
-        # but still require SOME email claim to exist.
-        if not email:
-            raise ValueError("no email claim in token")
+    if not email:
+        raise ValueError("no email claim in token")
+    if not info.get("email_verified", False):
+        # The allowlist (apps/api/auth/allowlist.py) authorizes purely by email
+        # string/domain match with no separate ownership proof. Firebase
+        # email/password sign-up lets anyone register ANY email address string
+        # (unverified until a confirmation link is clicked), so accepting an
+        # unverified claim here would let an attacker self-register as
+        # someone@<authorized-domain> and get auto-provisioned. Google/other
+        # federated sign-in always sets email_verified=True, so this only
+        # blocks the unverified email/password case, not normal Google login.
+        raise ValueError(f"email not verified: {email}")
 
     return {
         "email": email,

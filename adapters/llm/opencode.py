@@ -96,9 +96,21 @@ class OpenCodeZenLLM(LLMPort):
             # Graceful deterministic fallback
             return f"### Credit Appraisal Memo\n\n{prompt}\n\n*Generated via fallback synthesizer.*"
 
-    def answer_question(self, question: str, retrieved_passages: List[Dict[str, Any]]) -> str:
+    def answer_question(
+        self,
+        question: str,
+        retrieved_passages: List[Dict[str, Any]],
+        findings_context: Optional[str] = None,
+    ) -> str:
         """
-        Answers an underwriter question strictly from retrieved policy passages.
+        Answers an underwriting question STRICTLY from retrieved policy passages
+        plus this application's own deterministic findings (when supplied) - the
+        latter is what lets this answer questions like "why was this application
+        flagged/rejected?" with the actual computed reason, not just a generic
+        policy quote. Both sources are RAG-retrieved/deterministic, never
+        free-generated, so a full explanation can be given without risking a
+        hallucinated number or an autonomous disposition: the model narrates and
+        explains, it never invents a new finding or issues a new verdict.
         """
         formatted_passages = []
         for i, passage in enumerate(retrieved_passages, 1):
@@ -106,17 +118,32 @@ class OpenCodeZenLLM(LLMPort):
             text = passage.get("text") or passage.get("content", "")
             formatted_passages.append(f"[{chunk_id}]:\n{text}")
 
-        context_block = "\n\n".join(formatted_passages)
+        context_block = "\n\n".join(formatted_passages) or "(no policy passages retrieved for this query)"
+        findings_block = findings_context or "(this application has no findings recorded yet)"
 
         system_instruction = (
-            "You are an underwriting policy verification assistant for FinScan AI.\n"
-            "Answer the underwriter's question STRICTLY and SOLELY using the provided context passages.\n"
-            "Cite the passage IDs in your answer (e.g. [credit_policy_v1_p1]).\n"
-            "If the question cannot be answered using the provided passages, respond exactly with:\n"
+            "You are an underwriting research assistant for FinScan AI, helping a human "
+            "underwriter understand WHY an application was flagged, rejected, or passed, "
+            "and what policy requires.\n\n"
+            "Answer STRICTLY and SOLELY using the two sources below - never from memory, "
+            "assumption, or general lending knowledge:\n"
+            "1. <application_findings> - this application's own deterministic rule results. "
+            "These are already computed and verified; you may quote and explain them freely, "
+            "but never invent a new finding, alter a verdict, or state a number that isn't in them.\n"
+            "2. <evidence_passages> - retrieved policy clauses.\n\n"
+            "When explaining a flag or rejection: name the specific rule(s) that fired, quote "
+            "its stated reason, and explain the policy basis behind it in plain language a "
+            "reviewer can act on - do not just repeat the reason verbatim with no context.\n"
+            "Cite every claim: [RULE_ID] for a finding (e.g. [RULE-ID-01]), [chunk_id] for a "
+            "policy clause (e.g. [credit_policy_v1_p1]).\n"
+            "Never state whether the loan should be approved, rejected, or sanctioned going "
+            "forward - that decision belongs to the human underwriter, not you.\n"
+            "If neither source answers the question, respond exactly with:\n"
             "'I cannot answer this question based on the provided documents.'"
         )
 
         user_content = (
+            f"<application_findings>\n{findings_block}\n</application_findings>\n\n"
             f"<evidence_passages>\n{context_block}\n</evidence_passages>\n\n"
             f"Underwriter Inquiry: {question}"
         )

@@ -1,0 +1,23 @@
+[Unit]
+Description=FinScan AI - Background Worker
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/opt/finscan/app
+EnvironmentFile=/opt/finscan/app/.env
+ExecStart=/opt/finscan/app/.venv/bin/python -m worker.main
+Restart=on-failure
+RestartSec=3
+StandardOutput=journal
+StandardError=journal
+# Worker does long-running document jobs; give it real time to finish/checkpoint
+# on SIGTERM (which worker/main.py now handles gracefully) instead of the
+# default 90s.
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target

@@ -1,3 +1,9 @@
+## Docker scope under the systemd-native deploy model: ONLY Postgres, Redis,
+## and Caddy run here. api/worker/outbox-dispatcher run natively on the host
+## via systemd (infra/systemd/*.service) - see docs/deployment_guide.md.
+## 5432/6379 are published to the host (unlike the old all-Docker setup) since
+## the native processes reach them via localhost, not a Docker network alias.
+
 services:
   db:
     image: postgres:16-alpine
@@ -6,6 +12,8 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgrespassword
       POSTGRES_DB: finscan
+    ports:
+      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -18,6 +26,8 @@ services:
   redis:
     image: redis:7-alpine
     container_name: finscan-redis
+    ports:
+      - "6379:6379"
     volumes:
       - redis_data:/data
     healthcheck:
@@ -27,130 +37,19 @@ services:
       retries: 5
     restart: unless-stopped
 
-  migrate:
-    # migrate/api/outbox-dispatcher all build the SAME Dockerfile.api context -
-    # sharing one `image:` tag makes Compose build it once and reuse it for all
-    # three, instead of the ~5.7GB image getting built and stored 3x under
-    # separate per-service names (infra-migrate/infra-api/infra-outbox-dispatcher),
-    # which was silently tripling this image's disk footprint on every deploy.
-    image: finscan-api:latest
-    build:
-      context: ..
-      dockerfile: infra/Dockerfile.api
-    container_name: finscan-migrate
-    command: ["alembic", "upgrade", "head"]
-    depends_on:
-      db:
-        condition: service_healthy
-    environment:
-      DATABASE_URL: postgresql+asyncpg://postgres:postgrespassword@db:5432/finscan
-    restart: "no"
-
-  api:
-    image: finscan-api:latest
-    build:
-      context: ..
-      dockerfile: infra/Dockerfile.api
-    container_name: finscan-api
-    env_file:
-      - path: ../.env
-        required: false
-    depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      migrate:
-        condition: service_completed_successfully
-    environment:
-      DATABASE_URL: postgresql+asyncpg://postgres:postgrespassword@db:5432/finscan
-      REDIS_URL: redis://redis:6379/0
-      QUEUE_BACKEND: ${QUEUE_BACKEND:-postgres}
-      STORAGE_BACKEND: ${STORAGE_BACKEND:-local}
-      STORAGE_BASE_DIR: /app/data/storage
-      S3_BUCKET: ${S3_BUCKET:-}
-      AWS_REGION: ${AWS_REGION:-us-east-1}
-      SQS_QUEUE_URL: ${SQS_QUEUE_URL:-}
-      GROQ_API_KEY: ${GROQ_API_KEY:-}
-      OPENCODE_API_KEY: ${OPENCODE_API_KEY:-}
-      LLM_MODEL: ${LLM_MODEL:-openai/gpt-oss-20b}
-      LLM_BACKEND: ${LLM_BACKEND:-opencode}
-      API_PORT: 8000
-      ENVIRONMENT: ${ENVIRONMENT:-local}
-    volumes:
-      - dossiers_storage:/app/data/storage
-    expose:
-      - "8000"
-    ports:
-      - "8000:8000"
-    restart: unless-stopped
-
-  outbox-dispatcher:
-    image: finscan-api:latest
-    build:
-      context: ..
-      dockerfile: infra/Dockerfile.api
-    container_name: finscan-outbox-dispatcher
-    command: ["python", "-m", "apps.api.outbox_dispatcher"]
-    depends_on:
-      db:
-        condition: service_healthy
-      migrate:
-        condition: service_completed_successfully
-    environment:
-      DATABASE_URL: postgresql+asyncpg://postgres:postgrespassword@db:5432/finscan
-      QUEUE_BACKEND: ${QUEUE_BACKEND:-postgres}
-      SQS_QUEUE_URL: ${SQS_QUEUE_URL:-}
-      AWS_REGION: ${AWS_REGION:-us-east-1}
-      ENVIRONMENT: ${ENVIRONMENT:-local}
-    restart: unless-stopped
-
-  worker:
-    build:
-      context: ..
-      dockerfile: infra/Dockerfile.worker
-    container_name: finscan-worker
-    env_file:
-      - path: ../.env
-        required: false
-    depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      migrate:
-        condition: service_completed_successfully
-    environment:
-      DATABASE_URL: postgresql+asyncpg://postgres:postgrespassword@db:5432/finscan
-      REDIS_URL: redis://redis:6379/0
-      QUEUE_BACKEND: ${QUEUE_BACKEND:-postgres}
-      STORAGE_BACKEND: ${STORAGE_BACKEND:-local}
-      STORAGE_BASE_DIR: /app/data/storage
-      S3_BUCKET: ${S3_BUCKET:-}
-      AWS_REGION: ${AWS_REGION:-us-east-1}
-      SQS_QUEUE_URL: ${SQS_QUEUE_URL:-}
-      GROQ_API_KEY: ${GROQ_API_KEY:-}
-      LLM_MODEL: ${LLM_MODEL:-openai/gpt-oss-20b}
-      LLM_BACKEND: ${LLM_BACKEND:-opencode}
-      CHECKPOINT_DB_PATH: /app/data/storage/checkpoints.sqlite3
-      ENVIRONMENT: ${ENVIRONMENT:-local}
-      # Managed OCR fallback (Route 3): DetectDocumentText only, hard-capped at
-      # 100 pages/runtime in core/extraction/router.py. Keep false locally
-      # (hermetic CI); set true in cloud .env to enforce Textract fallback.
-      FINSCAN_ENABLE_TEXTRACT: ${FINSCAN_ENABLE_TEXTRACT:-false}
-    volumes:
-      - dossiers_storage:/app/data/storage
-    restart: unless-stopped
-
   caddy:
     image: caddy:2-alpine
     container_name: finscan-caddy
-    depends_on:
-      api:
-        condition: service_started
-    ports:
-      - "80:80"
-      - "443:443"
+    # Host networking: the native `api` systemd unit binds 0.0.0.0:8000 on the
+    # HOST, not inside any Docker network - Caddy needs to reach it at
+    # 127.0.0.1:8000 as seen from the host, which only host networking gives
+    # a container. `ports:` below is inert under network_mode: host (Caddy
+    # binds 80/443 directly on the host instead) and is left commented for
+    # documentation/rollback reference.
+    network_mode: host
+    # ports:
+    #   - "80:80"
+    #   - "443:443"
     environment:
       DOMAIN_NAME: ${DOMAIN_NAME:-localhost}
       ACME_EMAIL: ${ACME_EMAIL:-admin@example.com}
@@ -163,6 +62,5 @@ services:
 volumes:
   postgres_data:
   redis_data:
-  dossiers_storage:
   caddy_data:
   caddy_config:

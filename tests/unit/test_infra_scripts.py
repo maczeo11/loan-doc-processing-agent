@@ -77,7 +77,9 @@ def test_caddy_production_config():
     content = open(caddy_path, "r", encoding="utf-8").read()
 
     assert "{$DOMAIN_NAME:localhost}" in content
-    assert "reverse_proxy api:8000" in content
+    # Systemd-native deploy model: api runs on the host, not a Docker network
+    # alias - Caddy (network_mode: host) reaches it via loopback.
+    assert "reverse_proxy 127.0.0.1:8000" in content
     assert "Strict-Transport-Security" in content
     assert "header_up X-Forwarded-Proto {scheme}" in content
     # Ensure database/Redis are not exposed in Caddy

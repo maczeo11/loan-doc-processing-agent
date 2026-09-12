@@ -3,6 +3,16 @@
 # FinScan AI: Safe Rollback Automation Script (Phase 7)
 # Restores previous release reference or explicit target tag/SHA.
 # Performs non-destructive checkout, restarts services, and verifies health check.
+#
+# Systemd-native deploy model (see infra/deploy.sh / docs/deployment_guide.md).
+# NOTE - time-cost tradeoff vs the old Docker-image-cache-based rollback:
+# there is no cached image to fall back to anymore, so this re-runs
+# setup_venv.sh (pip install + npm build) at the target ref before restarting
+# services. pip/npm caches keep this fast when dependencies haven't changed
+# between the two refs; when they have, this can take 1-3 minutes instead of
+# Docker's ~10 seconds. Acceptable for a rarely-used break-glass path -
+# correctness (the rollback ref's actually-pinned dependency versions, not
+# whatever happens to be sitting in the venv) matters more here than speed.
 # ==============================================================================
 
 set -euo pipefail
@@ -56,10 +66,14 @@ if [ -f "${SCRIPT_DIR}/version.sh" ]; then
     "${SCRIPT_DIR}/version.sh" --env "${ROOT_DIR}/.env"
 fi
 
-# 4. Restart Services
-echo "[3/4] Restarting containers with rollback image..."
+# 4. Rebuild venv/UI at the rollback ref and restart native services
+echo "[3/4] Reinstalling dependencies and restarting native services..."
 docker compose -f "${COMPOSE_FILE}" up -d db redis
-docker compose -f "${COMPOSE_FILE}" up --build -d migrate api outbox-dispatcher worker caddy
+chmod +x "${SCRIPT_DIR}/setup_venv.sh"
+"${SCRIPT_DIR}/setup_venv.sh"
+"${ROOT_DIR}/.venv/bin/alembic" upgrade head
+sudo systemctl restart finscan-api finscan-worker finscan-outbox-dispatcher
+docker compose -f "${COMPOSE_FILE}" up -d --force-recreate caddy
 
 # 5. Health Check Verification
 echo "[4/4] Verifying health check on rollback deployment..."
@@ -82,7 +96,6 @@ if [ ${HEALTHY} -eq 1 ]; then
     echo "${ROLLBACK_REF}" > "${CURRENT_RELEASE_FILE}"
     HEALTH_OUTPUT=$(curl -s "${HEALTH_URL}")
 
-    # Reclaim disk from the just-superseded image generation (see deploy.sh).
     echo "Pruning dangling images and capping build cache..."
     docker image prune -f || true
     docker builder prune -f --keep-storage 5GB || true
@@ -96,7 +109,7 @@ if [ ${HEALTHY} -eq 1 ]; then
 else
     echo "=================================================================="
     echo "ERROR: Health check failed during rollback after ${MAX_RETRIES} attempts!"
-    docker compose -f "${COMPOSE_FILE}" logs --tail=50 api || true
+    journalctl -u finscan-api -n 50 --no-pager || true
     echo "=================================================================="
     exit 1
 fi

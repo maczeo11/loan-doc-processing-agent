@@ -28,6 +28,12 @@ services:
     restart: unless-stopped
 
   migrate:
+    # migrate/api/outbox-dispatcher all build the SAME Dockerfile.api context -
+    # sharing one `image:` tag makes Compose build it once and reuse it for all
+    # three, instead of the ~5.7GB image getting built and stored 3x under
+    # separate per-service names (infra-migrate/infra-api/infra-outbox-dispatcher),
+    # which was silently tripling this image's disk footprint on every deploy.
+    image: finscan-api:latest
     build:
       context: ..
       dockerfile: infra/Dockerfile.api
@@ -41,6 +47,7 @@ services:
     restart: "no"
 
   api:
+    image: finscan-api:latest
     build:
       context: ..
       dockerfile: infra/Dockerfile.api
@@ -79,6 +86,7 @@ services:
     restart: unless-stopped
 
   outbox-dispatcher:
+    image: finscan-api:latest
     build:
       context: ..
       dockerfile: infra/Dockerfile.api

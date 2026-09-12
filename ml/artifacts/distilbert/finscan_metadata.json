@@ -1,0 +1,12 @@
+{
+  "model_type": "distilbert_sequence_classifier",
+  "classes": [
+    "application_form",
+    "payslip",
+    "bank_statement",
+    "tax_acknowledgement",
+    "id_card"
+  ],
+  "max_seq_len": 256,
+  "batch_size": 4
+}

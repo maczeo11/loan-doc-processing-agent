@@ -12,6 +12,7 @@ to classify single pages or entire multi-page document packages into canonical c
 - UNKNOWN (abstention route for manual review / out-of-domain documents)
 """
 
+import os
 from typing import Dict, Any, List, Optional, Tuple
 from ml.classifier.baseline_tfidf import (
     predict_document_type,
@@ -21,12 +22,22 @@ from ml.classifier.baseline_tfidf import (
     DEFAULT_CONFIDENCE_THRESHOLD,
 )
 
+# Experimental hybrid cascade (ml/classifier/hybrid_cascade.py), off by
+# default. Escalates only the pages baseline already abstains on in an
+# uncertain confidence band to DistilBERT - see that module's docstring for
+# why. Matches the FINSCAN_USE_BGE-style env-var toggle already used in
+# core/rag/indexer.py, since core/ modules stay decoupled from apps/api's
+# pydantic Settings.
+_USE_HYBRID_CASCADE = os.getenv("FINSCAN_USE_HYBRID_CLASSIFIER", "0") == "1"
+
 
 class DocumentClassificationService:
     """Service wrapper for document type inference and routing."""
 
-    def __init__(self, threshold: float = DEFAULT_CONFIDENCE_THRESHOLD):
+    def __init__(self, threshold: float = DEFAULT_CONFIDENCE_THRESHOLD, use_hybrid_cascade: Optional[bool] = None):
         self.threshold = threshold
+        self.use_hybrid_cascade = _USE_HYBRID_CASCADE if use_hybrid_cascade is None else use_hybrid_cascade
+        self._cascade = None
         # Pre-warm model cache
         try:
             self._model = load_baseline_classifier()
@@ -44,7 +55,16 @@ class DocumentClassificationService:
                 "abstention_reason": Optional[str],
                 "probabilities": Dict[str, float]
             }
+        (plus "escalated_to_distilbert": bool when use_hybrid_cascade is on -
+        additive key, existing consumers reading the documented keys above
+        are unaffected.)
         """
+        if self.use_hybrid_cascade:
+            if self._cascade is None:
+                from ml.classifier.hybrid_cascade import HybridCascadeClassifier
+
+                self._cascade = HybridCascadeClassifier(threshold=self.threshold)
+            return self._cascade.predict_with_details(text)
         return predict_with_details(text, threshold=self.threshold)
 
     def classify_multi_page_document(self, page_texts: List[str]) -> Dict[str, Any]:

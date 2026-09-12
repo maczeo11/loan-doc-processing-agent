@@ -151,7 +151,12 @@ export const RightInspectorPane: React.FC<RightInspectorPaneProps> = ({
             }`}
           >
             <BookOpen className="w-3.5 h-3.5 text-theme-secondary" />
-            <span>Policy</span>
+            <span>Q&amp;A</span>
+            {flagCount > 0 && (
+              <span className="ml-0.5 px-1 py-0.5 rounded-full text-[10px] font-mono font-bold bg-theme-flag-bg text-theme-flag border border-theme-flag-border">
+                {flagCount}
+              </span>
+            )}
           </button>
 
           <button
@@ -374,6 +379,7 @@ export const RightInspectorPane: React.FC<RightInspectorPaneProps> = ({
             applicationId={application.id}
             onSelectEvidence={onSelectEvidence}
             isReadOnlyPreset={isReadOnlyPreset}
+            flaggedFindings={application.findings.filter((f) => f.verdict === 'flag')}
           />
         )}
 

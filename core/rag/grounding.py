@@ -128,11 +128,13 @@ def sanitize_summary_text(
     lines = summary_text.splitlines()
     sanitized_lines: List[str] = []
     has_dropped_claim = False
+    has_any_citation_tag = False
 
     for line in lines:
         # Search for citation tags like [DOC_p1] or [credit_policy_v1_p1]
         citation_matches = re.findall(r"\[([a-zA-Z0-9_\-]+)\]", line)
         if citation_matches:
+            has_any_citation_tag = True
             unauthorized = [
                 c for c in citation_matches
                 if c not in authorized_set
@@ -148,6 +150,24 @@ def sanitize_summary_text(
 
     if has_dropped_claim:
         sanitized_lines.append("\n> ⚠️ [ABSTENTION: One or more claims were dropped due to lack of verified citation grounding.]")
+
+    if not has_any_citation_tag:
+        # The per-line loop above only catches a citation tag that names an
+        # UNAUTHORIZED id - a line with ZERO citation tags never enters that
+        # branch at all, so a fully uncited, confidently-worded hallucination
+        # (a common small/cheap-model failure mode) previously sailed through
+        # completely untouched. Require at least one citation tag SOMEWHERE in
+        # the whole answer (authorized or not - an authorized one earns no
+        # extra warning, an unauthorized one is already dropped+flagged above);
+        # zero tags anywhere means nothing was ever actually cited, so the
+        # answer is withheld rather than read as evidence-backed. This check
+        # only fires when EVERY line had zero tags - it never overrides the
+        # per-line drop/warning behavior above.
+        return (
+            "> ⚠️ [ABSTENTION: This answer did not cite any verified policy or "
+            "application evidence and has been withheld. Rephrase the question "
+            "or consult the source documents directly.]"
+        )
 
     return "\n".join(sanitized_lines)
 

@@ -5,6 +5,22 @@ import { getEvidenceKey } from '../../utils/coordinates';
 import { sanitizePiiInText } from '../../utils/pii';
 import { ExternalLink, Shield } from 'lucide-react';
 
+/**
+ * One-line descriptions of what each deterministic rule (core/rules/*.py)
+ * actually checks, keyed by rule_id. Surfaced as a hover tooltip on the
+ * rule_id badge for reviewers who don't have the rule catalog memorized -
+ * the badge itself stays a stable audit handle (see core/rules/engine.py),
+ * this is purely an explanatory aid layered on top.
+ */
+const RULE_DESCRIPTIONS: Record<string, string> = {
+  'RULE-COMP-01': 'Verifies every mandatory document (application form, payslip, bank statement, tax acknowledgement, ID card) was uploaded and usable.',
+  'RULE-INC-01': 'Reconciles the payslip’s stated net salary against verified bank salary credits, within a 5% tolerance.',
+  'RULE-TAX-01': 'Reconciles the ITR’s gross total income against annualized payslip gross income, within a 10% tolerance.',
+  'RULE-ID-01': 'Cross-checks the applicant’s KYC name and PAN against the payslip, bank statement, and tax return.',
+  'RULE-ID-02': 'Cross-checks name and PAN between every uploaded identity document (e.g. ID card vs. a separately uploaded PAN card).',
+  'RULE-BANK-01': 'Verifies bank statement arithmetic: opening balance + credits − debits = closing balance.',
+};
+
 interface FindingCardProps {
   finding: Finding;
   isFocused: boolean;
@@ -33,7 +49,10 @@ export const FindingCard: React.FC<FindingCardProps> = ({
       <div className="flex items-center justify-between gap-2 mb-1.5">
         <div className="flex items-center gap-1.5">
           <Shield className="w-3.5 h-3.5 text-theme-brand" />
-          <span className="font-mono text-xs font-semibold text-theme-primary">
+          <span
+            className="font-mono text-xs font-semibold text-theme-primary underline decoration-dotted decoration-theme-muted underline-offset-2 cursor-help"
+            title={RULE_DESCRIPTIONS[finding.rule_id] || 'Deterministic rule check (see core/rules/).'}
+          >
             {finding.rule_id}
           </span>
         </div>

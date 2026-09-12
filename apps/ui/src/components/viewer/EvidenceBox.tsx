@@ -1,6 +1,5 @@
-import React, { useState } from 'react';
+import React from 'react';
 import type { EvidenceRef } from '../../types/contracts';
-import { sanitizePiiInText } from '../../utils/pii';
 
 interface PixelBounds {
   left: number;
@@ -16,19 +15,25 @@ interface EvidenceBoxProps {
   tag?: string | null;
 }
 
+/**
+ * Visual-only evidence highlight. It must NEVER cover or intercept the
+ * document text it points at:
+ * - outline-only (transparent fill) so the underlying PDF text stays legible;
+ * - pointer-events-none so text selection / scrolling passes straight through
+ *   (finding navigation already lives in the inspector pane);
+ * - a single compact pill parked OUTSIDE the box (flips below when near the
+ *   page top) instead of a large tooltip over neighbouring text. The full
+ *   quoted span is shown in the inspector, not duplicated here.
+ */
 export const EvidenceBox: React.FC<EvidenceBoxProps> = ({
   evidence,
   bounds,
   isSelected = true,
   tag,
 }) => {
-  const [isHovered, setIsHovered] = useState<boolean>(false);
-
   const confidencePct = Math.round((evidence.confidence ?? 1) * 100);
-  const extractionMethod = evidence.extraction_method || 'pymupdf_native';
-  // Quoted spans come straight off the document and routinely contain PAN,
-  // Aadhaar and account numbers — never render one unmasked.
-  const safeSpan = sanitizePiiInText(evidence.quoted_span || '');
+  // Park the pill below the box when there is no headroom above it.
+  const flipBelow = bounds.top < 30;
 
   return (
     <div
@@ -37,44 +42,27 @@ export const EvidenceBox: React.FC<EvidenceBoxProps> = ({
         top: `${bounds.top}px`,
         width: `${bounds.width}px`,
         height: `${bounds.height}px`,
+        boxShadow: isSelected
+          ? '0 0 0 2px var(--theme-unknown, #b45309), 0 0 10px 2px rgb(180 83 9 / 0.35)'
+          : '0 0 0 1px var(--theme-brand, #1d4ed8)',
       }}
-      className={`absolute z-20 transition-all pointer-events-auto cursor-pointer rounded-xs ${
-        isSelected
-          ? 'bg-theme-unknown-bg border-2 border-theme-unknown ring-2 ring-theme-unknown/40 shadow-sm'
-          : 'bg-theme-brand/10 border border-theme-brand hover:bg-theme-brand/20'
-      }`}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
+      className="absolute z-20 pointer-events-none rounded-[2px] bg-transparent"
       role="region"
-      aria-label={`Evidence citation: ${safeSpan}`}
+      aria-label={`Evidence citation on page ${evidence.page_number}, ${confidencePct}% confidence`}
     >
-      {/* Small Evidence Pill Header */}
-      <div className="absolute -top-4 left-0 flex items-center gap-1 z-30">
-        <span className="text-[9px] font-bold font-mono tracking-wider uppercase px-1.5 py-0.5 rounded-xs bg-theme-unknown text-white shadow-xs">
+      {/* Compact tag pill — outside the highlight, never over the text. */}
+      <div
+        className={`absolute left-0 z-30 flex items-center gap-1 whitespace-nowrap ${
+          flipBelow ? 'top-full mt-1' : '-top-5'
+        }`}
+      >
+        <span className="text-[9px] font-bold font-mono tracking-wider uppercase px-1.5 py-0.5 rounded-xs bg-theme-unknown text-white shadow">
           {tag || 'EVIDENCE'}
         </span>
+        <span className="text-[9px] font-mono px-1 py-0.5 rounded-xs bg-theme-card/95 border border-theme-border text-theme-muted shadow">
+          p{evidence.page_number} · {confidencePct}%
+        </span>
       </div>
-
-      {/* Floating Detail Tooltip on Hover or Selection */}
-      {(isHovered || isSelected) && (
-        <div className="absolute top-full left-0 mt-1.5 z-40 bg-theme-card text-theme-primary text-[11px] p-2.5 rounded-xs shadow-xl border border-theme-border-card min-w-[240px] max-w-sm pointer-events-none space-y-1.5 animate-fade-in">
-          <div className="flex items-center justify-between gap-2 border-b border-theme-border pb-1 text-[10px] text-theme-muted">
-            <span className="font-semibold text-theme-unknown uppercase tracking-wider font-mono">
-              Verified Evidence
-            </span>
-            <span className="font-mono text-theme-pass">{confidencePct}% confidence</span>
-          </div>
-          <p className="font-medium text-theme-primary italic leading-snug font-mono">
-            &ldquo;{safeSpan}&rdquo;
-          </p>
-          <div className="flex items-center justify-between text-[10px] text-theme-muted pt-0.5 border-t border-theme-border">
-            <span>
-              Engine: <code className="text-theme-secondary font-mono">{extractionMethod}</code>
-            </span>
-            <span className="font-mono">Page {evidence.page_number}</span>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

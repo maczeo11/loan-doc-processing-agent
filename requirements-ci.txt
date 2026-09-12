@@ -21,8 +21,13 @@ redis>=5.0.3
 # rapidfuzz: required by core/rules/identity.py (RULE-ID-01), imported at module
 # load via core/graph/nodes.py. Prebuilt wheel, no compilation in CI.
 rapidfuzz>=3.6.2
-langgraph>=0.0.30
+langgraph>=1.0,<2.0
 langchain-core>=0.1.38
+# langchain-openai: lightweight (no torch/heavy wheel) - needed to test the
+# feature-flagged agentic Q&A path (apps/api/agent.py) with ChatOpenAI mocked;
+# tests must never hit a live Groq/OpenAI endpoint (AGENTS.md: "CI must never
+# execute paid cloud API calls").
+langchain-openai>=0.1.1
 boto3>=1.34.0
 pymupdf>=1.24.0
 pyyaml>=6.0

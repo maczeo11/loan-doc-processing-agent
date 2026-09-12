@@ -19,6 +19,24 @@ logger = logging.getLogger(__name__)
 # Global cache for lazy initialized CPU OCR engine
 _PADDLE_OCR_INSTANCE = None
 
+# Tesseract CLI availability, probed once per process. Each get_textpage_ocr()
+# call without the binary burns ~0.2s in doomed subprocess spawns before
+# raising - on boxes without Tesseract (local dev, CI) that penalty hit every
+# below-threshold page. Cache the probe and skip fast instead.
+_TESSERACT_AVAILABLE: Union[bool, None] = None
+
+
+def is_tesseract_available() -> bool:
+    """True when the `tesseract` binary is on PATH (PyMuPDF OCR usable)."""
+    global _TESSERACT_AVAILABLE
+    if _TESSERACT_AVAILABLE is None:
+        import shutil
+
+        _TESSERACT_AVAILABLE = shutil.which("tesseract") is not None
+        if not _TESSERACT_AVAILABLE:
+            logger.info("Tesseract binary not on PATH - CPU OCR ladder will skip fast (Textract still applies).")
+    return _TESSERACT_AVAILABLE
+
 
 def get_paddle_ocr_engine():
     """
@@ -68,6 +86,11 @@ def extract_scanned_text_with_ocr(
 
         ocr_engine = get_paddle_ocr_engine()
         if ocr_engine is None:
+            # No PaddleOCR here - PyMuPDF's Tesseract bridge is the only CPU
+            # option left. Skip fast when the binary is absent (see
+            # is_tesseract_available) instead of burning subprocess timeouts.
+            if not is_tesseract_available():
+                return []
             # Fallback to PyMuPDF built-in OCR (Tesseract CPU engine).
             # Label honestly: this is NOT PaddleOCR.
             try:

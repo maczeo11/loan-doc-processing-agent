@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - 'feat/**'
+      - 'test/**'
   pull_request:
     branches:
       - main
@@ -84,3 +85,73 @@ jobs:
           pytest tests/unit tests/smoke -v --tb=short
         env:
           PYTHONPATH: .
+
+  deploy:
+    name: Deploy to EC2 (via SSM, when reachable)
+    runs-on: ubuntu-latest
+    needs: [test]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # Requires one-time AWS setup that has NOT been applied yet (see
+    # docs/improvement_roadmap.md): a GitHub OIDC provider + a scoped IAM
+    # role in the target AWS account, plus AmazonSSMManagedInstanceCore
+    # attached to the EC2 instance role. Until that exists, this job will
+    # fail at the "Configure AWS credentials" step - by design, not silently.
+    permissions:
+      id-token: write
+      contents: read
+    env:
+      AWS_REGION: ap-south-1
+      INSTANCE_ID: i-008fcd01dbd088e87
+    steps:
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.FINSCAN_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Check instance reachability (skip gracefully if stopped)
+        id: reachability
+        run: |
+          STATE=$(aws ssm describe-instance-information \
+            --filters "Key=InstanceIds,Values=${INSTANCE_ID}" \
+            --query "InstanceInformationList[0].PingStatus" \
+            --output text)
+          if [ "$STATE" == "Online" ]; then
+            echo "reachable=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "reachable=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::EC2 instance $INSTANCE_ID is not reachable via SSM (state: $STATE) - it is likely stopped for cost control. Skipping deploy, not failing the run."
+          fi
+
+      - name: Deploy via SSM (infra/deploy.sh on-box)
+        if: steps.reachability.outputs.reachable == 'true'
+        run: |
+          COMMAND_ID=$(aws ssm send-command \
+            --instance-ids "${INSTANCE_ID}" \
+            --document-name "AWS-RunShellScript" \
+            --parameters "commands=cd /opt/finscan/app && ./infra/deploy.sh ${{ github.sha }}" \
+            --query "Command.CommandId" --output text)
+          echo "Deploy command: $COMMAND_ID"
+
+          # Poll for completion (deploy.sh's own health-check/rollback-on-failure
+          # logic already exists - this just surfaces its exit status to CI).
+          for i in $(seq 1 30); do
+            sleep 10
+            STATUS=$(aws ssm get-command-invocation \
+              --command-id "$COMMAND_ID" --instance-id "${INSTANCE_ID}" \
+              --query "Status" --output text 2>/dev/null || echo "Pending")
+            echo "Attempt $i: $STATUS"
+            if [ "$STATUS" == "Success" ] || [ "$STATUS" == "Failed" ] || [ "$STATUS" == "Cancelled" ]; then
+              break
+            fi
+          done
+
+          aws ssm get-command-invocation \
+            --command-id "$COMMAND_ID" --instance-id "${INSTANCE_ID}" \
+            --query "{Status:Status,StdOut:StandardOutputContent,StdErr:StandardErrorContent}" \
+            --output json
+
+          if [ "$STATUS" != "Success" ]; then
+            echo "::error::Deploy failed or timed out (status: $STATUS). See infra/rollback.sh for manual rollback."
+            exit 1
+          fi

@@ -17,7 +17,12 @@ alembic>=1.13.0
 aiosqlite>=0.20.0
 
 # Agentic Framework & LLM
-langgraph>=0.0.30
+# langgraph pinned to a range actually exercised (create_react_agent's `prompt=`
+# kwarg has drifted across major versions - unpinned `>=0.0.30` let pip install
+# an untested future major and every test mocks create_react_agent entirely, so
+# a real API break would fail silently to the non-agentic fallback with no CI
+# signal; see tests/unit/test_agentic_qa.py::test_create_react_agent_signature_has_prompt_kwarg).
+langgraph>=1.0,<2.0
 langchain>=0.1.14
 langchain-core>=0.1.38
 langchain-community>=0.0.31
@@ -43,6 +48,13 @@ numpy>=1.26.4
 joblib>=1.3.2
 shap>=0.45.0
 rapidfuzz>=3.6.2  # Fast fuzzy string matching for cross-verification
+
+# DistilBERT challenger classifier (ml/classifier/challenger_distilbert.py,
+# hybrid_cascade.py). Guarded by importlib.util.find_spec at runtime - falls
+# back to a sklearn/heuristic path when absent, so this is deliberately NOT
+# in requirements-ci.txt (heavy wheel, CLAUDE.md: CI stays light).
+torch>=2.2.0
+transformers>=4.40.0
 
 # Observability & LLMOps
 langfuse>=2.25.0

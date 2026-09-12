@@ -13,7 +13,7 @@ import datetime
 import logging
 import os
 import re
-from typing import Any, Dict, List, Optional, Set, Union
+from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
 from core.contracts.state import LoanApplicationState, StatusTransition, ApplicationStatus
 from core.contracts.findings import Finding
@@ -21,9 +21,9 @@ from core.contracts.facts import MoneyFact, PayslipFacts, BankStatementFacts, Ta
 from core.rules.completeness import evaluate_completeness
 from core.rules.salary_audit import audit_salary_vs_bank
 from core.rules.tax_audit import audit_tax_vs_income
-from core.rules.identity import audit_identity_consistency
+from core.rules.identity import audit_identity_consistency, audit_identity_documents_consistency
 from core.rules.bank_arithmetic import validate_bank_statement_arithmetic
-from core.extraction.native_parser import extract_all_pages_content
+from core.extraction.router import route_page_extraction
 from core.extraction.extractors.payslip import PayslipExtractor
 from core.extraction.extractors.bank_statement import BankStatementExtractor
 from core.extraction.extractors.tax_return import TaxReturnExtractor
@@ -43,6 +43,116 @@ logger = logging.getLogger("finscan.graph.nodes")
 
 def _get_utc_timestamp() -> str:
     return datetime.datetime.now(datetime.timezone.utc).isoformat()
+
+
+# Per-document page cap (dossier cap enforced at API layer).
+MAX_PAGES_PER_DOCUMENT = 30
+
+
+def _extract_doc_texts_via_router(
+    pdf_input: Union[str, bytes], doc_id: str
+) -> tuple[List[Dict[str, Any]], str, int]:
+    """
+    Runs per-page OCR routing (PyMuPDF native -> Tesseract/PaddleOCR CPU ->
+    AWS Textract DetectDocumentText when FINSCAN_ENABLE_TEXTRACT=true) BEFORE
+    classification, per the AGENTS.md perception invariant.
+
+    Returns (pages, route_label, total_pages):
+    - pages: one dict per page in [1, capped] - {"page_number", "text",
+      "page_width", "page_height", "words"} - ALWAYS index-aligned to the real
+      physical page (blank/unreadable pages get "" text, not a dropped slot),
+      so a caller building EvidenceRef page numbers/bounding boxes downstream
+      never misattributes a citation to the wrong page or falls back to a
+      hardcoded page size. Filter out blank entries at the call site if only
+      non-empty pages are wanted (e.g. for classifier input).
+      "words" carries each routed span's REAL bounding box (from
+      route_page_extraction, whichever engine produced it) so
+      find_text_match_with_evidence (extractors/base.py) can locate an
+      extracted fact's actual position instead of falling back to its fixed
+      dummy footprint - every word of a span shares that span's box (word-level
+      boxes aren't available from the router), which still anchors a match to
+      the right line/region instead of an arbitrary corner of the page.
+    - route_label: "native" only when every page carried a usable native text
+      layer; "textract"/"paddle" when that engine produced text; else "ocr".
+    - total_pages: raw page count (pre-cap) for the reviewer dossier index.
+
+    Raises on unreadable PDF so callers fall through to UNKNOWN handling.
+    OCR text only feeds classification/extraction inputs - it never decides
+    verdicts (Prime Invariant untouched).
+
+    Opens the PDF once and reuses it across every page's route/extract calls
+    (see native_parser.py's `doc=` param) instead of reopening/reparsing the
+    file up to 3x per page - the common native-text case previously paid that
+    cost on every document.
+    """
+    from core.extraction.native_parser import open_pdf_document
+
+    doc = open_pdf_document(pdf_input)
+    try:
+        total_pages = len(doc)
+        capped = min(total_pages, MAX_PAGES_PER_DOCUMENT)
+        pages: List[Dict[str, Any]] = []
+        methods: Set[str] = set()
+        native_pages = 0
+
+        for page_number in range(1, capped + 1):
+            try:
+                evidence = route_page_extraction(
+                    pdf_input,
+                    page_number,
+                    document_id=doc_id,
+                    document_type="unknown",
+                    doc=doc,
+                )
+            except Exception as exc:
+                logger.warning(f"OCR routing failed for {doc_id} p{page_number}: {exc}")
+                evidence = []
+
+            page_rect = doc[page_number - 1].rect
+            page_width, page_height = float(page_rect.width), float(page_rect.height)
+            joined = ""
+            words: List[Dict[str, Any]] = []
+            if evidence:
+                methods.add(evidence[0].extraction_method)
+                if all(e.extraction_method == "pymupdf_native" for e in evidence):
+                    native_pages += 1
+                joined = "\n".join(
+                    e.quoted_span for e in evidence if (e.quoted_span or "").strip()
+                ).strip()
+                bb = evidence[0].bounding_box
+                if bb is not None and bb.page_width and bb.page_height:
+                    page_width, page_height = bb.page_width, bb.page_height
+                # Every word of a span shares that span's real bounding box (see
+                # docstring above) - lets find_text_match_with_evidence resolve an
+                # extracted fact's actual on-page position instead of always
+                # falling back to its fixed dummy footprint.
+                for e in evidence:
+                    if e.bounding_box is None:
+                        continue
+                    for w in (e.quoted_span or "").split():
+                        words.append({"word": w, "bbox": e.bounding_box})
+
+            pages.append(
+                {
+                    "page_number": page_number,
+                    "text": joined,
+                    "page_width": page_width,
+                    "page_height": page_height,
+                    "words": words,
+                }
+            )
+    finally:
+        doc.close()
+
+    if capped and native_pages == capped:
+        route_label = "native"
+    elif "textract_managed" in methods:
+        route_label = "textract"
+    elif "paddleocr_cpu" in methods:
+        route_label = "paddle"
+    else:
+        route_label = "ocr"
+    return pages, route_label, total_pages
 
 
 def triage_node(state: LoanApplicationState) -> Dict[str, Any]:
@@ -111,11 +221,18 @@ def ocr_and_classify_node(state: LoanApplicationState) -> Dict[str, Any]:
 
         page_texts: List[str] = []
 
-        # 1. Check if document texts provided directly in state (cache from prior run)
+        # 1. Check if document texts provided directly in state (cache from prior run).
+        # Accepts both the enriched per-page dict format this node now writes
+        # ({"page_number", "text", ...}) and the plain string-list format older
+        # callers/tests seed directly.
         if doc_id in doc_texts_map:
             val = doc_texts_map[doc_id]
             if isinstance(val, list):
-                page_texts = [str(p) for p in val if str(p).strip()]
+                page_texts = []
+                for p in val:
+                    text = str(p.get("text", "")) if isinstance(p, dict) else str(p)
+                    if text.strip():
+                        page_texts.append(text.strip())
             elif isinstance(val, str) and val.strip():
                 page_texts = [val.strip()]
 
@@ -137,17 +254,16 @@ def ocr_and_classify_node(state: LoanApplicationState) -> Dict[str, Any]:
                 try:
                     import time as _t
                     _t0 = _t.monotonic()
-                    pages = extract_all_pages_content(pdf_input)
-                    page_counts[doc_id] = len(pages)
-                    if len(pages) > 30:
-                        logger.warning(f"Truncating {doc_id} from {len(pages)} to 30 pages (dossier cap)")
-                        pages = pages[:30]
-                    page_texts = [p.get("text", "") for p in pages if p.get("text", "").strip()]
-                    # Every page carried a usable native text layer -> native route.
-                    # Any page without one had to be escalated to OCR downstream.
-                    ocr_routes[doc_id] = "native" if pages and len(page_texts) == len(pages) else "ocr"
-                    # Cache for Node 3 reuse (avoids second OCR pass).
-                    doc_texts_map[doc_id] = page_texts
+                    pages_data, route_label, total_pages = _extract_doc_texts_via_router(pdf_input, doc_id)
+                    if total_pages > MAX_PAGES_PER_DOCUMENT:
+                        logger.warning(f"Truncating {doc_id} from {total_pages} to {MAX_PAGES_PER_DOCUMENT} pages (dossier cap)")
+                    page_counts[doc_id] = total_pages
+                    ocr_routes[doc_id] = route_label
+                    # Cache the full per-page records (text + real page_number/width/
+                    # height) for Node 3 reuse - avoids a second OCR pass AND keeps
+                    # evidence page/bbox alignment correct when Node 3 reads this back.
+                    doc_texts_map[doc_id] = pages_data
+                    page_texts = [p["text"] for p in pages_data if p["text"].strip()]
                     logger.info(f"Parsed {doc_id}: {len(page_texts)} text pages in {int((_t.monotonic() - _t0) * 1000)}ms")
                 except Exception as err:
                     logger.debug(f"Failed to parse pages for {doc_id} in ocr_and_classify_node: {err}")
@@ -197,8 +313,8 @@ def extract_facts_node(state: LoanApplicationState) -> Dict[str, Any]:
     """
     Node 3: Fact Extraction Node (aliased as extract_fields_node).
     Reuses `document_texts` cached by Node 2 when available (no second OCR pass);
-    only re-parses PDFs for docs missing from cache. Pure native probe here —
-    heavy OCR routing lives in router.route_page_extraction for scanned pages.
+    docs missing from cache are re-routed through router.route_page_extraction
+    (same native -> CPU OCR -> Textract path as Node 2, never native-only).
     """
     manifest: Dict[str, str] = state.get("document_manifest") or {}
     doc_ids: List[str] = state.get("document_ids") or list(manifest.keys())
@@ -209,6 +325,14 @@ def extract_facts_node(state: LoanApplicationState) -> Dict[str, Any]:
     payslip: Optional[PayslipFacts] = state.get("payslip")
     bank_statement: Optional[BankStatementFacts] = state.get("bank_statement")
     tax_return: Optional[TaxReturnFacts] = state.get("tax_return")
+    # Every identity-type document extracted so far (id_card/kyc/pan/aadhaar),
+    # not just the first - lets RULE-ID-02 cross-check a separately uploaded
+    # ID card AND PAN card against each other. `applicant` above stays the
+    # first one for backward compatibility with existing consumers.
+    identity_docs: List[Dict[str, Any]] = list(state.get("identity_documents") or [])
+    seen_identity_doc_ids: Set[str] = {
+        d.get("doc_id") for d in identity_docs if isinstance(d, dict) and d.get("doc_id")
+    }
 
     storage = LocalFileSystemStorage()
     payslip_extractor = PayslipExtractor()
@@ -218,15 +342,36 @@ def extract_facts_node(state: LoanApplicationState) -> Dict[str, Any]:
 
     for doc_id in doc_ids:
         # Reuse Node 2 cache first: avoids second full OCR pass (major stall fix).
+        # Cache entries are the enriched per-page dict format Node 2 now writes
+        # ({"page_number", "text", "page_width", "page_height", "words"} - real
+        # physical page number/dimensions, not a re-enumerated index, plus each
+        # routed span's real bounding box under "words" so downstream evidence
+        # (find_text_match_with_evidence) resolves an actual on-page position
+        # instead of its fixed dummy footprint), with a fallback for the older
+        # plain string-list format some callers/tests still seed directly.
         cached_texts = (state.get("document_texts") or {}).get(doc_id)
         pages: List[Dict[str, Any]] = []
         if cached_texts:
             vals = cached_texts if isinstance(cached_texts, list) else [cached_texts]
-            pages = [
-                {"page_number": i + 1, "text": str(t)}
-                for i, t in enumerate(vals)
-                if str(t).strip()
-            ][:30]
+            for i, v in enumerate(vals):
+                if isinstance(v, dict):
+                    text = str(v.get("text", "")).strip()
+                    if not text:
+                        continue
+                    pages.append(
+                        {
+                            "page_number": v.get("page_number", i + 1),
+                            "text": text,
+                            "page_width": v.get("page_width"),
+                            "page_height": v.get("page_height"),
+                            "words": v.get("words", []),
+                        }
+                    )
+                else:
+                    text = str(v).strip()
+                    if text:
+                        pages.append({"page_number": i + 1, "text": text})
+            pages = pages[:MAX_PAGES_PER_DOCUMENT]
 
         if not pages:
             pdf_input: Optional[Union[str, bytes]] = None
@@ -243,7 +388,11 @@ def extract_facts_node(state: LoanApplicationState) -> Dict[str, Any]:
 
             if pdf_input:
                 try:
-                    pages = extract_all_pages_content(pdf_input)[:30]
+                    # Real page_number/page_width/page_height per page, index-
+                    # aligned to the physical page even when some pages are blank -
+                    # keeps downstream evidence bounding boxes correctly attributed.
+                    pages_data, _, _ = _extract_doc_texts_via_router(pdf_input, doc_id)
+                    pages = [p for p in pages_data if str(p.get("text", "")).strip()]
                 except Exception as err:
                     logger.warning(f"Failed to parse pages for {doc_id}: {err}")
 
@@ -298,15 +447,20 @@ def extract_facts_node(state: LoanApplicationState) -> Dict[str, Any]:
         elif norm_type in ("tax_return", "itr", "tax_acknowledgement") and tax_return is None:
             logger.info(f"Extracting Tax Return facts for {doc_id}")
             tax_return = tax_extractor.extract(doc_id=doc_id, pages=pages)
-        elif norm_type in ("id_card", "kyc", "identity_document", "pan", "aadhaar") and applicant is None:
+        elif norm_type in ("id_card", "kyc", "identity_document", "pan", "aadhaar") and doc_id not in seen_identity_doc_ids:
             logger.info(f"Extracting Applicant/KYC facts for {doc_id}")
-            applicant = id_extractor.extract(doc_id=doc_id, pages=pages)
+            fact = id_extractor.extract(doc_id=doc_id, pages=pages)
+            identity_docs.append({"doc_id": doc_id, "fact": fact})
+            seen_identity_doc_ids.add(doc_id)
+            if applicant is None:
+                applicant = fact
 
     return {
         "applicant": applicant,
         "payslip": payslip,
         "bank_statement": bank_statement,
         "tax_return": tax_return,
+        "identity_documents": identity_docs,
         "classified_types": classified_types,
         # Drop bulk bytes after extraction so later checkpoints (RAG/synthesis/
         # grounding/human_review) stay small — fixes SQLite BLOB bloat on 10pp jobs.
@@ -395,8 +549,44 @@ def evaluate_rules_node(state: LoanApplicationState) -> Dict[str, Any]:
     payslip_emp_name = payslip.employee_name if payslip else None
     bank_holder_name = bank.account_holder if bank else None
     itr_pan = tax_return.pan_number if tax_return else None
-    id_finding = audit_identity_consistency(applicant, payslip_emp_name, bank_holder_name, tax_pan=itr_pan)
+    # Cross-document provenance: every compared name/PAN must cite its own
+    # page, otherwise the finding shows KYC evidence twice (same-doc illusion).
+    tax_assessee_name = _fact_field(tax_return, "assessee_name", None)
+    if isinstance(tax_assessee_name, str) and tax_assessee_name.strip().upper() == "UNKNOWN":
+        tax_assessee_name = None
+    id_finding = audit_identity_consistency(
+        applicant,
+        payslip_emp_name,
+        bank_holder_name,
+        tax_pan=itr_pan,
+        tax_name=tax_assessee_name,
+        payslip_name_evidence=_fact_field(payslip, "employee_name_evidence", None),
+        bank_name_evidence=_fact_field(bank, "account_holder_evidence", None),
+        tax_name_evidence=_fact_field(tax_return, "assessee_name_evidence", None),
+        pan_evidence=_fact_field(tax_return, "pan_evidence", None),
+    )
     findings.append(id_finding)
+
+    # 4b. Cross-Identity-Document Consistency (RULE-ID-02): only meaningful
+    # when 2+ separate identity documents were uploaded (e.g. an ID/Aadhaar
+    # card AND a separate PAN card) - a single identity document has nothing
+    # to cross-check against, so no finding is added in that common case.
+    identity_docs: List[Tuple[str, ApplicantFact]] = []
+    for item in state.get("identity_documents") or []:
+        if not isinstance(item, dict):
+            continue
+        doc_id = item.get("doc_id")
+        fact = item.get("fact")
+        if isinstance(fact, dict):
+            try:
+                fact = ApplicantFact.model_validate(fact)
+            except Exception:
+                fact = None
+        if doc_id and fact is not None:
+            identity_docs.append((doc_id, fact))
+    cross_id_finding = audit_identity_documents_consistency(identity_docs)
+    if cross_id_finding is not None:
+        findings.append(cross_id_finding)
 
     # 5. Bank Statement Arithmetic Validation (RULE-BANK-01)
     open_bal = getattr(bank, "opening_balance", None) if bank else None
@@ -427,6 +617,15 @@ def _finding_field(finding: Any, name: str, default: Any = None) -> Any:
     if isinstance(finding, dict):
         return finding.get(name, default)
     return getattr(finding, name, default)
+
+
+def _fact_field(fact: Any, name: str, default: Any = None) -> Any:
+    """Reads a fact field whether the state carries a model or a plain dict (post-checkpoint serde)."""
+    if fact is None:
+        return default
+    if isinstance(fact, dict):
+        return fact.get(name, default)
+    return getattr(fact, name, default)
 
 
 def _resolve_policy_dir() -> str:

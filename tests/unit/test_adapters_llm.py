@@ -76,6 +76,32 @@ def test_opencode_answer_question_with_citations():
     assert "[credit_policy_v1_p1]" in user_prompt
 
 
+def test_opencode_answer_question_includes_findings_context():
+    # "Why was this application flagged/rejected?" needs the application's
+    # own deterministic findings in the prompt, not just policy passages -
+    # this is what actually lets the model explain a rejection reason.
+    mock_client = MagicMock()
+    mock_response = MagicMock()
+    mock_response.json.return_value = {
+        "choices": [{"message": {"content": "Flagged per [RULE-ID-01]: name mismatch."}}]
+    }
+    mock_client.post.return_value = mock_response
+
+    llm = OpenCodeZenLLM(api_key="test-key", http_client=mock_client)
+    findings_context = (
+        "Deterministic Application Findings (already verified - cite as [RULE_ID]):\n"
+        "- [RULE-ID-01] Cross-Document Identity Consistency (verdict=flag): "
+        "Critical identity mismatch."
+    )
+
+    llm.answer_question("Why was this application flagged?", [], findings_context=findings_context)
+
+    payload = mock_client.post.call_args[1]["json"]
+    user_prompt = payload["messages"][1]["content"]
+    assert "<application_findings>" in user_prompt
+    assert "RULE-ID-01" in user_prompt
+
+
 # =====================================================================
 # LocalQwenLLM Tests
 # =====================================================================

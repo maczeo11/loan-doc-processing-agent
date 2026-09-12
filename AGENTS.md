@@ -271,6 +271,7 @@ Every member of our 8-person team has a clearly separated module boundary. Read 
     - `RULE-INC-01` (`salary_audit.py`): Reconcile payslip net salary against verified bank credits within $5\%$ tolerance (`tolerance=0.05`).
     - `RULE-TAX-01` (`tax_audit.py`): Compare ITR gross total income against annualized payslip gross income ($12 \times \text{monthly gross}$).
     - `RULE-ID-01` (`identity.py`): Fuzzy string matching on applicant name and PAN across all dossier documents.
+    - `RULE-ID-02` (`identity.py`): Cross-checks name and PAN between every uploaded identity document itself (e.g. an ID/Aadhaar card AND a separately uploaded PAN card) — RULE-ID-01 only compares the single KYC doc against payslip/bank/tax; this catches a mismatched or swapped identity-document pair that RULE-ID-01 cannot see. Only emitted when 2+ identity documents were uploaded.
   - Credit Appraisal Memo (CAM) builder and narrative assembly in `core/reporting/memo_builder.py`.
 * **Inviolable Rules:**
   - **No agent authorship in financial arithmetic without manual review.**
@@ -304,7 +305,7 @@ Every member of our 8-person team has a clearly separated module boundary. Read 
   - FastAPI application endpoints (`apps/api/routes/applications.py`, `documents.py`, `review.py`).
   - PostgreSQL schema tables (`apps/api/db/models.py`) with SQLAlchemy 2.0 + asyncpg and Alembic migrations.
   - Transactional outbox implementation: committing application status updates and queue jobs in a single database transaction.
-  - Redis token buckets for rate limiting (5 uploads/min, 30 polls/min).
+  - Redis token buckets for rate limiting (30 uploads/min, 30 polls/min).
   - Cloud hosting infrastructure: single ARM `t4g.medium` EC2 instance, Caddy reverse proxy with Let's Encrypt HTTPS, Docker Compose, SQS/S3 provisioning, and teardown scripts.
 * **Authoritative Database & Outbox Architecture:**
   1. **Stack:** SQLAlchemy 2.0 (`DeclarativeBase`, `Mapped`, `mapped_column`) with `asyncpg` async driver. Alembic migrations located in `apps/api/alembic/`.

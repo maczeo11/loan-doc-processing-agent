@@ -103,6 +103,7 @@ class PayslipExtractor(BaseExtractor):
 
         return PayslipFacts(
             employee_name=emp_name or "UNKNOWN",
+            employee_name_evidence=emp_name_ev,
             employer_name=employer or "UNKNOWN",
             gross_salary=gross_fact,
             net_salary=net_fact,

@@ -28,7 +28,7 @@ class BankStatementExtractor(BaseExtractor):
 
     def extract(self, doc_id: str, pages: List[Dict[str, Any]]) -> BankStatementFacts:
         # 1. Account Holder
-        holder_name, _ = find_text_match_with_evidence(
+        holder_name, holder_ev = find_text_match_with_evidence(
             pages,
             r"(?:Account\s+Holder|Customer\s+Name|Account\s+Name|Name)\s*[:\-!|]?\s*([A-Za-z .]+)",
             doc_id,
@@ -143,6 +143,7 @@ class BankStatementExtractor(BaseExtractor):
 
         return BankStatementFacts(
             account_holder=holder_name or "UNKNOWN",
+            account_holder_evidence=holder_ev,
             bank_name=bank_name or "UNKNOWN",
             account_number_masked=masked_acct,
             salary_credits=salary_credits,

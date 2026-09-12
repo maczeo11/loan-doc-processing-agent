@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShieldCheck, UserCheck, HelpCircle } from 'lucide-react';
+import { ShieldCheck, UserCheck, HelpCircle, LogOut } from 'lucide-react';
 import { ApplicationStatus } from '../../types/application';
 import { StatusPill } from '../common/StatusPill';
 import { SlaTimer } from '../common/SlaTimer';
@@ -190,16 +190,15 @@ export const Header: React.FC<HeaderProps> = ({
               </select>
             )}
           </div>
-          {logout ? (
-            <button
-              type="button"
-              onClick={() => logout()}
-              className="hidden sm:block text-[11px] font-mono text-theme-muted hover:text-theme-primary px-1.5 py-1"
-              title="Sign out"
-            >
-              Logout
-            </button>
-          ) : null}
+          <button
+            type="button"
+            onClick={() => logout()}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xs bg-theme-card hover:bg-theme-flag-bg text-theme-secondary hover:text-theme-flag border border-theme-border hover:border-theme-flag-border text-[11px] font-mono font-semibold transition-colors"
+            title="Sign out"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Logout</span>
+          </button>
         </div>
       </div>
     </header>

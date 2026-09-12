@@ -18,6 +18,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt pyproject.toml ./
+# CPU-only torch first: ragas -> sentence-transformers pulls torch transitively,
+# and on linux/x86_64 the default PyPI resolution grabs the full CUDA build
+# (nvidia-cusparse/cusolver/cudnn/triton, several GB) even though this box has
+# no GPU (per AGENTS.md: classifier/embeddings must be 100% CPU). Installing
+# the CPU build from PyTorch's own index first means the main requirements.txt
+# install below finds torch already satisfied and never touches the CUDA
+# packages - this alone was enough to blow the disk on a t-class instance.
+RUN pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cpu torch
 RUN pip install --no-cache-dir --default-timeout=1000 --retries 5 -r requirements.txt
 RUN pip install --no-cache-dir -e .
 

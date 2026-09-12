@@ -70,7 +70,9 @@ def test_single_page_document_reports_one_page(tmp_path, state_for):
 
 
 def test_native_text_layer_reports_native_route(tmp_path, state_for):
-    path = _make_pdf(tmp_path, "payslip.pdf", ["Payslip gross salary and deductions"])
+    # Text must clear the router's native threshold (FINSCAN_OCR_MIN_CHARS=100,
+    # FINSCAN_OCR_MIN_WORDS=10) - shorter spans genuinely take the OCR branch.
+    path = _make_pdf(tmp_path, "payslip.pdf", ["Payslip for August: gross salary INR 80,000 with provident fund and tax deductions, net take-home pay credited"])
     result = ocr_and_classify_node(state_for({"DOC-1": path}))
 
     assert result["ocr_routes"]["DOC-1"] == "native"

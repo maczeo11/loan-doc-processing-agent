@@ -75,6 +75,9 @@ def audit_identity_consistency(
     tax_name: Optional[str] = None,
     pan_to_compare: Optional[str] = None,
     pan_evidence: Optional[EvidenceRef] = None,
+    payslip_name_evidence: Optional[EvidenceRef] = None,
+    bank_name_evidence: Optional[EvidenceRef] = None,
+    tax_name_evidence: Optional[EvidenceRef] = None,
 ) -> Finding:
     """
     RULE-ID-01: Cross-checks applicant name and PAN number across KYC, payslip,
@@ -114,10 +117,12 @@ def audit_identity_consistency(
 
     # 3. Collect supporting evidence from KYC
     evidence: List[EvidenceRef] = []
-    if getattr(applicant, "source_name", None):
-        evidence.append(applicant.source_name)
-    if getattr(applicant, "source_pan", None):
-        evidence.append(applicant.source_pan)
+    src_name = getattr(applicant, "source_name", None)
+    if isinstance(src_name, EvidenceRef):
+        evidence.append(src_name)
+    src_pan = getattr(applicant, "source_pan", None)
+    if isinstance(src_pan, EvidenceRef):
+        evidence.append(src_pan)
     if pan_evidence:
         evidence.append(pan_evidence)
 
@@ -161,14 +166,19 @@ def audit_identity_consistency(
                 policy_version="v1.0",
             )
 
-    # 5. Collect document names to cross-check
-    docs_to_compare: List[Tuple[str, str]] = []
+    # 5. Collect document names to cross-check, keeping each side's own
+    # page evidence. A finding that names a document in prose MUST cite that
+    # document's page, otherwise cross-document evidence shows KYC twice.
+    docs_to_compare: List[Tuple[str, str, Optional[EvidenceRef]]] = []
     if payslip_name and str(payslip_name).strip().upper() != "UNKNOWN":
-        docs_to_compare.append(("payslip", str(payslip_name).strip()))
+        docs_to_compare.append(("payslip", str(payslip_name).strip(), payslip_name_evidence))
     if bank_name and str(bank_name).strip().upper() != "UNKNOWN":
-        docs_to_compare.append(("bank statement", str(bank_name).strip()))
+        docs_to_compare.append(("bank statement", str(bank_name).strip(), bank_name_evidence))
     if tax_name and str(tax_name).strip().upper() != "UNKNOWN":
-        docs_to_compare.append(("tax return", str(tax_name).strip()))
+        docs_to_compare.append(("tax return", str(tax_name).strip(), tax_name_evidence))
+    for _, _, doc_ev in docs_to_compare:
+        if isinstance(doc_ev, EvidenceRef):
+            evidence.append(doc_ev)
 
     if not docs_to_compare and not pan_checked:
         return Finding(
@@ -189,7 +199,7 @@ def audit_identity_consistency(
     verified_matches: List[str] = []
     scores: List[float] = []
 
-    for doc_label, doc_val in docs_to_compare:
+    for doc_label, doc_val, _doc_ev in docs_to_compare:
         sim = compute_name_similarity(applicant_name, doc_val)
         score_pct = sim * 100.0
         scores.append(score_pct)
@@ -231,6 +241,104 @@ def audit_identity_consistency(
         rule_name="Cross-Document Identity Consistency",
         verdict="pass",
         reason=f"Identity confirmed for {applicant_name} across {', '.join(verified)}{lowest_str}.",
+        supporting_evidence=evidence,
+        policy_version="v1.0",
+    )
+
+
+def audit_identity_documents_consistency(
+    identity_docs: List[Tuple[str, ApplicantFact]],
+) -> Optional[Finding]:
+    """
+    RULE-ID-02: Cross-checks name and PAN between EVERY uploaded identity
+    document, not just the single KYC doc RULE-ID-01 compares against
+    payslip/bank/tax records. Covers the case RULE-ID-01 cannot: an applicant
+    who uploads an ID/Aadhaar card AND a separate PAN card as two distinct
+    documents - a common real dossier shape, not an edge case. Without this,
+    a mismatched or swapped identity document pair would never be cross-
+    checked (the pipeline only ever extracted facts from the first one).
+
+    Deterministic Python only. No LLM involvement.
+
+    Returns None (caller should skip appending it) when fewer than 2 identity
+    documents were uploaded - a single ID document has nothing to cross-check
+    against, so this intentionally does not add an "unknown" finding to the
+    common one-ID-document case.
+    """
+    if len(identity_docs) < 2:
+        return None
+
+    primary_doc_id, primary = identity_docs[0]
+    primary_name = (primary.full_name or "").strip()
+    primary_pan = normalize_pan(primary.pan_number)
+
+    evidence: List[EvidenceRef] = []
+    if isinstance(primary.source_name, EvidenceRef):
+        evidence.append(primary.source_name)
+    if isinstance(primary.source_pan, EvidenceRef):
+        evidence.append(primary.source_pan)
+
+    mismatches: List[str] = []
+    variations: List[str] = []
+
+    for doc_id, fact in identity_docs[1:]:
+        other_name = (fact.full_name or "").strip()
+        other_pan = normalize_pan(fact.pan_number)
+
+        if isinstance(fact.source_name, EvidenceRef):
+            evidence.append(fact.source_name)
+        if isinstance(fact.source_pan, EvidenceRef):
+            evidence.append(fact.source_pan)
+
+        if (
+            primary_name
+            and other_name
+            and primary_name.upper() != "UNKNOWN"
+            and other_name.upper() != "UNKNOWN"
+        ):
+            score_pct = compute_name_similarity(primary_name, other_name) * 100.0
+            if score_pct < NAME_VARIATION_THRESHOLD:
+                mismatches.append(
+                    f"'{doc_id}' name '{other_name}' vs '{primary_doc_id}' name '{primary_name}' ({score_pct:.0f}% match)"
+                )
+            elif score_pct < NAME_MATCH_THRESHOLD:
+                variations.append(
+                    f"'{doc_id}' name '{other_name}' vs '{primary_doc_id}' name '{primary_name}' ({score_pct:.0f}% match)"
+                )
+
+        if primary_pan and other_pan and primary_pan != other_pan:
+            mismatches.append(
+                f"'{doc_id}' PAN '{fact.pan_number}' vs '{primary_doc_id}' PAN '{primary.pan_number}'"
+            )
+
+    if mismatches:
+        return Finding(
+            rule_id="RULE-ID-02",
+            rule_name="Cross-Identity-Document Consistency",
+            verdict="flag",
+            reason=f"Critical identity mismatch between uploaded identity documents: {'; '.join(mismatches)}.",
+            supporting_evidence=evidence,
+            policy_version="v1.0",
+        )
+
+    if variations:
+        return Finding(
+            rule_id="RULE-ID-02",
+            rule_name="Cross-Identity-Document Consistency",
+            verdict="flag",
+            reason=(
+                "Reviewer verification required: name variation between uploaded "
+                f"identity documents: {'; '.join(variations)}."
+            ),
+            supporting_evidence=evidence,
+            policy_version="v1.0",
+        )
+
+    return Finding(
+        rule_id="RULE-ID-02",
+        rule_name="Cross-Identity-Document Consistency",
+        verdict="pass",
+        reason=f"All {len(identity_docs)} uploaded identity documents agree on name and PAN.",
         supporting_evidence=evidence,
         policy_version="v1.0",
     )

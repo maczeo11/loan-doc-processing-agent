@@ -135,6 +135,37 @@ def test_s3_storage_get():
     )
 
 
+def test_s3_storage_get_round_trips_the_uri_put_returns():
+    """
+    Regression test: put() returns a full 's3://{bucket}/{key}' URI (same
+    contract as local_fs.py returning a 'file://' URI), and callers persist
+    that return value, then pass it straight back into get() later (see
+    apps/api/routes/documents.py storing DocumentModel.storage_uri from
+    put()'s return, and worker/consumer.py reading it back via the manifest).
+    get() previously only did key.lstrip("/"), a no-op on a string starting
+    with 's3:', so every real deployment's document fetch requested a
+    literal S3 key of 's3://bucket/dossiers/...' - which never exists -
+    silently breaking OCR/extraction for every uploaded document. This must
+    round-trip exactly like local_fs.py's get(put(...)) already does.
+    """
+    mock_s3 = MagicMock()
+    mock_body = MagicMock()
+    mock_body.read.return_value = b"round-tripped bytes"
+    mock_s3.get_object.return_value = {"Body": mock_body}
+
+    storage = S3Storage(bucket_name="finscan-dossiers", s3_client=mock_s3)
+    uri = storage.put("dossiers/APP-1/DOC-1_id.pdf", b"content")
+    assert uri == "s3://finscan-dossiers/dossiers/APP-1/DOC-1_id.pdf"
+
+    data = storage.get(uri)
+
+    assert data == b"round-tripped bytes"
+    mock_s3.get_object.assert_called_once_with(
+        Bucket="finscan-dossiers",
+        Key="dossiers/APP-1/DOC-1_id.pdf",
+    )
+
+
 def test_s3_storage_get_signed_url():
     mock_s3 = MagicMock()
     mock_s3.generate_presigned_url.return_value = "https://signed.s3.amazonaws.com/doc.pdf?token=123"

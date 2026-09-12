@@ -9,6 +9,7 @@ from apps.api.db.models import UserModel
 from apps.api.db.session import get_db
 from apps.api.auth.schemas import GoogleLoginRequest, GoogleLoginResponse, SessionUser, AuthMeResponse
 from apps.api.auth.google_verify import verify_google_id_token
+from apps.api.auth.firebase_verify import verify_firebase_id_token
 from apps.api.auth.allowlist import get_or_seed_user
 from apps.api.auth.session import mint_session_jwt
 from apps.api.auth.deps import get_current_user
@@ -25,10 +26,15 @@ async def google_login(payload: GoogleLoginRequest, response: Response, session:
         token = mint_session_jwt(user.email, user.role)
         _set_cookie(response, token)
         return GoogleLoginResponse(user=user, session_jwt=token)
+    # Firebase Auth (Google-via-Firebase or email/password) if configured,
+    # otherwise fall back to plain Google Identity Services verification.
     try:
-        claims = verify_google_id_token(payload.id_token)
+        if settings.FIREBASE_PROJECT_ID:
+            claims = verify_firebase_id_token(payload.id_token)
+        else:
+            claims = verify_google_id_token(payload.id_token)
     except Exception as exc:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=f"Google verification failed: {exc}")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=f"Sign-in verification failed: {exc}")
     user_row = await get_or_seed_user(
         session,
         email=claims["email"],
@@ -61,7 +67,7 @@ async def logout(response: Response):
 
 
 def _set_cookie(response: Response, token: str) -> None:
-    secure = settings.ENVIRONMENT in ("cloud", "production")
+    secure = settings.TLS_ENABLED
     response.set_cookie(
         "finscan_session",
         token,

@@ -233,7 +233,11 @@ class DistilBertClassifier:
             "max_seq_len": self.max_seq_len,
             "batch_size": self.batch_size,
         }
-        with open(os.path.join(target_dir, "config.json"), "w", encoding="utf-8") as f:
+        # NOTE: this must NOT be named config.json - save_pretrained() above
+        # already wrote the real HF model config there (model_type,
+        # architectures, ...); overwriting it with this metadata previously
+        # made every saved checkpoint unloadable via from_pretrained().
+        with open(os.path.join(target_dir, "finscan_metadata.json"), "w", encoding="utf-8") as f:
             json.dump(metadata, f, indent=2)
 
     def load(self, model_dir: Optional[str] = None) -> None:

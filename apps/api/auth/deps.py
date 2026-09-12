@@ -64,14 +64,24 @@ def require_role(*roles: str):
 
 
 def current_user_email(request: Request, fallback: str = "user") -> str:
-    """Best-effort email for rate-limit keys (verified JWT preferred, header/IP fallback)."""
-    try:
-        tok = _bearer_token(request)
-        if tok and settings.AUTH_MODE != "mock":
-            claims = decode_session_jwt(tok)
-            email = (claims.get("sub") or "").strip()
-            if email:
-                return email
-    except Exception:
-        pass
+    """Best-effort email for rate-limit keys (verified JWT preferred, header/IP fallback).
+
+    The client-supplied `X-User-Id` header is only ever trusted in AUTH_MODE=="mock"
+    (local/demo, no real session mechanism exists to spoof). In "google"/"required"
+    mode a missing/invalid/expired JWT falls back to the generic `fallback` key
+    instead of an attacker-controlled header - otherwise anyone could set
+    X-User-Id to bypass a per-user rate limit or spend guard by pretending to be
+    a different (or nonexistent) verified user.
+    """
+    if settings.AUTH_MODE != "mock":
+        try:
+            tok = _bearer_token(request)
+            if tok:
+                claims = decode_session_jwt(tok)
+                email = (claims.get("sub") or "").strip()
+                if email:
+                    return email
+        except Exception:
+            pass
+        return fallback
     return request.headers.get("x-user-id") or fallback

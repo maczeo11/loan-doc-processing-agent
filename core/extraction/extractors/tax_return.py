@@ -27,7 +27,7 @@ class TaxReturnExtractor(BaseExtractor):
         fallback_ev = make_unknown_evidence(doc_id, "tax_acknowledgement")
 
         # 1. Assessee Name
-        name, _ = find_text_match_with_evidence(
+        name, name_ev = find_text_match_with_evidence(
             pages,
             r"(?:Name\s+of\s+Assessee|Assessee\s+Name|Name|Taxpayer\s+Name)\s*[:\-]\s*([A-Za-z .]+)",
             doc_id,
@@ -86,7 +86,9 @@ class TaxReturnExtractor(BaseExtractor):
 
         return TaxReturnFacts(
             assessee_name=name or "UNKNOWN",
+            assessee_name_evidence=name_ev,
             pan_number=pan or "UNKNOWN",
+            pan_evidence=pan_ev,
             assessment_year=ay_str or "UNKNOWN",
             gross_total_income=gross_income_fact,
             total_tax_paid=total_tax_fact,

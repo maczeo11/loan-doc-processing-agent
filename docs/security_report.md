@@ -205,8 +205,8 @@ Enforced via Redis token buckets:
 
 | Endpoint | Rate Limit | Window |
 |----------|------------|--------|
-| `POST /applications` | 5 requests | 1 minute |
-| `POST /applications/{id}/documents` | 5 requests | 1 minute |
+| `POST /applications` | 30 requests | 1 minute |
+| `POST /applications/{id}/documents` | 30 requests | 1 minute |
 | `GET /applications/{id}` | 30 requests | 1 minute |
 | `POST /applications/{id}/process` | 2 concurrent jobs | Per user |
 

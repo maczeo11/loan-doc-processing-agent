@@ -48,12 +48,21 @@ def test_iam_policy_structure_and_least_privilege():
     statements = policy.get("Statement", [])
     assert len(statements) >= 3, "IAM policy must have at least 3 statements (S3 bucket, S3 objects, SQS)"
 
-    # Verify every statement has explicit non-wildcard resource scoping
+    # Verify every statement has explicit non-wildcard resource scoping,
+    # except Textract DetectDocumentText: AWS offers no resource-level
+    # permission for it, so Resource "*" is mandatory (not a privilege widen).
+    # That statement must contain ONLY textract actions.
     for stmt in statements:
         assert stmt.get("Effect") == "Allow"
+        actions = stmt.get("Action", [])
+        if isinstance(actions, str):
+            actions = [actions]
         resources = stmt.get("Resource", [])
         if isinstance(resources, str):
             resources = [resources]
+        if all(a.startswith("textract:") for a in actions):
+            assert resources == ["*"], "Textract statement must use bare Resource '*' (no ARNs exist for it)"
+            continue
         for res in resources:
             assert res != "*", "Wildcard '*' account-wide resource is forbidden in least-privilege policy"
             assert ("${BUCKET_NAME}" in res or "${QUEUE_NAME}" in res or "${DLQ_NAME}" in res), (

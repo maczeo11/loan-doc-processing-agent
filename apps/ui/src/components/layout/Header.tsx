@@ -145,10 +145,10 @@ export const Header: React.FC<HeaderProps> = ({
             type="button"
             onClick={onOpenCopilot}
             className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xs bg-theme-brand/10 hover:bg-theme-brand/20 text-theme-brand border border-theme-brand/30 hover:border-theme-brand text-xs font-mono font-bold transition-all shadow-2xs cursor-pointer group"
-            title="Ask FinScan AI (Ctrl+K)"
+            title="Ask AI (Ctrl+K)"
           >
             <Sparkles className="w-3.5 h-3.5 text-theme-brand group-hover:rotate-12 transition-transform" />
-            <span className="hidden sm:inline">Ask FinScan AI</span>
+            <span className="hidden sm:inline">Ask AI</span>
             <kbd className="hidden md:inline text-[9.5px] font-mono px-1 py-0.5 rounded-xs bg-theme-card border border-theme-border text-theme-muted">
               ^K
             </kbd>

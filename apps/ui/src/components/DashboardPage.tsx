@@ -85,7 +85,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
   const awaitingReview = apps.filter((a) => a.status === 'READY_FOR_REVIEW').length;
 
   return (
-    <div className="min-h-screen w-screen bg-theme-app text-theme-primary">
+    <div className="min-h-full w-full bg-theme-app text-theme-primary">
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
         <div className="flex items-center justify-between gap-3 mb-2">
           <div className="flex items-center gap-3">

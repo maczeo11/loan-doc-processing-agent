@@ -84,7 +84,7 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({
     activeEvidence.page_number === currentPage;
 
   return (
-    <main className="w-full h-full flex flex-col bg-theme-desk overflow-hidden transition-colors duration-200">
+    <main className="w-full h-full min-h-0 flex flex-col bg-theme-desk overflow-hidden transition-colors duration-200">
       {/* Top Toolbar */}
       <ViewerToolbar
         docTitle={docTitle}

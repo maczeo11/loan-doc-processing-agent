@@ -589,7 +589,7 @@ function AppInner({
       return <LoginPage onLoggedIn={() => refreshLiveApps()} />;
     }
     return (
-      <div className="h-screen w-screen flex flex-col bg-theme-app overflow-hidden">
+      <div className="h-screen w-screen flex flex-col bg-theme-app overflow-y-auto">
         {authLoading ? (
           <div className="m-auto text-xs text-theme-muted">Verifying session…</div>
         ) : (

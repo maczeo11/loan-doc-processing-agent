@@ -109,7 +109,7 @@ export const LeftDossierPane: React.FC<LeftDossierPaneProps> = ({
   return (
     <aside
       style={{ width: `${width}px` }}
-      className="h-full flex-none flex flex-col border-r border-theme-border bg-theme-panel select-none overflow-hidden transition-colors duration-200"
+      className="h-full min-h-0 flex-none flex flex-col border-r border-theme-border bg-theme-panel select-none overflow-hidden transition-colors duration-200"
     >
       {/* Top: Compact Applicant Metadata Card */}
       <div className="p-4 border-b border-theme-border bg-theme-card">

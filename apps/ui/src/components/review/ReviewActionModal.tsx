@@ -92,8 +92,8 @@ export const ReviewActionModal: React.FC<ReviewActionModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 select-none">
-      <div className="w-full max-w-md rounded-xs bg-theme-card border border-theme-border shadow-2xl overflow-hidden flex flex-col transition-colors duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 select-none overflow-y-auto">
+      <div className="w-full max-w-md rounded-xs bg-theme-card border border-theme-border shadow-2xl overflow-hidden flex flex-col transition-colors duration-200 my-auto">
         {/* Modal Header */}
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-theme-border bg-theme-panel">
           <div className="flex items-center gap-2.5">

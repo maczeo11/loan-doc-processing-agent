@@ -184,6 +184,13 @@ export const PolicyQaTab: React.FC<PolicyQaTabProps> = ({
   const [question, setQuestion] = useState('');
   const [loading, setLoading] = useState(false);
   const [history, setHistory] = useState<PolicyQaResponse[]>([]);
+  const messagesEndRef = React.useRef<HTMLDivElement>(null);
+  const inputRef = React.useRef<HTMLInputElement>(null);
+
+  // Auto-scroll to newest message
+  React.useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [history, loading]);
 
   const ask = async (raw: string) => {
     const q = raw.trim();
@@ -191,6 +198,7 @@ export const PolicyQaTab: React.FC<PolicyQaTabProps> = ({
 
     if (isReadOnlyPreset) {
       setHistory((prev) => [
+        ...prev,
         {
           question: q,
           answer:
@@ -198,20 +206,19 @@ export const PolicyQaTab: React.FC<PolicyQaTabProps> = ({
           is_grounded: false,
           citations: [],
         },
-        ...prev,
       ]);
       return;
     }
 
     if (!applicationId) {
       setHistory((prev) => [
+        ...prev,
         {
           question: q,
           answer: 'Please select an active loan dossier before querying policy guidelines.',
           is_grounded: false,
           citations: [],
         },
-        ...prev,
       ]);
       return;
     }
@@ -220,8 +227,8 @@ export const PolicyQaTab: React.FC<PolicyQaTabProps> = ({
     setQuestion('');
 
     try {
-      // Build previous message history from existing conversation (chronological order)
-      const chatHistory: ChatMessage[] = [...history].reverse().slice(-6).flatMap((item) => [
+      // Build previous message history in chronological order (up to last 6 turns)
+      const chatHistory: ChatMessage[] = history.slice(-6).flatMap((item) => [
         { role: 'user' as const, content: item.question },
         { role: 'assistant' as const, content: item.answer },
       ]);
@@ -232,9 +239,6 @@ export const PolicyQaTab: React.FC<PolicyQaTabProps> = ({
       });
       const citations: PolicyCitation[] = (resp.citations || []).map((c) => ({
         chunk_id: c.chunk_id || '',
-        // A finding-sourced citation (chunk_id "FINDING-RULE-ID-XX", see
-        // apps/api/routes/review.py::_finding_evidence_citations) has no
-        // policy_id - label it as the application finding it is, not "Policy".
         policy_name: c.policy_id || c.title || (c.chunk_id?.startsWith('FINDING-') ? 'Application Finding' : 'Policy'),
         section: c.section || (c.page_number ? `Page ${c.page_number}` : ''),
         text: c.excerpt || c.text || c.quoted_span || '',
@@ -243,27 +247,23 @@ export const PolicyQaTab: React.FC<PolicyQaTabProps> = ({
         document_type: c.document_type,
         page_number: c.page_number,
         bounding_box: c.bounding_box ?? null,
+        is_policy: typeof c.is_policy === 'boolean' ? c.is_policy : !c.document_id,
       }));
 
-      // Trust the answer text itself, not just whether citations came back:
-      // the backend firewall (core/rag/grounding.py::sanitize_summary_text)
-      // can withhold an answer with an ABSTENTION notice even when `hits`
-      // (and therefore `citations`) were non-empty - grounded means the
-      // ANSWER cited something real, not merely that retrieval found something.
       const isAbstained = ABSTENTION_PATTERN.test(resp.answer || '');
 
       setHistory((prev) => [
+        ...prev,
         {
           question: q,
           answer: resp.answer,
           is_grounded: !isAbstained && citations.length > 0,
           citations,
         },
-        ...prev,
       ]);
     } catch (err: unknown) {
-      // Surface the failure in the stream; a silent catch reads as an answer.
       setHistory((prev) => [
+        ...prev,
         {
           question: q,
           answer: `Policy Q&A request failed: ${
@@ -272,7 +272,6 @@ export const PolicyQaTab: React.FC<PolicyQaTabProps> = ({
           is_grounded: false,
           citations: [],
         },
-        ...prev,
       ]);
     } finally {
       setLoading(false);
@@ -285,181 +284,194 @@ export const PolicyQaTab: React.FC<PolicyQaTabProps> = ({
   };
 
   return (
-    <div className="space-y-3.5">
-      {/* Ask Input */}
-      <form onSubmit={handleSubmit} className="relative">
-        <MessageCircleQuestion className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-theme-muted pointer-events-none" />
-        <input
-          type="text"
-          value={question}
-          onChange={(e) => setQuestion(e.target.value)}
-          placeholder="Ask policy guidelines or why a finding was flagged..."
-          aria-label="Ask a policy or findings question"
-          className="w-full bg-theme-card border border-theme-border rounded-xs py-2 pl-8 pr-9 text-xs text-theme-primary placeholder-theme-muted focus:outline-none focus:border-theme-brand shadow-xs transition-colors"
-        />
-        <button
-          type="submit"
-          disabled={loading || !question.trim()}
-          aria-label="Submit question"
-          className="absolute right-1.5 top-1/2 -translate-y-1/2 p-1.5 text-theme-muted hover:text-theme-primary disabled:opacity-40 transition-opacity cursor-pointer"
-        >
-          {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
-        </button>
-      </form>
-
-      {/* Flagged findings: lead with a direct "explain this" action per flag
-          rather than making the reviewer discover it's possible via the
-          generic question box. The backend grounds the answer in this
-          application's own finding reason + relevant policy, not a canned
-          restatement. */}
-      {flaggedFindings.length > 0 && (
-        <div className="p-3.5 rounded-xs bg-theme-flag-bg border border-theme-flag-border space-y-2">
-          <div className="flex items-center gap-1.5 text-[10px] uppercase font-mono font-bold text-theme-flag tracking-wider">
-            <AlertTriangle className="w-3 h-3" />
-            <span>
-              {flaggedFindings.length} flagged {flaggedFindings.length === 1 ? 'finding' : 'findings'} — ask why
-            </span>
+    <div className="h-full flex flex-col min-h-0 bg-theme-card select-text">
+      {/* Copilot Header */}
+      <div className="flex-none px-3.5 py-2.5 bg-theme-panel/70 border-b border-theme-border flex items-center justify-between">
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="w-5 h-5 rounded-full bg-theme-brand/10 border border-theme-brand/30 flex items-center justify-center text-theme-brand shrink-0">
+            <Sparkles className="w-3 h-3" />
           </div>
-          <div className="flex flex-col gap-1">
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs font-serif font-bold text-theme-primary truncate">Underwriter Copilot</span>
+              <span className="w-1.5 h-1.5 rounded-full bg-theme-pass animate-pulse shrink-0" />
+            </div>
+            <p className="text-[10px] text-theme-muted font-mono truncate">Grounded in Policy &amp; Applicant Documents</p>
+          </div>
+        </div>
+        {history.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setHistory([])}
+            className="flex items-center gap-1 px-2 py-1 rounded-xs text-[10px] font-mono text-theme-muted hover:text-theme-flag hover:bg-theme-flag-bg border border-transparent hover:border-theme-flag-border transition-colors cursor-pointer"
+            title="Clear chat history"
+          >
+            <X className="w-3 h-3" />
+            <span>Clear</span>
+          </button>
+        )}
+      </div>
+
+      {/* Flagged findings fast-action bar (if any) */}
+      {flaggedFindings.length > 0 && (
+        <div className="flex-none px-3 py-2 bg-theme-flag-bg/60 border-b border-theme-flag-border/60">
+          <div className="flex items-center gap-1.5 text-[10px] font-mono font-bold text-theme-flag uppercase tracking-wider mb-1.5">
+            <AlertTriangle className="w-3 h-3" />
+            <span>{flaggedFindings.length} flagged audit {flaggedFindings.length === 1 ? 'item' : 'items'}</span>
+          </div>
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 scrollbar-none">
             {flaggedFindings.map((f) => (
               <button
                 key={f.rule_id}
                 type="button"
                 onClick={() => ask(`Why was this application flagged for ${f.rule_name} (${f.rule_id})? Explain the reason and the policy basis.`)}
                 disabled={loading}
-                className="group text-left flex items-center justify-between gap-2 px-2 py-1.5 rounded-xs hover:bg-theme-card/60 transition-colors disabled:opacity-50"
+                className="shrink-0 flex items-center gap-1 px-2 py-1 rounded-xs bg-theme-card hover:bg-theme-panel border border-theme-flag-border text-[10.5px] font-mono text-theme-flag transition-colors disabled:opacity-50 cursor-pointer shadow-2xs"
               >
-                <span className="text-[11px] font-mono text-theme-flag truncate">
-                  Explain: {f.rule_name}
-                </span>
-                <Sparkles className="w-3 h-3 text-theme-flag/60 group-hover:text-theme-flag flex-shrink-0" />
+                <span>Explain: {f.rule_name}</span>
+                <Sparkles className="w-2.5 h-2.5 text-theme-flag/70" />
               </button>
             ))}
           </div>
         </div>
       )}
 
-      {/* Empty state: offer questions, never a pre-filled answer. */}
-      {history.length === 0 && !loading && (
-        <div className="p-3.5 rounded-xs bg-theme-panel border border-theme-border space-y-2">
-          <div className="flex items-center gap-1.5 text-[10px] uppercase font-mono font-bold text-theme-muted tracking-wider">
-            <BookOpen className="w-3 h-3" />
-            <span>Grounded policy &amp; findings retrieval</span>
-          </div>
-          <p className="text-[11px] text-theme-secondary leading-relaxed">
-            Answers quote retrieved policy passages and this application's own findings with
-            citations. Nothing is asserted without one.
-          </p>
-          <div className="flex flex-col gap-1.5 pt-0.5">
-            {SUGGESTED_QUESTIONS.map((suggestion) => (
-              <button
-                key={suggestion}
-                type="button"
-                onClick={() => ask(suggestion)}
-                disabled={loading}
-                className="text-left text-[11px] font-mono text-theme-brand hover:underline disabled:opacity-50"
-              >
-                → {suggestion}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Q&A Stream */}
-      <div className="space-y-3">
-        {loading && (
-          <div className="p-3.5 rounded-xs bg-theme-card border border-theme-border shadow-xs text-xs space-y-2 animate-pulse">
-            <div className="flex items-center gap-1.5 text-theme-muted">
-              <Loader2 className="w-3.5 h-3.5 animate-spin flex-shrink-0" />
-              <span className="text-[11px] font-mono">Retrieving policy &amp; findings…</span>
+      {/* Message Stream (Scrollable) */}
+      <div className="flex-1 min-h-0 overflow-y-auto p-3.5 space-y-3.5">
+        {/* Empty state: prompt suggestions */}
+        {history.length === 0 && !loading && (
+          <div className="p-4 rounded-xs bg-theme-panel border border-theme-border space-y-3">
+            <div className="flex items-center gap-2 text-xs font-serif font-bold text-theme-primary">
+              <BookOpen className="w-4 h-4 text-theme-brand" />
+              <span>Grounded Underwriter Research</span>
+            </div>
+            <p className="text-[11.5px] text-theme-secondary leading-relaxed">
+              Ask questions about debt-to-income limits, salary variance tolerances, mandatory retail documents, or specific applicant transactions. Every response is verified through deterministic grounding.
+            </p>
+            <div className="space-y-1.5 pt-1">
+              <span className="text-[10px] font-mono uppercase tracking-wider text-theme-muted font-semibold">Suggested Questions:</span>
+              <div className="flex flex-col gap-1.5">
+                {SUGGESTED_QUESTIONS.map((suggestion) => (
+                  <button
+                    key={suggestion}
+                    type="button"
+                    onClick={() => ask(suggestion)}
+                    disabled={loading}
+                    className="text-left p-2 rounded-xs bg-theme-card hover:bg-theme-panel-hover border border-theme-border text-[11px] font-mono text-theme-brand transition-colors disabled:opacity-50 cursor-pointer flex items-center justify-between gap-2 shadow-2xs group"
+                  >
+                    <span>{suggestion}</span>
+                    <span className="text-theme-muted group-hover:text-theme-brand transition-colors text-xs">→</span>
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         )}
 
+        {/* Message Thread */}
         {history.map((item, idx) => {
           const sourceCount = item.citations.length;
           return (
-            <div
-              key={idx}
-              className="rounded-xs bg-theme-card border border-theme-border shadow-xs text-xs overflow-hidden"
-            >
-              {/* Question header */}
-              <div className="flex items-start gap-2 px-3.5 pt-3 pb-2 bg-theme-panel/60 border-b border-theme-border">
-                <span className="flex-shrink-0 w-[18px] h-[18px] rounded-full bg-theme-brand text-white text-[9px] font-mono font-bold flex items-center justify-center mt-0.5">
-                  Q
-                </span>
-                <p className="font-serif font-bold text-theme-primary text-xs leading-snug">{item.question}</p>
+            <div key={idx} className="space-y-2">
+              {/* User Question Bubble */}
+              <div className="flex justify-end">
+                <div className="max-w-[85%] rounded-sm bg-theme-brand text-white px-3 py-2 text-xs shadow-xs">
+                  <p className="leading-relaxed font-sans">{item.question}</p>
+                </div>
               </div>
 
-              {/* Answer body */}
-              <div className="px-3.5 pt-2.5 pb-3 space-y-2">
-                <div className="pl-6">{renderAnswerBody(sanitizePiiInText(item.answer), `qa-${idx}`)}</div>
-
-                {/* Grounding banner */}
-                <div className="pt-2 border-t border-theme-border pl-6 space-y-1.5">
+              {/* Assistant Response Card */}
+              <div className="rounded-xs bg-theme-panel border border-theme-border text-xs overflow-hidden shadow-xs">
+                {/* Header */}
+                <div className="px-3 py-1.5 bg-theme-card border-b border-theme-border flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 text-[10px] font-mono font-bold text-theme-primary">
+                    <ShieldCheck className="w-3 h-3 text-theme-brand" />
+                    <span>FinScan AI Analysis</span>
+                  </div>
                   <div
-                    className={`flex items-center gap-1.5 text-[10px] uppercase font-mono font-semibold ${
+                    className={`flex items-center gap-1 text-[9.5px] uppercase font-mono font-semibold ${
                       item.is_grounded ? 'text-theme-pass' : 'text-theme-unknown'
                     }`}
                   >
                     {item.is_grounded ? (
-                      <ShieldCheck className="w-3 h-3 flex-shrink-0" />
+                      <>
+                        <ShieldCheck className="w-3 h-3 text-theme-pass" />
+                        <span>Grounded ({sourceCount})</span>
+                      </>
                     ) : (
-                      <ShieldAlert className="w-3 h-3 flex-shrink-0" />
+                      <>
+                        <ShieldAlert className="w-3 h-3 text-theme-unknown" />
+                        <span>Unverified</span>
+                      </>
                     )}
-                    <span>
-                      {item.is_grounded
-                        ? `Grounded — ${sourceCount} source${sourceCount === 1 ? '' : 's'} cited`
-                        : 'Unverified — not asserted as evidence-backed'}
-                    </span>
                   </div>
+                </div>
 
+                {/* Body */}
+                <div className="p-3 space-y-2.5">
+                  {renderAnswerBody(sanitizePiiInText(item.answer), `qa-${idx}`)}
+
+                  {/* Citations & Evidence Links */}
                   {sourceCount > 0 && (
-                    <div className="flex flex-col gap-1.5">
-                      {item.citations.map((c, cIdx) => {
-                        const ev = toEvidenceRef(c);
-                        const fromFinding = isFindingCitation(c);
-                        const accent = fromFinding
-                          ? 'border-l-2 border-l-theme-flag'
-                          : 'border-l-2 border-l-theme-brand';
-                        const body = (
-                          <>
-                            <div className="text-[10px] font-mono text-theme-muted mb-1 flex items-center gap-1.5">
-                              {fromFinding ? (
-                                <AlertTriangle className="w-2.5 h-2.5 text-theme-flag flex-shrink-0" />
-                              ) : (
-                                <BookOpen className="w-2.5 h-2.5 text-theme-brand flex-shrink-0" />
-                              )}
-                              <span className="truncate">{c.policy_name}{c.section ? ` · ${c.section}` : ''}</span>
-                            </div>
-                            {c.text && (
-                              <span className="italic text-theme-secondary">&ldquo;{sanitizePiiInText(c.text)}&rdquo;</span>
-                            )}
-                          </>
-                        );
+                    <div className="pt-2 border-t border-theme-border/70 space-y-1.5">
+                      <div className="text-[10px] font-mono uppercase tracking-wider text-theme-muted font-bold">
+                        Supporting Citations ({sourceCount})
+                      </div>
+                      <div className="flex flex-col gap-1.5">
+                        {item.citations.map((c, cIdx) => {
+                          const ev = toEvidenceRef(c);
+                          const fromFinding = isFindingCitation(c);
+                          const isDoc = !c.is_policy && !!c.document_id;
+                          const accent = fromFinding
+                            ? 'border-l-2 border-l-theme-flag'
+                            : isDoc
+                            ? 'border-l-2 border-l-theme-pass'
+                            : 'border-l-2 border-l-theme-brand';
 
-                        // Navigable citations become jump targets into the PDF canvas.
-                        return ev && onSelectEvidence ? (
-                          <button
-                            key={cIdx}
-                            type="button"
-                            onClick={() => onSelectEvidence(ev)}
-                            title="Click to jump and highlight on PDF canvas"
-                            className={`w-full text-left bg-theme-panel hover:bg-theme-card p-2 rounded-xs border border-theme-border hover:border-theme-border-card ${accent} text-[11px] text-theme-secondary font-mono transition-colors cursor-pointer flex items-start justify-between gap-2`}
-                          >
-                            <span className="min-w-0 flex-1">{body}</span>
-                            <ExternalLink className="w-3 h-3 text-theme-muted flex-shrink-0 mt-0.5" />
-                          </button>
-                        ) : (
-                          <div
-                            key={cIdx}
-                            className={`bg-theme-panel p-2 rounded-xs border border-theme-border ${accent} text-[11px] text-theme-secondary font-mono`}
-                          >
-                            {body}
-                          </div>
-                        );
-                      })}
+                          const content = (
+                            <>
+                              <div className="flex items-center justify-between gap-1.5 mb-0.5">
+                                <span className="text-[10px] font-mono font-semibold text-theme-primary truncate">
+                                  {isDoc
+                                    ? `📄 ${c.document_id}${c.page_number ? ` (Page ${c.page_number})` : ''}`
+                                    : fromFinding
+                                    ? `⚖️ ${c.policy_name}`
+                                    : `📜 ${c.policy_name}${c.section ? ` · ${c.section}` : ''}`}
+                                </span>
+                                {isDoc && ev && onSelectEvidence && (
+                                  <span className="text-[9px] font-mono text-theme-pass font-bold flex items-center gap-0.5 shrink-0">
+                                    Jump to PDF <ExternalLink className="w-2.5 h-2.5" />
+                                  </span>
+                                )}
+                              </div>
+                              {c.text && (
+                                <p className="text-[10.5px] text-theme-secondary italic line-clamp-2 leading-relaxed">
+                                  &ldquo;{sanitizePiiInText(c.text)}&rdquo;
+                                </p>
+                              )}
+                            </>
+                          );
+
+                          return isDoc && ev && onSelectEvidence ? (
+                            <button
+                              key={cIdx}
+                              type="button"
+                              onClick={() => onSelectEvidence(ev)}
+                              title="Click to jump and highlight on PDF canvas"
+                              className={`w-full text-left bg-theme-card hover:bg-theme-panel-hover p-2 rounded-xs border border-theme-border ${accent} text-[11px] font-mono transition-colors cursor-pointer shadow-2xs`}
+                            >
+                              {content}
+                            </button>
+                          ) : (
+                            <div
+                              key={cIdx}
+                              className={`bg-theme-card p-2 rounded-xs border border-theme-border ${accent} text-[11px] font-mono shadow-2xs`}
+                            >
+                              {content}
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -467,18 +479,49 @@ export const PolicyQaTab: React.FC<PolicyQaTabProps> = ({
             </div>
           );
         })}
+
+        {/* Loading Bubble */}
+        {loading && (
+          <div className="rounded-xs bg-theme-panel border border-theme-border p-3 space-y-2 animate-pulse">
+            <div className="flex items-center gap-2 text-theme-muted">
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-theme-brand shrink-0" />
+              <span className="text-xs font-mono">Searching policy guidelines &amp; applicant documents…</span>
+            </div>
+          </div>
+        )}
+
+        {/* Bottom anchor for auto-scroll */}
+        <div ref={messagesEndRef} />
       </div>
 
-      {history.length > 0 && (
-        <button
-          type="button"
-          onClick={() => setHistory([])}
-          className="w-full flex items-center justify-center gap-1.5 py-1.5 text-[10px] uppercase font-mono font-semibold text-theme-muted hover:text-theme-secondary transition-colors"
-        >
-          <X className="w-3 h-3" />
-          Clear conversation
-        </button>
-      )}
+      {/* Sticky Bottom Input Bar */}
+      <div className="flex-none p-2.5 bg-theme-panel border-t border-theme-border">
+        <form onSubmit={handleSubmit} className="relative flex items-center">
+          <MessageCircleQuestion className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-theme-muted pointer-events-none" />
+          <input
+            ref={inputRef}
+            type="text"
+            value={question}
+            onChange={(e) => setQuestion(e.target.value)}
+            placeholder="Ask policy, flags, or applicant document details..."
+            aria-label="Ask underwriter research question"
+            disabled={loading}
+            className="w-full bg-theme-card border border-theme-border rounded-xs py-2 pl-8 pr-9 text-xs text-theme-primary placeholder-theme-muted focus:outline-none focus:border-theme-brand shadow-2xs transition-colors disabled:opacity-50"
+          />
+          <button
+            type="submit"
+            disabled={loading || !question.trim()}
+            aria-label="Submit inquiry"
+            className="absolute right-1.5 top-1/2 -translate-y-1/2 p-1.5 text-theme-brand hover:opacity-80 disabled:text-theme-muted disabled:opacity-40 transition-opacity cursor-pointer"
+          >
+            {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+          </button>
+        </form>
+        <div className="flex items-center justify-between px-1 pt-1.5 text-[9.5px] font-mono text-theme-muted">
+          <span>Press Enter to send</span>
+          <span>Dual RAG: Policy + Dossier</span>
+        </div>
+      </div>
     </div>
   );
 };

@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShieldCheck, UserCheck, HelpCircle, LogOut } from 'lucide-react';
+import { ShieldCheck, UserCheck, HelpCircle, LogOut, Sparkles } from 'lucide-react';
 import { ApplicationStatus } from '../../types/application';
 import { StatusPill } from '../common/StatusPill';
 import { SlaTimer } from '../common/SlaTimer';
@@ -14,6 +14,7 @@ interface HeaderProps {
   createdAt?: string;
   updatedAt?: string;
   onOpenShortcuts: () => void;
+  onOpenCopilot?: () => void;
   liveApplications?: Array<{ application_id: string; applicant_name: string; status: string }>;
   onRefresh?: () => void;
   onOpenNewApplication?: () => void;
@@ -29,6 +30,7 @@ export const Header: React.FC<HeaderProps> = ({
   createdAt,
   updatedAt,
   onOpenShortcuts,
+  onOpenCopilot,
   liveApplications = [],
   onRefresh,
   onOpenNewApplication,
@@ -134,6 +136,22 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* Right: Shortcuts + User (ledger theme locked; no theme switcher) */}
       <div className="flex items-center gap-2 sm:gap-3 shrink-0 ml-auto">
+
+        {/* Copilot Quick Launch Button */}
+        {onOpenCopilot && (
+          <button
+            type="button"
+            onClick={onOpenCopilot}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xs bg-theme-brand/10 hover:bg-theme-brand/20 text-theme-brand border border-theme-brand/30 hover:border-theme-brand text-xs font-mono font-bold transition-all shadow-2xs cursor-pointer group"
+            title="Ask FinScan Underwriter Copilot (Ctrl+K)"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-theme-brand group-hover:rotate-12 transition-transform" />
+            <span className="hidden sm:inline">Copilot</span>
+            <kbd className="hidden md:inline text-[9.5px] font-mono px-1 py-0.5 rounded-xs bg-theme-card border border-theme-border text-theme-muted">
+              ^K
+            </kbd>
+          </button>
+        )}
 
         {/* Shortcuts Button */}
         <button

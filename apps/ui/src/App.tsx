@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { Sparkles } from 'lucide-react';
 import { Header } from './components/layout/Header';
 import { LeftDossierPane } from './components/layout/LeftDossierPane';
-import { RightInspectorPane } from './components/layout/RightInspectorPane';
+import { RightInspectorPane, TabType } from './components/layout/RightInspectorPane';
 import { PdfViewer } from './components/viewer/PdfViewer';
 import { KeyboardShortcutsModal } from './components/common/KeyboardShortcutsModal';
 import { ReviewActionModal } from './components/review/ReviewActionModal';
@@ -141,6 +142,12 @@ function AppInner({
   const [isNewAppModalOpen, setIsNewAppModalOpen] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [mobilePane, setMobilePane] = useState<'documents' | 'viewer' | 'inspector'>('viewer');
+  const [inspectorTab, setInspectorTab] = useState<TabType>('findings');
+
+  const handleOpenCopilot = useCallback(() => {
+    setInspectorTab('policy');
+    setMobilePane('inspector');
+  }, []);
 
   const { user, isLoading: authLoading } = useAuth();
   const [liveApps, setLiveApps] = useState<DashboardApp[]>([]);
@@ -453,6 +460,13 @@ function AppInner({
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Global shortcut: Ctrl+K / Cmd+K opens Underwriter Copilot
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        handleOpenCopilot();
+        return;
+      }
+
       const target = e.target as HTMLElement;
       if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') return;
 
@@ -587,6 +601,7 @@ function AppInner({
         createdAt={application.created_at}
         updatedAt={application.updated_at}
         onOpenShortcuts={() => setShortcutsOpen(true)}
+        onOpenCopilot={handleOpenCopilot}
         liveApplications={liveApps}
         onRefresh={refreshLiveApps}
         onOpenNewApplication={() => setIsNewAppModalOpen(true)}
@@ -638,11 +653,11 @@ function AppInner({
         </div>
       )}
 
-      {/* Three-Pane Swiss Reviewer Workspace Layout.
-          Below lg the panes become a single switched view rather than
-          disappearing — the inspector holds findings and sign-off, so hiding it
+      {/* Main Workspace: 3-pane layout on desktop, tabbed on mobile/tablet.
+          Previously this hardcoded `lg:grid lg:grid-cols-[280px_1fr_390px]`,
+          which broke on smaller laptops (e.g. 1024-1280px) and completely
           removed the entire review workflow on anything narrower than a laptop. */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex overflow-hidden relative">
         {/* Left Pane: Dossier Documents */}
         <div className={`${mobilePane === 'documents' ? 'flex' : 'hidden'} lg:block shrink-0 w-full lg:w-auto`}>
           <LeftDossierPane
@@ -658,17 +673,31 @@ function AppInner({
         </div>
 
         {/* Center Pane: PDF.js Viewer */}
-        <div className={`${mobilePane === 'viewer' ? 'block' : 'hidden'} lg:block flex-1 h-full min-w-0`}>
+        <div className={`${mobilePane === 'viewer' ? 'block' : 'hidden'} lg:block flex-1 h-full min-w-0 relative`}>
           <PdfViewer
             docId={selectedDocId}
             docTitle={currentDocTitle}
             pdfSource={pdfSource}
             isDemoMode={isDemoPreset}
           />
+
+          {/* Quick Floating Copilot Button (Visible in Center/Viewer pane when Copilot isn't active) */}
+          {inspectorTab !== 'policy' && (
+            <button
+              type="button"
+              onClick={handleOpenCopilot}
+              className="absolute bottom-4 right-4 z-20 flex items-center gap-2 px-3 py-2 rounded-full bg-theme-brand text-white shadow-lg hover:shadow-xl hover:scale-105 transition-all text-xs font-mono font-bold group"
+              title="Open FinScan Copilot (Ctrl+K)"
+            >
+              <Sparkles className="w-4 h-4 group-hover:rotate-12 transition-transform" />
+              <span>Ask Copilot</span>
+              <kbd className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded text-white/90">^K</kbd>
+            </button>
+          )}
         </div>
 
         {/* Right Pane: Inspector */}
-        <div className={`${mobilePane === 'inspector' ? 'block' : 'hidden'} lg:block shrink-0 w-full lg:w-auto`}>
+        <div className={`${mobilePane === 'inspector' ? 'block' : 'hidden'} lg:block shrink-0 h-full min-h-0 w-full lg:w-auto`}>
           <RightInspectorPane
             application={application}
             activeEvidenceKey={activeEvidenceKey}
@@ -683,6 +712,8 @@ function AppInner({
             onCancelJob={handleCancelJob}
             isReadOnlyPreset={isDemoPreset}
             width={390}
+            activeTab={inspectorTab}
+            onTabChange={setInspectorTab}
           />
         </div>
       </div>

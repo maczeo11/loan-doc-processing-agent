@@ -16,6 +16,7 @@ export interface PolicyCitation {
   document_type?: string;
   page_number?: number;
   bounding_box?: BoundingBox | null;
+  is_policy?: boolean;
 }
 
 export interface PolicyQaResponse {

@@ -38,9 +38,11 @@ interface RightInspectorPaneProps {
   onCancelJob?: () => void;
   isReadOnlyPreset?: boolean;
   width: number;
+  activeTab?: TabType;
+  onTabChange?: (tab: TabType) => void;
 }
 
-type TabType = 'findings' | 'facts' | 'cam' | 'policy' | 'audit';
+export type TabType = 'findings' | 'facts' | 'cam' | 'policy' | 'audit';
 
 const REQUIRED_DOC_LABELS: Record<string, string> = {
   application_form: 'Application Form',
@@ -64,8 +66,18 @@ export const RightInspectorPane: React.FC<RightInspectorPaneProps> = ({
   onCancelJob,
   isReadOnlyPreset = false,
   width,
+  activeTab: controlledActiveTab,
+  onTabChange,
 }) => {
-  const [activeTab, setActiveTab] = useState<TabType>('findings');
+  const [internalActiveTab, setInternalActiveTab] = useState<TabType>('findings');
+  const activeTab = controlledActiveTab ?? internalActiveTab;
+  const setActiveTab = (tab: TabType) => {
+    if (onTabChange) {
+      onTabChange(tab);
+    } else {
+      setInternalActiveTab(tab);
+    }
+  };
 
   const flagCount = application.findings.filter((f) => f.verdict === 'flag').length;
   const passCount = application.findings.filter((f) => f.verdict === 'pass').length;
@@ -91,7 +103,7 @@ export const RightInspectorPane: React.FC<RightInspectorPaneProps> = ({
   return (
     <aside
       style={{ width: `${width}px` }}
-      className="h-full flex-none flex flex-col border-l border-theme-border bg-theme-panel select-none overflow-hidden transition-colors duration-200"
+      className="h-full min-h-0 flex-none flex flex-col border-l border-theme-border bg-theme-panel overflow-hidden transition-colors duration-200"
     >
       {/* Tab Navigation Header.
           Labels are deliberately short: with five tabs, full labels ("Audit
@@ -174,7 +186,13 @@ export const RightInspectorPane: React.FC<RightInspectorPaneProps> = ({
       </div>
 
       {/* Tab Contents */}
-      <div className="flex-1 overflow-y-auto p-3.5 bg-theme-card">
+      <div
+        className={`flex-1 min-h-0 bg-theme-card ${
+          activeTab === 'policy'
+            ? 'overflow-hidden flex flex-col p-0'
+            : 'overflow-y-auto p-3.5'
+        }`}
+      >
         {activeTab === 'findings' && (
           <div className="space-y-3">
             {/* Terminal failure: the dossier stopped, and the reason is shown.

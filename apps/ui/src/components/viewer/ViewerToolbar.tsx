@@ -55,9 +55,9 @@ export const ViewerToolbar: React.FC<ViewerToolbarProps> = ({
   };
 
   return (
-    <div className="h-12 bg-theme-header border-b border-theme-border px-4 flex items-center justify-between shadow-xs shrink-0 transition-colors duration-200">
+    <div className="min-h-[48px] py-1 bg-theme-header border-b border-theme-border px-3 sm:px-4 flex flex-wrap items-center justify-between gap-2 shadow-xs shrink-0 transition-colors duration-200">
       {/* Document Info & Source Badge */}
-      <div className="flex items-center gap-2 truncate">
+      <div className="flex items-center gap-2 min-w-0 max-w-full sm:max-w-md truncate">
         <FileSearch className="w-4 h-4 text-theme-brand shrink-0" />
         <span className="text-xs font-serif font-bold text-theme-primary truncate">
           {docTitle}
@@ -69,7 +69,7 @@ export const ViewerToolbar: React.FC<ViewerToolbarProps> = ({
       </div>
 
       {/* Page & Zoom Controls */}
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-2 sm:gap-3 shrink-0 ml-auto">
         {/* Page Switcher */}
         <div className="flex items-center gap-1 bg-theme-panel border border-theme-border rounded-xs p-0.5">
           <button

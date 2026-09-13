@@ -43,15 +43,11 @@ export const Header: React.FC<HeaderProps> = ({
   const personaLocked = mode === 'google';
 
   return (
-    <header className="h-14 min-h-[56px] bg-theme-header border-b border-theme-border px-3 sm:px-5 flex items-center justify-between gap-3 select-none z-30 shadow-xs transition-colors duration-200">
-      {/* Brand & Dossier Switcher.
-          `shrink-0` here meant this group never yielded width, so the right-hand
-          cluster (shortcuts, user chip, logout) was pushed past the viewport
-          edge and clipped at every breakpoint. It shrinks now; the dossier
-          select truncates instead. */}
-      <div className="flex items-center gap-3 sm:gap-5 min-w-0 shrink">
-        <div className="flex items-center gap-3 shrink-0">
-          <div className="w-8 h-8 rounded-sm bg-theme-brand flex items-center justify-center text-white shadow-sm ring-1 ring-theme-border">
+    <header className="min-h-[56px] py-2 bg-theme-header border-b border-theme-border px-3 sm:px-5 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 select-none z-30 shadow-xs transition-colors duration-200">
+      {/* Brand & Dossier Switcher (wraps and aligns cleanly on zoom) */}
+      <div className="flex flex-wrap items-center gap-2.5 sm:gap-4 min-w-0">
+        <div className="flex items-center gap-2.5 shrink-0">
+          <div className="w-8 h-8 rounded-sm bg-theme-brand flex items-center justify-center text-white shadow-sm ring-1 ring-theme-border shrink-0">
             <ShieldCheck className="w-5 h-5" />
           </div>
           <div className="hidden sm:block">
@@ -72,12 +68,12 @@ export const Header: React.FC<HeaderProps> = ({
         <div className="h-6 w-px bg-theme-border hidden md:block" />
 
         {/* Application Selector */}
-        <div className="flex items-center gap-2 min-w-0">
+        <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-wrap">
           <span className="text-xs text-theme-muted font-medium hidden lg:inline shrink-0">Dossier:</span>
           <select
             value={selectedAppId}
             onChange={(e) => onSelectAppId(e.target.value)}
-            className="bg-theme-card border border-theme-border rounded-xs px-3 py-1.5 text-xs font-mono font-semibold text-theme-primary focus:outline-none focus:border-theme-brand transition-colors cursor-pointer shadow-2xs max-w-[180px] sm:max-w-[280px] truncate"
+            className="bg-theme-card border border-theme-border rounded-xs px-2.5 py-1.5 text-xs font-mono font-semibold text-theme-primary focus:outline-none focus:border-theme-brand transition-colors cursor-pointer shadow-2xs max-w-[170px] sm:max-w-[260px] truncate"
           >
             {!selectedAppId && (
               <option value="">— Select or Create Dossier —</option>
@@ -101,7 +97,7 @@ export const Header: React.FC<HeaderProps> = ({
             <button
               type="button"
               onClick={onRefresh}
-              className="px-2 py-1 bg-theme-panel hover:bg-theme-card border border-theme-border rounded-xs text-[11px] font-mono text-theme-secondary hover:text-theme-primary transition-colors cursor-pointer"
+              className="px-2 py-1 bg-theme-panel hover:bg-theme-card border border-theme-border rounded-xs text-[11px] font-mono text-theme-secondary hover:text-theme-primary transition-colors cursor-pointer shrink-0"
               title="Refresh live applications from backend"
             >
               ↻ Refresh
@@ -111,7 +107,7 @@ export const Header: React.FC<HeaderProps> = ({
             <button
               type="button"
               onClick={onOpenNewApplication}
-              className="flex items-center gap-1 px-2.5 py-1 bg-theme-brand hover:opacity-90 text-white rounded-xs text-[11px] font-mono font-bold transition-all shadow-xs cursor-pointer"
+              className="flex items-center gap-1 px-2.5 py-1 bg-theme-brand hover:opacity-90 text-white rounded-xs text-[11px] font-mono font-bold transition-all shadow-xs cursor-pointer shrink-0"
               title="Initialize a new loan application container"
             >
               <span>+ New</span>
@@ -120,13 +116,9 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       </div>
 
-      {/* Center: Live Status & SLA Timer. The status pill is the single most
-          important signal on the screen, so it stays visible from md up; only
-          the wider SLA readout waits for xl. */}
-      <div className="hidden md:flex items-center gap-4 shrink-0">
+      {/* Center: Live Status & SLA Timer */}
+      <div className="hidden xl:flex items-center gap-3 shrink-0">
         <StatusPill status={status} reviewerDecision={reviewerDecision} />
-        {/* The SLA readout is wide; at xl (1280) it crowded the header on the
-            most common laptop width. It waits for 2xl now. */}
         <div className="hidden 2xl:block">
           <SlaTimer
             createdAt={createdAt}
@@ -136,20 +128,20 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       </div>
 
-      {/* Right: Shortcuts + User (ledger theme locked; no theme switcher) */}
-      <div className="flex items-center gap-2 sm:gap-3 shrink-0 ml-auto">
+      {/* Right: Shortcuts + User (auto-aligns gracefully on high zoom) */}
+      <div className="flex flex-wrap items-center gap-2 sm:gap-2.5 shrink-0 ml-auto justify-end">
 
-        {/* AI Quick Launch Button */}
+        {/* The Single Canonical FinScan AI Button */}
         {onOpenCopilot && (
           <button
             type="button"
             onClick={onOpenCopilot}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xs bg-theme-brand/10 hover:bg-theme-brand/20 text-theme-brand border border-theme-brand/30 hover:border-theme-brand text-xs font-mono font-bold transition-all shadow-2xs cursor-pointer group"
-            title="Ask AI (Ctrl+K)"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xs bg-theme-brand hover:opacity-90 text-white border border-theme-brand text-xs font-mono font-bold transition-all shadow-xs cursor-pointer group shrink-0"
+            title="FinScan AI Copilot & Policy Q&A (Ctrl+K)"
           >
-            <Sparkles className="w-3.5 h-3.5 text-theme-brand group-hover:rotate-12 transition-transform" />
-            <span className="hidden sm:inline">Ask AI</span>
-            <kbd className="hidden md:inline text-[9.5px] font-mono px-1 py-0.5 rounded-xs bg-theme-card border border-theme-border text-theme-muted">
+            <Sparkles className="w-3.5 h-3.5 text-white group-hover:rotate-12 transition-transform" />
+            <span className="inline">FinScan AI</span>
+            <kbd className="hidden sm:inline text-[9.5px] font-mono px-1.5 py-0.5 rounded-xs bg-white/20 text-white/95 border border-white/30">
               ^K
             </kbd>
           </button>
@@ -158,17 +150,17 @@ export const Header: React.FC<HeaderProps> = ({
         {/* Shortcuts Button */}
         <button
           onClick={onOpenShortcuts}
-          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xs bg-theme-card hover:bg-theme-panel text-theme-secondary hover:text-theme-primary border border-theme-border text-xs transition-colors"
+          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xs bg-theme-card hover:bg-theme-panel text-theme-secondary hover:text-theme-primary border border-theme-border text-xs transition-colors shrink-0"
           title="Keyboard Shortcuts Guide (?)"
         >
           <HelpCircle className="w-3.5 h-3.5 text-theme-muted" />
           <kbd className="text-[10px] font-mono text-theme-muted font-bold">?</kbd>
         </button>
 
-        <div className="h-6 w-px bg-theme-border" />
+        <div className="h-6 w-px bg-theme-border hidden sm:block" />
 
-        {/* User chip (persona switch kept for mock mode; Google mode shows chip + logout) */}
-        <div className="flex items-center gap-2.5">
+        {/* User chip */}
+        <div className="flex items-center gap-2 shrink-0">
           <div className="w-8 h-8 rounded-full bg-theme-panel border border-theme-border overflow-hidden flex items-center justify-center text-theme-secondary shadow-2xs shrink-0">
             {user?.avatarUrl ? (
               <img src={user.avatarUrl} alt={user.name} className="w-full h-full object-cover" />
@@ -213,7 +205,7 @@ export const Header: React.FC<HeaderProps> = ({
           <button
             type="button"
             onClick={() => logout()}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xs bg-theme-card hover:bg-theme-flag-bg text-theme-secondary hover:text-theme-flag border border-theme-border hover:border-theme-flag-border text-[11px] font-mono font-semibold transition-colors"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xs bg-theme-card hover:bg-theme-flag-bg text-theme-secondary hover:text-theme-flag border border-theme-border hover:border-theme-flag-border text-[11px] font-mono font-semibold transition-colors shrink-0"
             title="Sign out"
           >
             <LogOut className="w-3.5 h-3.5" />

@@ -105,26 +105,21 @@ export const RightInspectorPane: React.FC<RightInspectorPaneProps> = ({
       style={{ width: `${width}px` }}
       className="h-full min-h-0 flex-none flex flex-col border-l border-theme-border bg-theme-panel overflow-hidden transition-colors duration-200"
     >
-      {/* Tab Navigation Header.
-          Labels are deliberately short: with five tabs, full labels ("Audit
-          Findings", "Facts Ledger", "Policy RAG") overflowed the 390px pane and
-          pushed Policy and Audit off-screen with no visible scroll affordance,
-          so two tabs were unreachable at 1280px. Short labels fit; overflow-x
-          stays as a safety net for narrower panes. */}
-      <div className="h-11 min-h-[44px] border-b border-theme-border bg-theme-header px-1.5 flex items-center overflow-x-auto">
-        <div className="flex items-center gap-0.5 shrink-0">
+      {/* Tab Navigation Header (auto-aligns and scrolls smoothly under zoom) */}
+      <div className="min-h-[44px] py-1 border-b border-theme-border bg-theme-header px-2 flex items-center overflow-x-auto scrollbar-none">
+        <div className="flex items-center gap-1 shrink-0">
           <button
             onClick={() => setActiveTab('findings')}
-            className={`flex items-center gap-1 px-1.5 py-1.5 rounded-xs text-[11px] font-mono font-bold transition-all whitespace-nowrap ${
+            className={`flex items-center gap-1 px-2 py-1.5 rounded-xs text-[11px] font-mono font-bold transition-all whitespace-nowrap shrink-0 ${
               activeTab === 'findings'
                 ? 'bg-theme-card text-theme-primary border border-theme-border shadow-xs'
                 : 'text-theme-muted hover:text-theme-primary hover:bg-theme-panel'
             }`}
           >
-            <ShieldCheck className="w-3.5 h-3.5 text-theme-brand" />
+            <ShieldCheck className="w-3.5 h-3.5 text-theme-brand shrink-0" />
             <span>Findings</span>
             {flagCount > 0 && (
-              <span className="ml-0.5 px-1 py-0.5 rounded-full text-[10px] font-mono font-bold bg-theme-flag-bg text-theme-flag border border-theme-flag-border">
+              <span className="ml-0.5 px-1 py-0.5 rounded-full text-[10px] font-mono font-bold bg-theme-flag-bg text-theme-flag border border-theme-flag-border shrink-0">
                 {flagCount}
               </span>
             )}
@@ -132,41 +127,41 @@ export const RightInspectorPane: React.FC<RightInspectorPaneProps> = ({
 
           <button
             onClick={() => setActiveTab('facts')}
-            className={`flex items-center gap-1 px-1.5 py-1.5 rounded-xs text-[11px] font-mono font-bold transition-all whitespace-nowrap ${
+            className={`flex items-center gap-1 px-2 py-1.5 rounded-xs text-[11px] font-mono font-bold transition-all whitespace-nowrap shrink-0 ${
               activeTab === 'facts'
                 ? 'bg-theme-card text-theme-primary border border-theme-border shadow-xs'
                 : 'text-theme-muted hover:text-theme-primary hover:bg-theme-panel'
             }`}
           >
-            <Table className="w-3.5 h-3.5 text-theme-secondary" />
+            <Table className="w-3.5 h-3.5 text-theme-secondary shrink-0" />
             <span>Facts</span>
           </button>
 
           <button
             onClick={() => setActiveTab('cam')}
-            className={`flex items-center gap-1 px-1.5 py-1.5 rounded-xs text-[11px] font-mono font-bold transition-all whitespace-nowrap ${
+            className={`flex items-center gap-1 px-2 py-1.5 rounded-xs text-[11px] font-mono font-bold transition-all whitespace-nowrap shrink-0 ${
               activeTab === 'cam'
                 ? 'bg-theme-card text-theme-primary border border-theme-border shadow-xs'
                 : 'text-theme-muted hover:text-theme-primary hover:bg-theme-panel'
             }`}
           >
-            <FileText className="w-3.5 h-3.5 text-theme-secondary" />
+            <FileText className="w-3.5 h-3.5 text-theme-secondary shrink-0" />
             <span>CAM</span>
           </button>
 
           <button
             onClick={() => setActiveTab('policy')}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xs text-[11px] font-mono font-bold transition-all whitespace-nowrap ${
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xs text-[11px] font-mono font-bold transition-all whitespace-nowrap shrink-0 ${
               activeTab === 'policy'
                 ? 'bg-theme-brand text-white border border-theme-brand shadow-sm ring-1 ring-theme-brand/30'
                 : 'bg-theme-brand/10 text-theme-brand hover:bg-theme-brand hover:text-white border border-theme-brand/30'
             }`}
             title="Ask FinScan AI Copilot"
           >
-            <Sparkles className="w-3.5 h-3.5 fill-current" />
+            <Sparkles className="w-3.5 h-3.5 fill-current shrink-0" />
             <span>Ask AI</span>
             {flagCount > 0 ? (
-              <span className={`ml-0.5 px-1.5 py-0.2 rounded-full text-[9px] font-mono font-bold ${
+              <span className={`ml-0.5 px-1.5 py-0.2 rounded-full text-[9px] font-mono font-bold shrink-0 ${
                 activeTab === 'policy'
                   ? 'bg-white text-theme-brand'
                   : 'bg-theme-brand text-white'
@@ -174,7 +169,7 @@ export const RightInspectorPane: React.FC<RightInspectorPaneProps> = ({
                 {flagCount}
               </span>
             ) : (
-              <span className={`w-1.5 h-1.5 rounded-full ${
+              <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${
                 activeTab === 'policy' ? 'bg-emerald-300 animate-pulse' : 'bg-theme-brand animate-pulse'
               }`} />
             )}
@@ -182,13 +177,13 @@ export const RightInspectorPane: React.FC<RightInspectorPaneProps> = ({
 
           <button
             onClick={() => setActiveTab('audit')}
-            className={`flex items-center gap-1 px-1.5 py-1.5 rounded-xs text-[11px] font-mono font-bold transition-all whitespace-nowrap ${
+            className={`flex items-center gap-1 px-2 py-1.5 rounded-xs text-[11px] font-mono font-bold transition-all whitespace-nowrap shrink-0 ${
               activeTab === 'audit'
                 ? 'bg-theme-card text-theme-primary border border-theme-border shadow-xs'
                 : 'text-theme-muted hover:text-theme-primary hover:bg-theme-panel'
             }`}
           >
-            <History className="w-3.5 h-3.5 text-theme-secondary" />
+            <History className="w-3.5 h-3.5 text-theme-secondary shrink-0" />
             <span>Audit</span>
           </button>
         </div>
@@ -483,38 +478,38 @@ export const RightInspectorPane: React.FC<RightInspectorPaneProps> = ({
               </p>
             )}
 
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
               <button
                 type="button"
                 disabled={isActionDisabled}
                 onClick={() => onTriggerAction('APPROVED')}
-                className="flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xs text-xs font-mono font-bold bg-theme-pass hover:opacity-90 text-white shadow-sm transition-all cursor-pointer disabled:opacity-50"
+                className="flex items-center justify-center gap-1 py-2 px-1 sm:px-2 rounded-xs text-[11px] sm:text-xs font-mono font-bold bg-theme-pass hover:opacity-90 text-white shadow-sm transition-all cursor-pointer disabled:opacity-50 min-w-0 whitespace-nowrap"
                 title="Approve Loan Application (A)"
               >
-                <CheckCircle className="w-3.5 h-3.5" />
-                <span>Approve</span>
+                <CheckCircle className="w-3.5 h-3.5 shrink-0" />
+                <span className="truncate">Approve</span>
               </button>
 
               <button
                 type="button"
                 disabled={isActionDisabled}
                 onClick={() => onTriggerAction('REJECTED')}
-                className="flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xs text-xs font-mono font-bold bg-theme-flag hover:opacity-90 text-white shadow-sm transition-all cursor-pointer disabled:opacity-50"
+                className="flex items-center justify-center gap-1 py-2 px-1 sm:px-2 rounded-xs text-[11px] sm:text-xs font-mono font-bold bg-theme-flag hover:opacity-90 text-white shadow-sm transition-all cursor-pointer disabled:opacity-50 min-w-0 whitespace-nowrap"
                 title="Reject Loan Application (R)"
               >
-                <AlertTriangle className="w-3.5 h-3.5" />
-                <span>Reject</span>
+                <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                <span className="truncate">Reject</span>
               </button>
 
               <button
                 type="button"
                 disabled={isActionDisabled}
                 onClick={() => onTriggerAction('NEEDS_INFO')}
-                className="flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xs text-xs font-mono font-bold bg-theme-unknown hover:opacity-90 text-white shadow-sm transition-all cursor-pointer disabled:opacity-50"
+                className="flex items-center justify-center gap-1 py-2 px-1 sm:px-2 rounded-xs text-[11px] sm:text-xs font-mono font-bold bg-theme-unknown hover:opacity-90 text-white shadow-sm transition-all cursor-pointer disabled:opacity-50 min-w-0 whitespace-nowrap"
                 title="Request Supplemental Information (N)"
               >
-                <HelpCircle className="w-3.5 h-3.5" />
-                <span>Need Info</span>
+                <HelpCircle className="w-3.5 h-3.5 shrink-0" />
+                <span className="truncate">Need Info</span>
               </button>
             </div>
           </>

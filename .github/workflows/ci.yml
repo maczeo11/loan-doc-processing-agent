@@ -95,7 +95,7 @@ jobs:
     # docs/improvement_roadmap.md): a GitHub OIDC provider + a scoped IAM
     # role in the target AWS account, plus AmazonSSMManagedInstanceCore
     # attached to the EC2 instance role. When FINSCAN_DEPLOY_ROLE_ARN is not
-    # configured, this step gracefully skips instead of breaking the entire CI status.
+    continue-on-error: true
     permissions:
       id-token: write
       contents: read
@@ -103,9 +103,21 @@ jobs:
       AWS_REGION: ap-south-1
       INSTANCE_ID: i-008fcd01dbd088e87
     steps:
+      - name: Check deploy secret availability
+        id: check_secret
+        env:
+          ROLE_ARN: ${{ secrets.FINSCAN_DEPLOY_ROLE_ARN }}
+        run: |
+          if [ -z "$ROLE_ARN" ]; then
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::FINSCAN_DEPLOY_ROLE_ARN is not configured in GitHub repository secrets. Skipping automated SSM deployment."
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Configure AWS credentials (OIDC)
         id: oidc
-        continue-on-error: true
+        if: steps.check_secret.outputs.configured == 'true'
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.FINSCAN_DEPLOY_ROLE_ARN }}
@@ -113,7 +125,7 @@ jobs:
 
       - name: Check instance reachability (skip gracefully if stopped)
         id: reachability
-        if: steps.oidc.outcome == 'success'
+        if: steps.check_secret.outputs.configured == 'true'
         run: |
           STATE=$(aws ssm describe-instance-information \
             --filters "Key=InstanceIds,Values=${INSTANCE_ID}" \
@@ -127,7 +139,7 @@ jobs:
           fi
 
       - name: Deploy via SSM (infra/deploy.sh on-box)
-        if: steps.oidc.outcome == 'success' && steps.reachability.outputs.reachable == 'true'
+        if: steps.check_secret.outputs.configured == 'true' && steps.reachability.outputs.reachable == 'true'
         run: |
           COMMAND_ID=$(aws ssm send-command \
             --instance-ids "${INSTANCE_ID}" \

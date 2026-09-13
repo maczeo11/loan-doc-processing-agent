@@ -17,7 +17,7 @@ try:
 except ImportError:  # pragma: no cover
     BM25Okapi = None
 
-from core.rag.chunking import DocumentChunk, load_and_chunk_policy_file
+from core.rag.chunking import DocumentChunk, chunk_document_pages, load_and_chunk_policy_file
 
 logger = logging.getLogger("finscan.rag.indexer")
 
@@ -359,4 +359,63 @@ class IndexManager:
                 logger.error(f"Failed to load policy file {p_file}: {e}")
 
         return policy_index
+
+    def index_application_dossier(
+        self,
+        application_id: str,
+        document_texts: Dict[str, Any],
+        classified_types: Optional[Dict[str, str]] = None,
+        use_bge: Optional[bool] = None,
+    ) -> IsolatedIndex:
+        """
+        Indexes extracted document text pages for a specific application dossier
+        into an isolated application index. Maintains strict tenant isolation.
+        """
+        if not application_id or application_id.upper() == "POLICY":
+            raise ValueError("application_id must be a valid applicant ID.")
+
+        classified_types = classified_types or {}
+        app_index = self.get_or_create_app_index(application_id)
+        all_chunks: List[DocumentChunk] = []
+
+        for doc_id, pages_val in (document_texts or {}).items():
+            if not pages_val:
+                continue
+
+            doc_type = classified_types.get(doc_id, "document")
+            pages_data: List[Dict[str, Any]] = []
+
+            if isinstance(pages_val, list):
+                for idx, item in enumerate(pages_val):
+                    if isinstance(item, dict):
+                        pages_data.append(item)
+                    elif isinstance(item, str) and item.strip():
+                        pages_data.append({
+                            "page_number": idx + 1,
+                            "text": item.strip(),
+                            "page_width": 612.0,
+                            "page_height": 792.0,
+                            "words": [],
+                        })
+            elif isinstance(pages_val, str) and pages_val.strip():
+                pages_data.append({
+                    "page_number": 1,
+                    "text": pages_val.strip(),
+                    "page_width": 612.0,
+                    "page_height": 792.0,
+                    "words": [],
+                })
+
+            if pages_data:
+                chunks = chunk_document_pages(pages_data, doc_id=doc_id, is_policy=False)
+                for chunk in chunks:
+                    chunk.document_type = doc_type
+                all_chunks.extend(chunks)
+
+        if all_chunks:
+            app_index.add_chunks(all_chunks, use_bge=use_bge)
+            logger.info(f"Indexed {len(all_chunks)} chunks from {len(document_texts)} docs for application {application_id}")
+
+        return app_index
+
 

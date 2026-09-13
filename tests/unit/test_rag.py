@@ -446,3 +446,54 @@ def test_sanitize_document_text():
     assert "'''" in sanitized
 
 
+def test_index_application_dossier():
+    """Verifies that IndexManager.index_application_dossier chunks and indexes document texts with provenance."""
+    manager = IndexManager()
+    doc_texts = {
+        "DOC-PAYSLIP-01": [
+            {
+                "page_number": 1,
+                "text": "Acme Corp Payslip. Employee: Jane Doe. Net Pay: INR 75,000. Month: August 2026.",
+                "page_width": 612.0,
+                "page_height": 792.0,
+                "words": [],
+            }
+        ],
+        "DOC-BANK-01": [
+            {
+                "page_number": 1,
+                "text": "State Bank of India Statement. Credit: INR 75,000 ACH Salary Acme Corp.",
+                "page_width": 612.0,
+                "page_height": 792.0,
+                "words": [],
+            }
+        ],
+    }
+    classified = {
+        "DOC-PAYSLIP-01": "payslip",
+        "DOC-BANK-01": "bank_statement",
+    }
+
+    app_index = manager.index_application_dossier(
+        "APP-TEST-99",
+        document_texts=doc_texts,
+        classified_types=classified,
+        use_bge=False,
+    )
+
+    assert len(app_index) == 2
+    chunk = app_index.get_chunk("DOC-PAYSLIP-01_p1")
+    assert chunk is not None
+    assert chunk.document_type == "payslip"
+    assert chunk.page_number == 1
+    assert "Jane Doe" in chunk.text
+
+    # Retrieve from dossier via retriever
+    retriever = HybridRetriever(index_manager=manager, policy_dir="policies", use_bge=False)
+    results = retriever.retrieve_dossier("APP-TEST-99", "salary Acme Corp", top_k=2)
+    assert len(results) > 0
+    assert results[0]["is_policy"] is False
+    assert results[0]["evidence_ref"]["document_id"] in ["DOC-PAYSLIP-01", "DOC-BANK-01"]
+
+
+

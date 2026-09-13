@@ -301,6 +301,19 @@ def ocr_and_classify_node(state: LoanApplicationState) -> Dict[str, Any]:
 
         classified[doc_id] = predicted
 
+    # Index applicant document chunks into isolated RAG application index
+    app_id = state.get("application_id")
+    if app_id and doc_texts_map:
+        try:
+            from core.rag.indexer import IndexManager
+            IndexManager().index_application_dossier(
+                app_id,
+                doc_texts_map,
+                classified_types=classified,
+            )
+        except Exception as exc:
+            logger.warning(f"Failed to index dossier in ocr_and_classify_node for {app_id}: {exc}")
+
     return {
         "classified_types": classified,
         "document_texts": doc_texts_map,

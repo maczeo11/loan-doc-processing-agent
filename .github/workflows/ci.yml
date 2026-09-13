@@ -90,7 +90,7 @@ jobs:
     name: Deploy to EC2 (via SSM, when reachable)
     runs-on: ubuntu-latest
     needs: [test]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && secrets.FINSCAN_DEPLOY_ROLE_ARN != ''
     # Requires one-time AWS setup that has NOT been applied yet (see
     # docs/improvement_roadmap.md): a GitHub OIDC provider + a scoped IAM
     # role in the target AWS account, plus AmazonSSMManagedInstanceCore

@@ -32,7 +32,7 @@ from typing import Any, Dict, List, Optional
 
 from core.rag.grounding import DISPOSITION_PATTERNS, sanitize_summary_text
 from core.rag.retriever import HybridRetriever
-from core.rag.tools import format_hits_for_llm, search_policy_passages
+from core.rag.tools import format_hits_for_llm, search_dossier_passages, search_policy_passages
 
 logger = logging.getLogger("finscan.api.agent")
 
@@ -72,29 +72,16 @@ def get_agentic_chat_model() -> Optional[Any]:
 def answer_question_agentic(
     question: str,
     retriever: HybridRetriever,
+    application_id: Optional[str] = None,
     findings_context: Optional[str] = None,
     extra_authorized_ids: Optional[List[str]] = None,
+    chat_history: Optional[List[Dict[str, str]]] = None,
 ) -> Optional[Dict[str, Any]]:
     """
-    Runs a read-only ReAct agent (policy search only - see module docstring
-    for why dossier search isn't included yet) to answer an underwriter's
-    question, then firewalls the result through core/rag/grounding.py before
-    returning it.
-
-    `findings_context`: this application's own deterministic findings
-    (apps/api/routes/review.py::_build_findings_context), embedded directly in
-    the system prompt as trusted context (not a tool call - these are already
-    computed and verified, no retrieval needed). This is what lets the agent
-    answer "why was this application flagged/rejected?" with the actual
-    computed reason instead of only ever searching the policy corpus.
-    `extra_authorized_ids`: the finding rule_ids present in that context (e.g.
-    "RULE-ID-01") - merged into the grounding firewall's authorized-citation
-    set alongside real policy chunk_ids, so a [RULE_ID] citation is treated
-    the same way a [chunk_id] citation is, not as a special case.
-
-    Returns {"answer": str, "citations": List[Dict], "chunk_ids": List[str]}
-    on success, or None if the agentic path isn't available/fails - callers
-    must fall back to the existing single-shot answer_question() path.
+    Runs a read-only ReAct agent with policy search and dossier document search
+    to answer an underwriter's question, then firewalls the result through
+    core/rag/grounding.py before returning it.
+    Supports multi-turn chat history.
     """
     chat_model = get_agentic_chat_model()
     if chat_model is None:
@@ -116,6 +103,18 @@ def answer_question_agentic(
         session_hits.extend(hits)
         return format_hits_for_llm(hits)
 
+    tools = [search_policy]
+
+    if application_id:
+        @tool
+        def search_dossier(query: str) -> str:
+            """Search this applicant's uploaded documents (payslips, bank statements, tax returns, KYC IDs) for specific details, transactions, or values."""
+            hits = search_dossier_passages(retriever, application_id, query)
+            session_hits.extend(hits)
+            return format_hits_for_llm(hits)
+
+        tools.append(search_dossier)
+
     findings_block = (
         f"\n\nThis application's own deterministic findings (already verified - "
         f"quote and explain freely, never invent a new one or alter a verdict):\n"
@@ -125,22 +124,32 @@ def answer_question_agentic(
     )
     system_prompt = (
         "You are an underwriter's research assistant, helping them understand WHY "
-        "an application was flagged, rejected, or passed, and what policy requires. "
-        "Answer STRICTLY using the search_policy tool for policy questions and the "
-        "application findings below for 'why was this flagged/rejected' questions - "
-        "never from memory or assumption. When explaining a flag or rejection, name "
+        "an application was flagged, rejected, or passed, what policy requires, and specific facts "
+        "inside the applicant's uploaded documents. "
+        "Answer STRICTLY using the search_policy tool for policy questions, search_dossier for specific "
+        "applicant document details, and the application findings below for 'why was this flagged/rejected' "
+        "questions - never from memory or assumption. When explaining a flag or rejection, name "
         "the specific rule that fired, quote its reason, and explain the policy basis "
         "in plain language a reviewer can act on. Cite every fact: [chunk_id] for a "
-        "policy passage, [RULE_ID] for a finding (e.g. [RULE-ID-01]). Never state "
+        "policy or dossier passage, [RULE_ID] for a finding (e.g. [RULE-ID-01]). Never state "
         "whether the loan should be approved, rejected, or sanctioned going forward - "
         "that is a human decision. If neither source answers the question, say so "
         "plainly." + findings_block
     )
 
     try:
-        agent = create_react_agent(chat_model, [search_policy], prompt=system_prompt)
+        agent = create_react_agent(chat_model, tools, prompt=system_prompt)
+        messages = []
+        if chat_history:
+            for msg in chat_history:
+                role = "user" if msg.get("role") in ("user", "human") else "assistant"
+                content = msg.get("content", "")
+                if content:
+                    messages.append((role, content))
+        messages.append(("user", question))
+
         result = agent.invoke(
-            {"messages": [("user", question)]},
+            {"messages": messages},
             config={"recursion_limit": AGENT_RECURSION_LIMIT},
         )
         final_message = result["messages"][-1]
@@ -153,10 +162,6 @@ def answer_question_agentic(
     authorized_ids = chunk_ids + list(extra_authorized_ids or [])
     grounded_answer = sanitize_summary_text(answer_text, authorized_chunk_ids=authorized_ids)
 
-    # sanitize_summary_text only strips unauthorized citations. Unlike the CAM
-    # narrative path (validate_llm_narrative), it doesn't check for autonomous
-    # disposition language - and validate_llm_narrative can't be reused as-is
-    # here because it hard-fails whenever findings=[] (always true for Q&A).
     # Defense in depth: redact any approve/reject/sanction language ourselves.
     for pattern in DISPOSITION_PATTERNS:
         if pattern.search(grounded_answer):
@@ -173,9 +178,12 @@ def answer_question_agentic(
             "chunk_id": h.get("chunk_id"),
             "policy_id": h.get("doc_id") if h.get("is_policy") else None,
             "document_id": h.get("doc_id") if not h.get("is_policy") else None,
+            "document_type": h.get("document_type") or "document",
             "page_number": h.get("page_number"),
+            "bounding_box": h.get("bounding_box"),
             "score": h.get("score"),
             "text": h.get("text"),
+            "is_policy": h.get("is_policy", True),
         }
         for h in session_hits
     ]

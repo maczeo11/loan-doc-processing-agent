@@ -47,8 +47,14 @@ class ReviewDecisionRequest(BaseModel):
     confirm_app_id: Optional[str] = None
 
 
+class ChatMessage(BaseModel):
+    role: Literal["user", "assistant", "system"]
+    content: str
+
+
 class QuestionRequest(BaseModel):
     question: str
+    history: Optional[List[ChatMessage]] = None
 
 
 class QuestionResponse(BaseModel):
@@ -324,6 +330,7 @@ async def ask_question(id: str, payload: QuestionRequest, session: AsyncSession 
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Question exceeds 1000 characters")
     # Prompt-injection hygiene: delimit inquiry, strip control chars; retriever+grounding treat it as data.
     question = " ".join(question.split())
+    raw_history = [m.model_dump() for m in payload.history] if payload.history else None
 
     try:
         from core.rag.indexer import IndexManager
@@ -332,40 +339,53 @@ async def ask_question(id: str, payload: QuestionRequest, session: AsyncSession 
         policy_dir = _resolve_policy_dir()
         manager = IndexManager()
         manager.load_policy_corpus(policy_dir=policy_dir)
+
+        # Index applicant's own documents for dossier retrieval
+        app_state = dict(app_model.state_json or {})
+        doc_texts = app_state.get("document_texts") or {}
+        classified_types = app_state.get("classified_types") or {}
+        if doc_texts:
+            try:
+                manager.index_application_dossier(id, doc_texts, classified_types=classified_types)
+            except Exception as idx_err:
+                logger.warning(f"Failed to index dossier in review route for '{id}': {idx_err}")
+
         retriever = HybridRetriever(index_manager=manager, policy_dir=policy_dir)
-        hits = retriever.retrieve_policy(question, top_k=5)
+
+        # Retrieve relevant passages from policy
+        policy_hits = retriever.retrieve_policy(question, top_k=3)
+
+        # Retrieve relevant passages from applicant dossier
+        dossier_hits = []
+        try:
+            dossier_hits = retriever.retrieve_dossier(id, question, top_k=3)
+        except Exception as d_err:
+            logger.debug(f"Dossier retrieval not available for '{id}': {d_err}")
+
+        hits = dossier_hits + policy_hits
     except Exception as err:
-        logger.warning(f"Policy retrieval unavailable for question on '{id}': {err}")
+        logger.warning(f"Retrieval unavailable for question on '{id}': {err}")
         hits = []
 
     # Only abstain immediately when there is truly nothing to answer from:
-    # no policy passages AND no application findings to explain, AND the
-    # agentic path (which can reformulate its own search query via the
-    # search_policy tool) isn't available to try harder. Previously this
-    # short-circuited on empty `hits` unconditionally, which meant the
-    # agent's own tool-driven search never got a chance to retry with a
-    # different query when the caller's exact wording missed on the first pass.
+    # no policy passages, no dossier passages, AND no application findings to explain.
     if not hits and not findings_context and not settings.AGENTIC_QA_ENABLED:
         return QuestionResponse(
-            answer="No relevant policy passages found for this question. I abstain rather than guess.",
+            answer="No relevant policy passages or dossier evidence found for this question. I abstain rather than guess.",
             citations=[],
         )
 
-    # Experimental: read-only tool-calling agent (apps/api/agent.py), off by
-    # default. On success it returns a grounding-firewalled answer already
-    # built from its own tool-call citations (plus this application's own
-    # findings, so it can explain a flag/rejection, not just quote policy);
-    # on None (disabled, no LLM backend, or any failure) we fall through to
-    # the existing logic below untouched - this branch never changes default
-    # behavior.
+    # Experimental: read-only tool-calling agent (apps/api/agent.py), off by default.
     if settings.AGENTIC_QA_ENABLED:
         from apps.api.agent import answer_question_agentic
 
         agentic_result = answer_question_agentic(
             question,
             retriever,
+            application_id=id,
             findings_context=findings_context,
             extra_authorized_ids=finding_rule_ids,
+            chat_history=raw_history,
         )
         if agentic_result is not None:
             cited_rules = {rid for rid in finding_rule_ids if f"[{rid}]" in agentic_result["answer"]}
@@ -384,7 +404,7 @@ async def ask_question(id: str, payload: QuestionRequest, session: AsyncSession 
         page_number = hit.get("page_number")
         citation: Dict[str, Any] = {
             "chunk_id": hit.get("chunk_id"),
-            "policy_id": doc_id,
+            "policy_id": doc_id if is_policy else None,
             "section": f"Page {page_number}" if page_number else None,
             "page_number": page_number,
             "score": hit.get("score"),
@@ -402,11 +422,7 @@ async def ask_question(id: str, payload: QuestionRequest, session: AsyncSession 
             citation["bounding_box"] = hit.get("bounding_box")
         citations.append(citation)
 
-    # If LLM is configured (e.g. Groq, OpenCode, or OpenAI - same 3-way key
-    # resolution OpenCodeZenLLM itself uses), generate grounded synthesis from
-    # BOTH the retrieved policy passages and this application's own findings,
-    # so a "why was this flagged/rejected" question gets a real explanation,
-    # not just a policy quote.
+    # If LLM is configured (e.g. Groq, OpenCode, or OpenAI), generate grounded synthesis
     answer_text = None
     if os.getenv("GROQ_API_KEY") or os.getenv("OPENCODE_API_KEY") or os.getenv("OPENAI_API_KEY"):
         try:
@@ -414,14 +430,12 @@ async def ask_question(id: str, payload: QuestionRequest, session: AsyncSession 
             from core.rag.grounding import sanitize_summary_text
 
             llm = OpenCodeZenLLM()
-            raw_answer = llm.answer_question(question, hits, findings_context=findings_context)
-            # RAG grounding firewall: the agentic path already runs this: apply
-            # it here too so the DEFAULT (non-agentic, AGENTIC_QA_ENABLED=False)
-            # Q&A path - the one actually live in production today - can't
-            # return an ungrounded/hallucinated answer just because agentic
-            # mode happens to be off. Authorized set = retrieved policy chunk
-            # IDs + this application's own finding rule_ids (both trusted,
-            # non-LLM-originated citations).
+            raw_answer = llm.answer_question(
+                question,
+                hits,
+                findings_context=findings_context,
+                chat_history=raw_history,
+            )
             authorized_ids = [h.get("chunk_id") for h in hits if h.get("chunk_id")] + list(finding_rule_ids)
             answer_text = sanitize_summary_text(raw_answer, authorized_chunk_ids=authorized_ids)
         except Exception as llm_err:
@@ -432,13 +446,16 @@ async def ask_question(id: str, payload: QuestionRequest, session: AsyncSession 
         if findings_context:
             lines.append(findings_context)
         if hits:
-            lines.append(f"Top {len(hits)} policy passages relevant to: {question}")
+            policy_count = len([h for h in hits if h.get("is_policy")])
+            dossier_count = len([h for h in hits if not h.get("is_policy")])
+            lines.append(f"Top passages relevant to: {question} ({dossier_count} from dossier, {policy_count} from policy)")
             for i, hit in enumerate(hits, start=1):
                 text = str(hit.get("text", "")).strip()
                 excerpt = text[:400] + ("..." if len(text) > 400 else "")
-                lines.append(f"{i}. [{hit.get('chunk_id')}] {excerpt}")
+                src = "Policy" if hit.get("is_policy", True) else f"Document {hit.get('doc_id')}"
+                lines.append(f"{i}. [{hit.get('chunk_id')}] ({src}) {excerpt}")
         if not lines:
-            lines = ["No relevant policy passages or application findings available for this question. I abstain rather than guess."]
+            lines = ["No relevant policy passages, dossier evidence, or application findings available for this question. I abstain rather than guess."]
         answer_text = "\n".join(lines)
 
     cited_rules = {rid for rid in finding_rule_ids if f"[{rid}]" in answer_text}

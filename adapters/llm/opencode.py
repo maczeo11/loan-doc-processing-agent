@@ -101,41 +101,39 @@ class OpenCodeZenLLM(LLMPort):
         question: str,
         retrieved_passages: List[Dict[str, Any]],
         findings_context: Optional[str] = None,
+        chat_history: Optional[List[Dict[str, str]]] = None,
     ) -> str:
         """
-        Answers an underwriting question STRICTLY from retrieved policy passages
-        plus this application's own deterministic findings (when supplied) - the
-        latter is what lets this answer questions like "why was this application
-        flagged/rejected?" with the actual computed reason, not just a generic
-        policy quote. Both sources are RAG-retrieved/deterministic, never
-        free-generated, so a full explanation can be given without risking a
-        hallucinated number or an autonomous disposition: the model narrates and
-        explains, it never invents a new finding or issues a new verdict.
+        Answers an underwriting question STRICTLY from retrieved policy and dossier passages
+        plus this application's own deterministic findings (when supplied).
+        Supports multi-turn chat history for conversational underwriter assistance.
         """
         formatted_passages = []
         for i, passage in enumerate(retrieved_passages, 1):
             chunk_id = passage.get("id") or passage.get("chunk_id", f"chunk_{i}")
             text = passage.get("text") or passage.get("content", "")
-            formatted_passages.append(f"[{chunk_id}]:\n{text}")
+            is_policy = passage.get("is_policy", True)
+            source_tag = "Policy" if is_policy else f"Dossier Document ({passage.get('doc_id', 'doc')})"
+            formatted_passages.append(f"[{chunk_id}] ({source_tag}):\n{text}")
 
-        context_block = "\n\n".join(formatted_passages) or "(no policy passages retrieved for this query)"
+        context_block = "\n\n".join(formatted_passages) or "(no policy or dossier passages retrieved for this query)"
         findings_block = findings_context or "(this application has no findings recorded yet)"
 
         system_instruction = (
             "You are an underwriting research assistant for FinScan AI, helping a human "
             "underwriter understand WHY an application was flagged, rejected, or passed, "
-            "and what policy requires.\n\n"
-            "Answer STRICTLY and SOLELY using the two sources below - never from memory, "
+            "what policy requires, and specific details from the applicant's uploaded documents.\n\n"
+            "Answer STRICTLY and SOLELY using the sources below - never from memory, "
             "assumption, or general lending knowledge:\n"
             "1. <application_findings> - this application's own deterministic rule results. "
             "These are already computed and verified; you may quote and explain them freely, "
             "but never invent a new finding, alter a verdict, or state a number that isn't in them.\n"
-            "2. <evidence_passages> - retrieved policy clauses.\n\n"
+            "2. <evidence_passages> - retrieved policy clauses and applicant document excerpts.\n\n"
             "When explaining a flag or rejection: name the specific rule(s) that fired, quote "
             "its stated reason, and explain the policy basis behind it in plain language a "
             "reviewer can act on - do not just repeat the reason verbatim with no context.\n"
             "Cite every claim: [RULE_ID] for a finding (e.g. [RULE-ID-01]), [chunk_id] for a "
-            "policy clause (e.g. [credit_policy_v1_p1]).\n"
+            "policy or document clause (e.g. [credit_policy_v1_p1] or [DOC-123_p1]).\n"
             "Never state whether the loan should be approved, rejected, or sanctioned going "
             "forward - that decision belongs to the human underwriter, not you.\n"
             "If neither source answers the question, respond exactly with:\n"
@@ -148,12 +146,18 @@ class OpenCodeZenLLM(LLMPort):
             f"Underwriter Inquiry: {question}"
         )
 
+        messages = [{"role": "system", "content": system_instruction}]
+        if chat_history:
+            for turn in chat_history:
+                role = "user" if turn.get("role") in ("user", "human") else "assistant"
+                content = turn.get("content", "")
+                if content:
+                    messages.append({"role": role, "content": content})
+        messages.append({"role": "user", "content": user_content})
+
         payload = {
             "model": self.model,
-            "messages": [
-                {"role": "system", "content": system_instruction},
-                {"role": "user", "content": user_content},
-            ],
+            "messages": messages,
             "temperature": 0.0,
         }
 

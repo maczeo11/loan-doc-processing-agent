@@ -220,8 +220,14 @@ export interface Citation {
   [key: string]: unknown;
 }
 
+export interface ChatMessage {
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+}
+
 export interface QuestionRequest {
   question: string;
+  history?: ChatMessage[];
 }
 
 export interface QuestionResponse {

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { api } from '../../services/api';
 import { PolicyQaResponse, PolicyCitation } from '../../types/api';
 import { EvidenceRef } from '../../types/evidence';
-import { Finding } from '../../types/contracts';
+import { Finding, ChatMessage } from '../../types/contracts';
 import { sanitizePiiInText } from '../../utils/pii';
 import {
   Send,
@@ -220,7 +220,16 @@ export const PolicyQaTab: React.FC<PolicyQaTabProps> = ({
     setQuestion('');
 
     try {
-      const resp = await api.askQuestion(applicationId, { question: q });
+      // Build previous message history from existing conversation (chronological order)
+      const chatHistory: ChatMessage[] = [...history].reverse().slice(-6).flatMap((item) => [
+        { role: 'user' as const, content: item.question },
+        { role: 'assistant' as const, content: item.answer },
+      ]);
+
+      const resp = await api.askQuestion(applicationId, {
+        question: q,
+        history: chatHistory,
+      });
       const citations: PolicyCitation[] = (resp.citations || []).map((c) => ({
         chunk_id: c.chunk_id || '',
         // A finding-sourced citation (chunk_id "FINDING-RULE-ID-XX", see

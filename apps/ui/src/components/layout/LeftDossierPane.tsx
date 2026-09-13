@@ -9,6 +9,8 @@ import {
   Layers,
   ChevronLeft,
   ChevronRight,
+  Sparkles,
+  AlertTriangle,
 } from 'lucide-react';
 import { LoanApplication, DossierDocument } from '../../types/application';
 import { MaskedValue } from '../common/MaskedValue';
@@ -217,7 +219,56 @@ export const LeftDossierPane: React.FC<LeftDossierPaneProps> = ({
                           {doc.ocr_route === 'native' ? 'Native Layer' : 'OCR'}
                         </span>
                       )}
-                      {doc.page_count === undefined && !doc.ocr_route && (
+
+                      {/* ML Classification Confidence Badge */}
+                      {doc.classification && (
+                        (() => {
+                          const conf = doc.classification.confidence;
+                          const pct = Math.round(conf * 100);
+                          const isHigh = conf >= 0.75;
+                          const isMed = conf >= 0.50 && conf < 0.75;
+                          const isHeuristic = doc.classification.method === 'heuristic_fallback';
+                          const isLow = !isHeuristic && conf < 0.50;
+
+                          // Format alternative probabilities for tooltip
+                          const probs = doc.classification.class_probabilities || {};
+                          const altText = Object.entries(probs)
+                            .sort(([, a], [, b]) => b - a)
+                            .slice(0, 3)
+                            .map(([k, v]) => `${k.replace('_', ' ')}: ${Math.round(v * 100)}%`)
+                            .join(', ');
+
+                          const tooltip = isHeuristic
+                            ? 'Classified via keyword heuristic fallback'
+                            : `ML Confidence: ${pct}%${altText ? ` (${altText})` : ''} · Model v${doc.classification.model_version || '2.0'}`;
+
+                          return (
+                            <span
+                              title={tooltip}
+                              className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-xs border font-semibold cursor-help ${
+                                isHigh
+                                  ? 'bg-theme-pass-bg border-theme-pass-border text-theme-pass'
+                                  : isMed
+                                    ? 'bg-theme-card border-theme-border text-theme-secondary'
+                                    : isHeuristic
+                                      ? 'bg-theme-panel border-theme-border text-theme-muted'
+                                      : 'bg-theme-flag-bg border-theme-flag-border text-theme-flag'
+                              }`}
+                            >
+                              {isHigh ? (
+                                <Sparkles className="w-2.5 h-2.5" />
+                              ) : isLow ? (
+                                <AlertTriangle className="w-2.5 h-2.5" />
+                              ) : null}
+                              <span>
+                                {isHeuristic ? 'Heuristic' : `${pct}% ML`}
+                              </span>
+                            </span>
+                          );
+                        })()
+                      )}
+
+                      {doc.page_count === undefined && !doc.ocr_route && !doc.classification && (
                         <span className="px-1.5 py-0.5 rounded-xs bg-theme-panel border border-theme-border">
                           Not yet analysed
                         </span>

@@ -104,6 +104,14 @@ export interface StatusTransition {
   reason?: string | null;
 }
 
+export interface ClassificationMetadata {
+  confidence: number;
+  class_probabilities?: Record<string, number>;
+  model_version?: string;
+  method?: 'ml_baseline' | 'heuristic_fallback' | 'user_override';
+  requires_human_triage?: boolean;
+}
+
 export interface LoanApplicationState {
   application_id: string;
   status: ApplicationStatus;
@@ -113,6 +121,8 @@ export interface LoanApplicationState {
   document_ids?: string[];
   document_manifest?: Record<string, string>;
   classified_types?: Record<string, string>;
+  /** ML classification metadata (confidence, class probabilities, triage flags). */
+  classification_metadata?: Record<string, ClassificationMetadata>;
   /** Real filename as uploaded (doc_id -> filename). */
   document_filenames?: Record<string, string>;
   /** Observed page count per document (doc_id -> pages). */

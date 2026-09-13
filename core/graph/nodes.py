@@ -211,6 +211,7 @@ def ocr_and_classify_node(state: LoanApplicationState) -> Dict[str, Any]:
     # index reports what actually happened instead of a plausible-looking guess.
     page_counts: Dict[str, int] = dict(state.get("document_pages", {}) or {})
     ocr_routes: Dict[str, str] = dict(state.get("ocr_routes", {}) or {})
+    classification_metadata: Dict[str, Any] = dict(state.get("classification_metadata", {}) or {})
 
     storage = LocalFileSystemStorage()
     all_ids = list(set(doc_ids + list(manifest.keys())))
@@ -270,16 +271,18 @@ def ocr_and_classify_node(state: LoanApplicationState) -> Dict[str, Any]:
 
         # 3. Call classifier adapter if text is available
         predicted = "UNKNOWN"
+        ml_res: Optional[Dict[str, Any]] = None
         if page_texts:
             try:
                 from core.extraction.classifier_adapter import classify_document
-                res = classify_document(page_texts)
-                predicted = res.get("document_class", "UNKNOWN")
+                ml_res = classify_document(page_texts)
+                predicted = ml_res.get("document_class", "UNKNOWN")
             except Exception as ex:
                 logger.warning(f"Classifier adapter exception for doc_id {doc_id}: {ex}")
                 predicted = "UNKNOWN"
 
         # 4. Keyword-heuristic fallback on UNKNOWN or exception
+        is_heuristic = False
         if predicted in ("UNKNOWN", "unknown"):
             doc_lower = doc_id.lower()
             uri_lower = manifest.get(doc_id, "").lower()
@@ -288,18 +291,52 @@ def ocr_and_classify_node(state: LoanApplicationState) -> Dict[str, Any]:
 
             if "payslip" in combo or "salary" in combo:
                 predicted = "payslip"
+                is_heuristic = True
             elif "bank" in combo or "statement" in combo:
                 predicted = "bank_statement"
+                is_heuristic = True
             elif "tax" in combo or "itr" in combo or "form16" in combo:
                 predicted = "tax_acknowledgement"
+                is_heuristic = True
             elif "pan" in combo or "aadhaar" in combo or "kyc" in combo or "id" in combo:
                 predicted = "id_card"
+                is_heuristic = True
             elif "form" in combo or "app" in combo:
                 predicted = "application_form"
+                is_heuristic = True
             else:
                 predicted = "unknown"
 
         classified[doc_id] = predicted
+
+        # Record classification provenance & uncertainty for underwriter UI
+        if ml_res and not is_heuristic and predicted not in ("UNKNOWN", "unknown"):
+            page_results = ml_res.get("page_results", [])
+            class_probs = page_results[0].get("probabilities", {}) if page_results else {}
+            conf = float(ml_res.get("confidence", 0.0))
+            classification_metadata[doc_id] = {
+                "confidence": round(conf, 4),
+                "class_probabilities": class_probs,
+                "model_version": "2.0",
+                "method": "ml_baseline",
+                "requires_human_triage": bool(ml_res.get("requires_human_triage", conf < 0.40)),
+            }
+        elif is_heuristic:
+            classification_metadata[doc_id] = {
+                "confidence": 0.50,
+                "class_probabilities": {predicted: 0.50},
+                "model_version": "2.0",
+                "method": "heuristic_fallback",
+                "requires_human_triage": True,
+            }
+        else:
+            classification_metadata[doc_id] = {
+                "confidence": 0.0,
+                "class_probabilities": {},
+                "model_version": "2.0",
+                "method": "heuristic_fallback",
+                "requires_human_triage": True,
+            }
 
     # Index applicant document chunks into isolated RAG application index
     app_id = state.get("application_id")
@@ -316,6 +353,7 @@ def ocr_and_classify_node(state: LoanApplicationState) -> Dict[str, Any]:
 
     return {
         "classified_types": classified,
+        "classification_metadata": classification_metadata,
         "document_texts": doc_texts_map,
         "document_pages": page_counts,
         "ocr_routes": ocr_routes,

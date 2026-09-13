@@ -1,6 +1,6 @@
-import type { EvidenceRef, Finding, ApplicationStatus } from './contracts';
+import type { EvidenceRef, Finding, ApplicationStatus, ClassificationMetadata } from './contracts';
 
-export type { ApplicationStatus };
+export type { ApplicationStatus, ClassificationMetadata };
 
 export interface MoneyFact {
   amount: number;
@@ -56,6 +56,8 @@ export interface DossierDocument {
   page_count?: number;
   /** Route that produced the text layer; undefined until perception has run. */
   ocr_route?: OcrRoute;
+  /** ML classification metadata (confidence, alternative class probabilities, triage flags). */
+  classification?: ClassificationMetadata;
   /** True only when a finding cites this document as supporting evidence. */
   verified: boolean;
 }

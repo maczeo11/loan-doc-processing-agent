@@ -25,6 +25,14 @@ class StatusTransition(TypedDict):
     reason: Optional[str]
 
 
+class ClassificationMetadata(TypedDict, total=False):
+    confidence: float
+    class_probabilities: Dict[str, float]
+    model_version: str
+    method: Literal["ml_baseline", "heuristic_fallback", "user_override"]
+    requires_human_triage: bool
+
+
 class LoanApplicationState(TypedDict):
     """
     Authoritative state dictionary passed through LangGraph nodes.
@@ -38,6 +46,8 @@ class LoanApplicationState(TypedDict):
     document_manifest: Dict[str, str]  # doc_id -> storage_uri
     document_bytes: Optional[Dict[str, bytes]]
     classified_types: Dict[str, str]  # doc_id -> doc_type
+    # ML classification metadata (confidence, class distribution, triage status)
+    classification_metadata: Optional[Dict[str, ClassificationMetadata]]
     # Observed during perception, not guessed by the UI: real page count and the
     # route that actually produced the text layer for each document.
     document_pages: Dict[str, int]  # doc_id -> page count

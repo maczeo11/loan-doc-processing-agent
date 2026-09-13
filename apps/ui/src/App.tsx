@@ -36,6 +36,7 @@ function toLoanApplication(
   const pageCounts = state.document_pages || {};
   const ocrRoutes = state.ocr_routes || {};
   const filenames = state.document_filenames || {};
+  const classMeta = state.classification_metadata || {};
   // A document counts as verified only when at least one finding actually cites
   // it. Hardcoding `verified: true` put a green check on every file in the
   // dossier regardless of whether anything had been checked against it.
@@ -63,6 +64,7 @@ function toLoanApplication(
       // until perception reports a real value.
       page_count: pageCounts[id],
       ocr_route: ocrRoutes[id],
+      classification: classMeta[id],
       verified: citedDocIds.has(id),
     } as DossierDocument;
   });

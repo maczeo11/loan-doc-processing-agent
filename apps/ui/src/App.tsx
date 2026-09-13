@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { Sparkles } from 'lucide-react';
+import { Sparkles, Play, Loader2, ArrowRight } from 'lucide-react';
 import { Header } from './components/layout/Header';
 import { LeftDossierPane } from './components/layout/LeftDossierPane';
 import { RightInspectorPane, TabType } from './components/layout/RightInspectorPane';
@@ -424,6 +424,35 @@ function AppInner({
     }
   };
 
+  const handleReclassifyDocument = async (docId: string, newType: string) => {
+    try {
+      await api.reclassifyDocument(selectedAppId, docId, newType);
+      setNotification(`Document ${docId} reclassified as ${newType.replace('_', ' ')}.`);
+      await fetchApplicationData();
+      refreshLiveApps();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to reclassify document';
+      setNotification(msg);
+      throw err;
+    }
+  };
+
+  const handleDeleteDocument = async (docId: string) => {
+    try {
+      await api.deleteDocument(selectedAppId, docId);
+      setNotification(`Document ${docId} removed from dossier.`);
+      if (selectedDocId === docId) {
+        onSelectDoc('');
+      }
+      await fetchApplicationData();
+      refreshLiveApps();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to delete document';
+      setNotification(msg);
+      throw err;
+    }
+  };
+
   const handleProcessDossier = async () => {
     setIsProcessing(true);
     try {
@@ -655,6 +684,45 @@ function AppInner({
         </div>
       )}
 
+      {/* Elevated Pipeline Action Banner (F-04): Appears whenever application is in UPLOADED state */}
+      {application.status === 'UPLOADED' && (
+        <div className="bg-theme-brand/10 border-b border-theme-brand/30 px-4 py-2 flex items-center justify-between gap-3 shrink-0">
+          <div className="flex items-center gap-2 text-xs">
+            <span className="w-2 h-2 rounded-full bg-theme-brand animate-pulse shrink-0" />
+            <span className="font-mono font-bold text-theme-primary">
+              Dossier Ingested ({application.documents.length} {application.documents.length === 1 ? 'document' : 'documents'})
+            </span>
+            <span className="text-theme-secondary hidden sm:inline">
+              · Ready for OCR perception, fact extraction, and deterministic credit rules.
+            </span>
+          </div>
+          <button
+            type="button"
+            disabled={isProcessing || isDemoPreset || application.documents.length === 0}
+            onClick={handleProcessDossier}
+            className="px-3 py-1.5 rounded-xs bg-theme-brand hover:opacity-90 text-white text-xs font-mono font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+            title={
+              application.documents.length === 0
+                ? 'Upload at least one document first'
+                : 'Execute deterministic credit verification pipeline'
+            }
+          >
+            {isProcessing ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                <span>Running Pipeline…</span>
+              </>
+            ) : (
+              <>
+                <Play className="w-3.5 h-3.5 fill-current" />
+                <span>Run Verification Pipeline</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </>
+            )}
+          </button>
+        </div>
+      )}
+
       {/* Main Workspace: 3-pane layout on desktop, tabbed on mobile/tablet.
           Previously this hardcoded `lg:grid lg:grid-cols-[280px_1fr_390px]`,
           which broke on smaller laptops (e.g. 1024-1280px) and completely
@@ -670,6 +738,9 @@ function AppInner({
               setMobilePane('viewer');
             }}
             onUploadDocument={handleUploadDocument}
+            onReclassifyDocument={handleReclassifyDocument}
+            onDeleteDocument={handleDeleteDocument}
+            isReadOnlyPreset={isDemoPreset}
             width={280}
           />
         </div>

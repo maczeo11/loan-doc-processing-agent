@@ -429,3 +429,147 @@ async def get_document_content(
         },
     )
 
+
+class ReclassifyDocumentRequest(BaseModel):
+    doc_type: str
+
+
+@router.patch("/{id}/documents/{doc_id}/reclassify", response_model=dict)
+async def reclassify_document(
+    id: str,
+    doc_id: str,
+    payload: ReclassifyDocumentRequest,
+    session: AsyncSession = Depends(get_db),
+):
+    """
+    HITL Reclassification: Allows an underwriter to override or correct a document's classification.
+    Updates DocumentModel.doc_type and state_json['classified_types'] + state_json['classification_metadata'].
+    """
+    normalized = normalize_doc_type_hint(payload.doc_type)
+    if not normalized:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid document type '{payload.doc_type}'. Must be one of: {sorted(list(CANONICAL_DOC_TYPES))}",
+        )
+
+    stmt = select(ApplicationModel).where(ApplicationModel.id == id).with_for_update()
+    app_model = (await session.execute(stmt)).scalar_one_or_none()
+    if not app_model:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Application '{id}' not found")
+
+    doc_stmt = select(DocumentModel).where(DocumentModel.id == doc_id, DocumentModel.application_id == id)
+    doc_model = (await session.execute(doc_stmt)).scalar_one_or_none()
+    if not doc_model:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Document '{doc_id}' not found in application '{id}'")
+
+    old_type = doc_model.doc_type or "unknown"
+    doc_model.doc_type = normalized
+
+    state = dict(app_model.state_json or {})
+    classified = dict(state.get("classified_types", {}))
+    classified[doc_id] = normalized
+    state["classified_types"] = classified
+
+    meta = dict(state.get("classification_metadata", {}))
+    meta[doc_id] = {
+        "confidence": 1.0,
+        "class_probabilities": {normalized: 1.0},
+        "model_version": "human_override",
+        "method": "user_override",
+        "requires_human_triage": False,
+    }
+    state["classification_metadata"] = meta
+
+    app_model.state_json = state
+    app_model.updated_at = utc_now()
+
+    await session.commit()
+    logger.info(f"Reclassified document '{doc_id}' in application '{id}': {old_type} -> {normalized}")
+
+    return {
+        "status": "ok",
+        "document_id": doc_id,
+        "application_id": id,
+        "old_type": old_type,
+        "new_type": normalized,
+    }
+
+
+@router.delete("/{id}/documents/{doc_id}", response_model=dict)
+async def delete_document(
+    id: str,
+    doc_id: str,
+    session: AsyncSession = Depends(get_db),
+    storage: StoragePort = Depends(get_storage),
+):
+    """
+    Document Deletion: Allows an underwriter to remove an erroneous or accidental document from the dossier.
+    Purges storage, DocumentModel, and references in state_json.
+    """
+    stmt = select(ApplicationModel).where(ApplicationModel.id == id).with_for_update()
+    app_model = (await session.execute(stmt)).scalar_one_or_none()
+    if not app_model:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Application '{id}' not found")
+
+    doc_stmt = select(DocumentModel).where(DocumentModel.id == doc_id, DocumentModel.application_id == id)
+    doc_model = (await session.execute(doc_stmt)).scalar_one_or_none()
+    if not doc_model:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Document '{doc_id}' not found in application '{id}'")
+
+    storage_key = build_storage_key(
+        application_id=id,
+        document_id=doc_id,
+        filename=doc_model.filename,
+    )
+
+    # 1. Purge from storage if supported
+    if hasattr(storage, "delete"):
+        try:
+            await asyncio.to_thread(storage.delete, storage_key)
+        except Exception as del_err:
+            logger.warning(f"Failed to delete storage object '{storage_key}': {del_err}")
+
+    # 2. Update state_json
+    state = dict(app_model.state_json or {})
+    doc_ids = [d for d in state.get("document_ids", []) if d != doc_id]
+    state["document_ids"] = doc_ids
+
+    manifest = dict(state.get("document_manifest", {}))
+    manifest.pop(doc_id, None)
+    state["document_manifest"] = manifest
+
+    classified = dict(state.get("classified_types", {}))
+    classified.pop(doc_id, None)
+    state["classified_types"] = classified
+
+    meta = dict(state.get("classification_metadata", {}))
+    meta.pop(doc_id, None)
+    state["classification_metadata"] = meta
+
+    filenames = dict(state.get("document_filenames", {}))
+    filenames.pop(doc_id, None)
+    state["document_filenames"] = filenames
+
+    pages = dict(state.get("document_pages", {}))
+    pages.pop(doc_id, None)
+    state["document_pages"] = pages
+
+    routes = dict(state.get("ocr_routes", {}))
+    routes.pop(doc_id, None)
+    state["ocr_routes"] = routes
+
+    app_model.state_json = state
+    app_model.updated_at = utc_now()
+
+    # 3. Delete database record
+    await session.delete(doc_model)
+    await session.commit()
+
+    logger.info(f"Deleted document '{doc_id}' from application '{id}'")
+    return {
+        "status": "ok",
+        "document_id": doc_id,
+        "application_id": id,
+        "deleted": True,
+    }
+

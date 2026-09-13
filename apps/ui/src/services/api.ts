@@ -180,6 +180,42 @@ export const api = {
   },
 
   /**
+   * Reclassify a document (human-in-the-loop override)
+   */
+  async reclassifyDocument(
+    applicationId: string,
+    docId: string,
+    docType: string
+  ): Promise<{ status: string; document_id: string; application_id: string; old_type: string; new_type: string }> {
+    const res = await authedFetch(
+      `${BASE_URL}/applications/${encodeURIComponent(applicationId)}/documents/${encodeURIComponent(docId)}/reclassify`,
+      {
+        method: 'PATCH',
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ doc_type: docType }),
+      }
+    );
+    return handleResponse(res);
+  },
+
+  /**
+   * Delete an erroneous or accidental document from the dossier
+   */
+  async deleteDocument(
+    applicationId: string,
+    docId: string
+  ): Promise<{ status: string; document_id: string; application_id: string; deleted: boolean }> {
+    const res = await authedFetch(
+      `${BASE_URL}/applications/${encodeURIComponent(applicationId)}/documents/${encodeURIComponent(docId)}`,
+      {
+        method: 'DELETE',
+        headers: authHeaders(),
+      }
+    );
+    return handleResponse(res);
+  },
+
+  /**
    * Poll processing job status
    */
   async getJobStatus(jobId: string): Promise<JobStatusResponse> {

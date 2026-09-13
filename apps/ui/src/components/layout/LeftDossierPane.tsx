@@ -11,6 +11,11 @@ import {
   ChevronRight,
   Sparkles,
   AlertTriangle,
+  Trash2,
+  Tag,
+  Loader2,
+  X,
+  AlertCircle,
 } from 'lucide-react';
 import { LoanApplication, DossierDocument } from '../../types/application';
 import { MaskedValue } from '../common/MaskedValue';
@@ -23,6 +28,9 @@ interface LeftDossierPaneProps {
   onSelectDocId: (id: string) => void;
   width: number;
   onUploadDocument?: (file: File, docTypeHint?: string) => Promise<void>;
+  onReclassifyDocument?: (docId: string, newType: string) => Promise<void>;
+  onDeleteDocument?: (docId: string) => Promise<void>;
+  isReadOnlyPreset?: boolean;
 }
 
 export const LeftDossierPane: React.FC<LeftDossierPaneProps> = ({
@@ -31,9 +39,17 @@ export const LeftDossierPane: React.FC<LeftDossierPaneProps> = ({
   onSelectDocId,
   width,
   onUploadDocument,
+  onReclassifyDocument,
+  onDeleteDocument,
+  isReadOnlyPreset = false,
 }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
+  const [editingDocId, setEditingDocId] = useState<string | null>(null);
+  const [selectedNewType, setSelectedNewType] = useState<string>('payslip');
+  const [deletingDocId, setDeletingDocId] = useState<string | null>(null);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const getDocIcon = (type: string) => {
     switch (type) {
@@ -275,6 +291,41 @@ export const LeftDossierPane: React.FC<LeftDossierPaneProps> = ({
                       )}
                     </div>
                   </div>
+
+                  {/* Underwriter Card Action Buttons: Reclassify & Delete */}
+                  {!isReadOnlyPreset && (
+                    <div className="flex items-center gap-1 opacity-60 hover:opacity-100 transition-opacity">
+                      {onReclassifyDocument && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingDocId(doc.id);
+                            setSelectedNewType(doc.document_type.toLowerCase());
+                            setActionError(null);
+                          }}
+                          className="p-1 rounded-xs hover:bg-theme-panel text-theme-muted hover:text-theme-primary transition-colors cursor-pointer"
+                          title="Change Document Classification Type"
+                        >
+                          <Tag className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                      {onDeleteDocument && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDeletingDocId(doc.id);
+                            setActionError(null);
+                          }}
+                          className="p-1 rounded-xs hover:bg-theme-flag-bg text-theme-muted hover:text-theme-flag transition-colors cursor-pointer"
+                          title="Remove Document from Dossier"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             );
@@ -293,6 +344,153 @@ export const LeftDossierPane: React.FC<LeftDossierPaneProps> = ({
           <span>Upload File</span>
         </button>
       </div>
+
+      {/* Reclassify Modal */}
+      {editingDocId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 select-none animate-in fade-in duration-150">
+          <div className="w-full max-w-sm rounded-xs bg-theme-card border border-theme-border shadow-2xl p-5 space-y-4">
+            <div className="flex items-center justify-between border-b border-theme-border pb-3">
+              <div className="flex items-center gap-2">
+                <Tag className="w-4 h-4 text-theme-brand" />
+                <h4 className="text-xs font-serif font-bold text-theme-primary">Reclassify Document</h4>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingDocId(null)}
+                className="text-theme-muted hover:text-theme-primary p-1"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {actionError && (
+              <div className="p-2.5 rounded-xs bg-theme-flag-bg border border-theme-flag-border text-theme-flag text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{actionError}</span>
+              </div>
+            )}
+
+            <p className="text-[11px] text-theme-secondary leading-relaxed">
+              Override the classification for <span className="font-mono font-bold text-theme-primary">{editingDocId}</span>.
+              The deterministic rule engine will evaluate this document under the selected category.
+            </p>
+
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-mono font-bold uppercase text-theme-muted">
+                Target Category
+              </label>
+              <select
+                value={selectedNewType}
+                onChange={(e) => setSelectedNewType(e.target.value)}
+                className="w-full p-2 rounded-xs border border-theme-border bg-theme-panel text-xs text-theme-primary focus:outline-none focus:ring-1 focus:ring-theme-brand"
+              >
+                <option value="payslip">Payslip (Salary Voucher)</option>
+                <option value="bank_statement">Bank Account Statement</option>
+                <option value="tax_acknowledgement">Tax Return (ITR-V Acknowledgement)</option>
+                <option value="id_card">KYC / ID Proof (PAN / Aadhaar)</option>
+                <option value="application_form">Loan Application Form</option>
+              </select>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-theme-border">
+              <button
+                type="button"
+                disabled={actionLoading}
+                onClick={() => setEditingDocId(null)}
+                className="px-3 py-1.5 text-xs font-mono rounded-xs border border-theme-border text-theme-secondary hover:text-theme-primary"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={actionLoading}
+                onClick={async () => {
+                  if (!onReclassifyDocument || !editingDocId) return;
+                  setActionLoading(true);
+                  setActionError(null);
+                  try {
+                    await onReclassifyDocument(editingDocId, selectedNewType);
+                    setEditingDocId(null);
+                  } catch (err) {
+                    setActionError(err instanceof Error ? err.message : 'Failed to reclassify');
+                  } finally {
+                    setActionLoading(false);
+                  }
+                }}
+                className="px-3 py-1.5 text-xs font-mono font-bold rounded-xs bg-theme-brand text-white hover:opacity-90 flex items-center gap-1.5"
+              >
+                {actionLoading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                <span>Confirm Override</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deletingDocId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 select-none animate-in fade-in duration-150">
+          <div className="w-full max-w-sm rounded-xs bg-theme-card border border-theme-flag-border shadow-2xl p-5 space-y-4">
+            <div className="flex items-center justify-between border-b border-theme-border pb-3">
+              <div className="flex items-center gap-2 text-theme-flag">
+                <Trash2 className="w-4 h-4" />
+                <h4 className="text-xs font-serif font-bold">Remove Document</h4>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDeletingDocId(null)}
+                className="text-theme-muted hover:text-theme-primary p-1"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {actionError && (
+              <div className="p-2.5 rounded-xs bg-theme-flag-bg border border-theme-flag-border text-theme-flag text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{actionError}</span>
+              </div>
+            )}
+
+            <p className="text-[11px] text-theme-secondary leading-relaxed">
+              Are you sure you want to remove <span className="font-mono font-bold text-theme-primary">{deletingDocId}</span> from this loan dossier?
+              This will permanently delete the file and all associated fact citations.
+            </p>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-theme-border">
+              <button
+                type="button"
+                disabled={actionLoading}
+                onClick={() => setDeletingDocId(null)}
+                className="px-3 py-1.5 text-xs font-mono rounded-xs border border-theme-border text-theme-secondary hover:text-theme-primary"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={actionLoading}
+                onClick={async () => {
+                  if (!onDeleteDocument || !deletingDocId) return;
+                  setActionLoading(true);
+                  setActionError(null);
+                  try {
+                    await onDeleteDocument(deletingDocId);
+                    setDeletingDocId(null);
+                  } catch (err) {
+                    setActionError(err instanceof Error ? err.message : 'Failed to delete');
+                  } finally {
+                    setActionLoading(false);
+                  }
+                }}
+                className="px-3 py-1.5 text-xs font-mono font-bold rounded-xs bg-theme-flag text-white hover:opacity-90 flex items-center gap-1.5"
+              >
+                {actionLoading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                <span>Delete Document</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Supplemental Document Upload Modal */}
       {onUploadDocument && (

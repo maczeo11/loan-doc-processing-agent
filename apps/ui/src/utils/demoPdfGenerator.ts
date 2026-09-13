@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Deterministic generator for synthetic demo PDF documents in APP-25195.
  * Creates standard PDF 1.4 byte arrays client-side without external dependencies.
  * Strictly adheres to AGENTS.md synthetic watermarking rules.
@@ -246,4 +246,81 @@ export function generateDemoPdfForDoc(docId: string): Uint8Array {
         ],
       ]);
   }
+}
+
+/**
+ * Generates an auditable, styled signed Credit Appraisal Memo (CAM) PDF receipt
+ * directly in the browser for preset/offline dossiers.
+ */
+export function generateSignedCamPdf(application: {
+  id: string;
+  applicant_name: string;
+  pan_masked: string;
+  loan_amount?: number;
+  status: string;
+  reviewer_decision?: string | null;
+  reviewer_notes?: string | null;
+  findings: Array<{ rule_id: string; rule_name: string; verdict: string; reason: string }>;
+  memo_markdown?: string;
+  payslip_facts?: { net_salary?: { amount: number } | null };
+  bank_facts?: { average_salary_credit?: { amount: number } | null; salary_credits?: Array<{ amount: number }> };
+  tax_facts?: { gross_total_income?: { amount: number } | null };
+}): Uint8Array {
+  const decision = application.reviewer_decision || (application.status === 'REVIEWED' ? 'APPROVED' : 'PENDING REVIEW');
+  const notes = application.reviewer_notes || 'Review executed per institutional credit underwriting guidelines.';
+  const statedNet = application.payslip_facts?.net_salary?.amount
+    ? `INR ${application.payslip_facts.net_salary.amount.toLocaleString()}`
+    : '—';
+  const avgDeposit = application.bank_facts?.average_salary_credit?.amount
+    ? `INR ${application.bank_facts.average_salary_credit.amount.toLocaleString()}`
+    : application.bank_facts?.salary_credits?.[0]?.amount
+    ? `INR ${application.bank_facts.salary_credits[0].amount.toLocaleString()}`
+    : '—';
+  const taxIncome = application.tax_facts?.gross_total_income?.amount
+    ? `INR ${application.tax_facts.gross_total_income.amount.toLocaleString()}`
+    : '—';
+
+  const page1Lines: PageLine[] = [
+    { text: 'FINSCAN AI — CREDIT APPRAISAL MEMORANDUM', size: 15, isBold: true },
+    { text: `Dossier Reference: ${application.id} | Status: ${application.status}`, size: 10, isBold: true },
+    { text: '-------------------------------------------------------------------------------------------------', size: 9 },
+    { text: `OFFICIAL DISPOSITION: [ ${decision} ]`, size: 13, isBold: true },
+    { text: `Underwriter Reviewer Rationale: ${notes}`, size: 10 },
+    { text: 'Prime Invariant: Deterministic code decides. AI explains. Human approves.', size: 9 },
+    { text: '-------------------------------------------------------------------------------------------------', size: 9 },
+    { text: 'APPLICANT & FINANCIAL AUDIT SUMMARY', size: 12, isBold: true },
+    { text: `Applicant Full Name: ${application.applicant_name}`, size: 10 },
+    { text: `Permanent Account Number (Masked): ${application.pan_masked}`, size: 10 },
+    { text: `Requested Loan Amount: ${application.loan_amount ? `INR ${application.loan_amount.toLocaleString()}` : '—'}`, size: 10, isBold: true },
+    { text: `Stated Net Monthly Salary: ${statedNet}`, size: 10 },
+    { text: `Bank Average Monthly Credit: ${avgDeposit}`, size: 10 },
+    { text: `ITR Gross Total Income: ${taxIncome}`, size: 10 },
+    { text: '-------------------------------------------------------------------------------------------------', size: 9 },
+    { text: 'DETERMINISTIC RULE FINDINGS', size: 12, isBold: true },
+  ];
+
+  for (const f of application.findings.slice(0, 6)) {
+    const vSymbol = f.verdict.toLowerCase() === 'pass' ? '[PASS]' : f.verdict.toLowerCase() === 'flag' ? '[FLAG]' : '[UNKNOWN]';
+    page1Lines.push({
+      text: `${vSymbol} ${f.rule_id} (${f.rule_name}): ${f.reason}`,
+      size: 9.5,
+      isBold: f.verdict.toLowerCase() !== 'pass',
+    });
+  }
+
+  const page2Lines: PageLine[] = [
+    { text: 'CREDIT APPRAISAL MEMO (CAM) NARRATIVE', size: 14, isBold: true },
+    { text: `Application ID: ${application.id}`, size: 10 },
+    { text: '-------------------------------------------------------------------------------------------------', size: 9 },
+  ];
+
+  const memoLines = (application.memo_markdown || 'No memo text synthesized.').split('\n');
+  for (const m of memoLines) {
+    const clean = m.replace(/[*#]/g, '').trim();
+    if (clean) {
+      page2Lines.push({ text: clean, size: 9.5, isBold: m.startsWith('#') || m.startsWith('**') });
+    }
+  }
+
+  return buildPdf([page1Lines, page2Lines]);
 }

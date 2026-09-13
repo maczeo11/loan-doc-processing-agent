@@ -4,6 +4,8 @@ import { sanitizePiiInText } from '../../utils/pii';
 import { api, downloadBlobUrl } from '../../services/api';
 import { Download, FileText, ShieldCheck, ShieldAlert, Loader2, AlertTriangle } from 'lucide-react';
 
+import { generateSignedCamPdf } from '../../utils/demoPdfGenerator';
+
 interface MemoNarrativeTabProps {
   application: LoanApplication;
   /** Preset archetypes have no backend dossier to export. */
@@ -94,12 +96,32 @@ export const MemoNarrativeTab: React.FC<MemoNarrativeTabProps> = ({
     downloadBlobUrl(URL.createObjectURL(blob), `CAM_${application.id}.md`);
   };
 
-  // Goes through the authenticated client so the session travels with it and a
-  // 409/501 renders inline instead of opening a raw JSON error page in a tab.
+  // Exports signed CAM PDF: client-side deterministic generation for presets,
+  // authenticated ReportLab API endpoint for live backend dossiers.
   const handleExportPdf = async () => {
     setExporting(true);
     setExportError(null);
     try {
+      if (isReadOnlyPreset) {
+        const bytes = generateSignedCamPdf({
+          id: application.id,
+          applicant_name: application.applicant_name,
+          pan_masked: application.pan_masked,
+          loan_amount: application.loan_amount,
+          status: application.status,
+          reviewer_decision: application.reviewer_decision,
+          reviewer_notes: application.reviewer_notes,
+          findings: application.findings,
+          memo_markdown: application.memo_markdown,
+          payslip_facts: application.payslip_facts,
+          bank_facts: application.bank_facts,
+          tax_facts: application.tax_facts,
+        });
+        const blob = new Blob([bytes.buffer as ArrayBuffer], { type: 'application/pdf' });
+        downloadBlobUrl(URL.createObjectURL(blob), `CAM_${application.id}.pdf`);
+        return;
+      }
+
       const result = await api.exportApplication(application.id, 'pdf');
       if ('blobUrl' in result) {
         downloadBlobUrl(result.blobUrl, result.filename);
@@ -127,13 +149,11 @@ export const MemoNarrativeTab: React.FC<MemoNarrativeTabProps> = ({
           <button
             type="button"
             onClick={handleExportPdf}
-            disabled={exporting || isReadOnlyPreset || !hasMemo}
+            disabled={exporting || !hasMemo}
             title={
-              isReadOnlyPreset
-                ? 'Offline preset — no backend dossier to export'
-                : !hasMemo
-                  ? 'Run the verification pipeline to generate the memo'
-                  : 'Download the official CAM PDF'
+              !hasMemo
+                ? 'Run the verification pipeline to generate the memo'
+                : 'Download the official signed CAM PDF'
             }
             className="flex items-center gap-1.5 px-2.5 py-1 rounded-xs bg-theme-panel hover:bg-theme-card text-theme-primary border border-theme-border text-xs font-serif font-semibold transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
           >

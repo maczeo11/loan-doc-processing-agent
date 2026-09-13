@@ -13,7 +13,7 @@ import {
   ShieldCheck,
   Table,
   FileText,
-  BookOpen,
+  Sparkles,
   History,
   CheckCircle,
   AlertTriangle,
@@ -156,18 +156,27 @@ export const RightInspectorPane: React.FC<RightInspectorPaneProps> = ({
 
           <button
             onClick={() => setActiveTab('policy')}
-            className={`flex items-center gap-1 px-1.5 py-1.5 rounded-xs text-[11px] font-mono font-bold transition-all whitespace-nowrap ${
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xs text-[11px] font-mono font-bold transition-all whitespace-nowrap ${
               activeTab === 'policy'
-                ? 'bg-theme-card text-theme-primary border border-theme-border shadow-xs'
-                : 'text-theme-muted hover:text-theme-primary hover:bg-theme-panel'
+                ? 'bg-theme-brand text-white border border-theme-brand shadow-sm ring-1 ring-theme-brand/30'
+                : 'bg-theme-brand/10 text-theme-brand hover:bg-theme-brand hover:text-white border border-theme-brand/30'
             }`}
+            title="Ask FinScan AI Copilot"
           >
-            <BookOpen className="w-3.5 h-3.5 text-theme-secondary" />
-            <span>Q&amp;A</span>
-            {flagCount > 0 && (
-              <span className="ml-0.5 px-1 py-0.5 rounded-full text-[10px] font-mono font-bold bg-theme-flag-bg text-theme-flag border border-theme-flag-border">
+            <Sparkles className="w-3.5 h-3.5 fill-current" />
+            <span>Ask AI</span>
+            {flagCount > 0 ? (
+              <span className={`ml-0.5 px-1.5 py-0.2 rounded-full text-[9px] font-mono font-bold ${
+                activeTab === 'policy'
+                  ? 'bg-white text-theme-brand'
+                  : 'bg-theme-brand text-white'
+              }`}>
                 {flagCount}
               </span>
+            ) : (
+              <span className={`w-1.5 h-1.5 rounded-full ${
+                activeTab === 'policy' ? 'bg-emerald-300 animate-pulse' : 'bg-theme-brand animate-pulse'
+              }`} />
             )}
           </button>
 

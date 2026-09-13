@@ -285,7 +285,7 @@ export const PolicyQaTab: React.FC<PolicyQaTabProps> = ({
 
   return (
     <div className="h-full flex flex-col min-h-0 bg-theme-card select-text">
-      {/* Copilot Header */}
+      {/* FinScan AI Header */}
       <div className="flex-none px-3.5 py-2.5 bg-theme-panel/70 border-b border-theme-border flex items-center justify-between">
         <div className="flex items-center gap-2 min-w-0">
           <div className="w-5 h-5 rounded-full bg-theme-brand/10 border border-theme-brand/30 flex items-center justify-center text-theme-brand shrink-0">
@@ -293,7 +293,7 @@ export const PolicyQaTab: React.FC<PolicyQaTabProps> = ({
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-1.5">
-              <span className="text-xs font-serif font-bold text-theme-primary truncate">Underwriter Copilot</span>
+              <span className="text-xs font-serif font-bold text-theme-primary truncate">Ask FinScan AI</span>
               <span className="w-1.5 h-1.5 rounded-full bg-theme-pass animate-pulse shrink-0" />
             </div>
             <p className="text-[10px] text-theme-muted font-mono truncate">Grounded in Policy &amp; Applicant Documents</p>

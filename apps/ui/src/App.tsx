@@ -754,16 +754,16 @@ function AppInner({
             isDemoMode={isDemoPreset}
           />
 
-          {/* Quick Floating Copilot Button (Visible in Center/Viewer pane when Copilot isn't active) */}
+          {/* Quick Floating AI Button (Visible in Center/Viewer pane when Q&A isn't active) */}
           {inspectorTab !== 'policy' && (
             <button
               type="button"
               onClick={handleOpenCopilot}
               className="absolute bottom-4 right-4 z-20 flex items-center gap-2 px-3 py-2 rounded-full bg-theme-brand text-white shadow-lg hover:shadow-xl hover:scale-105 transition-all text-xs font-mono font-bold group"
-              title="Open FinScan Copilot (Ctrl+K)"
+              title="Ask FinScan AI (Ctrl+K)"
             >
               <Sparkles className="w-4 h-4 group-hover:rotate-12 transition-transform" />
-              <span>Ask Copilot</span>
+              <span>Ask FinScan AI</span>
               <kbd className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded text-white/90">^K</kbd>
             </button>
           )}

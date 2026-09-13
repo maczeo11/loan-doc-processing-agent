@@ -70,15 +70,21 @@ fi
 # 5. Ensure db/redis are up, install/refresh deps + build UI, migrate, restart
 # the native systemd services. No image build happens anymore - api/worker/
 # outbox-dispatcher run directly on the host.
-echo "[4/6] Ensuring db/redis containers are up..."
-docker compose -f "${COMPOSE_FILE}" up -d db redis
+echo "[4/6] Ensuring db/pgbouncer/redis containers are up..."
+docker compose -f "${COMPOSE_FILE}" up -d db pgbouncer redis
 
 echo "[5/6] Installing Python deps, building UI, running migrations..."
 chmod +x "${SCRIPT_DIR}/setup_venv.sh"
 "${SCRIPT_DIR}/setup_venv.sh"
 "${ROOT_DIR}/.venv/bin/alembic" upgrade head
 
-echo "[6/6] Restarting native services..."
+echo "[6/6] Syncing systemd unit files and restarting native services..."
+# Unit files under infra/systemd/ are NOT symlinked into /etc/systemd/system -
+# without this, a change to a .service file (e.g. the gunicorn ExecStart
+# below) would sit unused in the repo forever after `git checkout` while the
+# box kept running whatever was installed at first bootstrap.
+sudo cp "${SCRIPT_DIR}/systemd/"*.service /etc/systemd/system/
+sudo systemctl daemon-reload
 sudo systemctl restart finscan-api finscan-worker finscan-outbox-dispatcher
 # Re-create Caddy too in case Caddyfile.production or docker-compose.yml
 # changed (e.g. DOMAIN_NAME) - cheap since it's a stock image, no build.
@@ -105,7 +111,22 @@ if [ ${HEALTHY} -eq 1 ]; then
     echo "${TARGET_REF}" > "${CURRENT_RELEASE_FILE}"
     HEALTH_OUTPUT=$(curl -s "${HEALTH_URL}")
 
-    # Reclaim disk: with only stock images (postgres/redis/caddy) left in
+    # Warm up every gunicorn worker before calling this deploy "done": the
+    # single curl above only ever reached ONE of the N worker processes
+    # (apps/api/main.py's own startup hook already eagerly loads the RAG
+    # policy index per-worker, but each worker's DB connection pool and OS
+    # page cache are still cold until it serves at least one real request).
+    # Without this, the first judge/underwriter request to land on whichever
+    # worker DIDN'T get the curl above pays that cold-start cost live during
+    # the demo instead of here, right after deploy, where nobody's watching.
+    READY_URL="http://localhost/health/ready"
+    WARMUP_REQUESTS=$(( ${API_WORKERS:-4} * 2 ))
+    echo "Warming ${WARMUP_REQUESTS} requests across API workers..."
+    for i in $(seq 1 "${WARMUP_REQUESTS}"); do
+        curl -sf "${READY_URL}" > /dev/null 2>&1 || true
+    done
+
+    # Reclaim disk: with only stock images (postgres/pgbouncer/redis/caddy) left in
     # Docker, this is now mostly routine hygiene rather than the load-bearing
     # fix it was under the old all-Docker model - but still safe/cheap to run.
     echo "Pruning dangling images and capping build cache..."

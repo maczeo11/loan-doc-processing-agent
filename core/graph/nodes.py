@@ -342,8 +342,8 @@ def ocr_and_classify_node(state: LoanApplicationState) -> Dict[str, Any]:
     app_id = state.get("application_id")
     if app_id and doc_texts_map:
         try:
-            from core.rag.indexer import IndexManager
-            IndexManager().index_application_dossier(
+            from core.rag.indexer import get_default_index_manager
+            get_default_index_manager().index_application_dossier(
                 app_id,
                 doc_texts_map,
                 classified_types=classified,
@@ -736,10 +736,10 @@ def retrieve_policy_node(state: LoanApplicationState) -> Dict[str, Any]:
         queries.append("bank statement balance arithmetic opening closing balance credits debits")
 
     try:
-        from core.rag.indexer import IndexManager
+        from core.rag.indexer import get_default_index_manager
         from core.rag.retriever import HybridRetriever
 
-        manager = IndexManager()
+        manager = get_default_index_manager()
         manager.load_policy_corpus(policy_dir=_resolve_policy_dir())
         retriever = HybridRetriever(index_manager=manager, policy_dir=_resolve_policy_dir())
         for query in queries:

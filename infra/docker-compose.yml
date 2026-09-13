@@ -1,8 +1,9 @@
-## Docker scope under the systemd-native deploy model: ONLY Postgres, Redis,
-## and Caddy run here. api/worker/outbox-dispatcher run natively on the host
-## via systemd (infra/systemd/*.service) - see docs/deployment_guide.md.
-## 5432/6379 are published to the host (unlike the old all-Docker setup) since
-## the native processes reach them via localhost, not a Docker network alias.
+## Docker scope under the systemd-native deploy model: ONLY Postgres,
+## PgBouncer, Redis, and Caddy run here. api/worker/outbox-dispatcher run
+## natively on the host via systemd (infra/systemd/*.service) - see
+## docs/deployment_guide.md. 5432/6379/6432 are published to the host (unlike
+## the old all-Docker setup) since the native processes reach them via
+## localhost, not a Docker network alias.
 
 services:
   db:
@@ -10,7 +11,14 @@ services:
     container_name: finscan-db
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgrespassword
+      # Pre-existing gap this touches while adding pgbouncer below: was a bare
+      # literal here, independent of whatever password DATABASE_URL in .env
+      # actually specified - changing one without the other silently broke
+      # auth. Both `db` and `pgbouncer` now read the same ${POSTGRES_PASSWORD}
+      # (docker compose auto-loads .env from the CWD deploy.sh runs from -
+      # see infra/deploy.sh); the literal default preserves today's local-dev
+      # behavior for anyone who hasn't set it.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgrespassword}
       POSTGRES_DB: finscan
     ports:
       - "5432:5432"
@@ -21,6 +29,40 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
+
+  pgbouncer:
+    # Connection pooler sitting in front of Postgres. Why: gunicorn (see
+    # infra/systemd/finscan-api.service) runs several worker PROCESSES, each
+    # with its own SQLAlchemy pool (pool_size=10, max_overflow=20 -
+    # apps/api/db/session.py) - at API_WORKERS=4 that's up to 120 possible
+    # Postgres backend connections from the API alone, before the worker and
+    # outbox-dispatcher processes are even counted, against Postgres's
+    # default max_connections=100. PgBouncer's transaction-mode pooling
+    # multiplexes all of that onto a small number of real backend
+    # connections. The app's DATABASE_URL points here (:6432); migrations use
+    # ALEMBIC_DATABASE_URL to talk to `db` (:5432) directly instead, since DDL
+    # doesn't tolerate transaction pooling - see apps/api/config.py.
+    image: edoburu/pgbouncer:1.24.1
+    container_name: finscan-pgbouncer
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: "postgres://postgres:${POSTGRES_PASSWORD:-postgrespassword}@db:5432/finscan"
+      POOL_MODE: transaction
+      MAX_CLIENT_CONN: 500
+      DEFAULT_POOL_SIZE: 25
+      # Auth is native postgres MD5/SCRAM passthrough (edoburu image default);
+      # no separate userlist.txt needed for this single-user setup.
+      AUTH_TYPE: scram-sha-256
+    ports:
+      - "6432:6432"
+    # No healthcheck here: the edoburu/pgbouncer image doesn't bundle a
+    # psql/pg_isready client to probe itself with, and a shell-only TCP probe
+    # is unreliable across busybox builds. infra/deploy.sh's end-to-end
+    # `curl /health` retry loop is the real gate - it only passes once the
+    # API can actually complete a query through this container.
     restart: unless-stopped
 
   redis:

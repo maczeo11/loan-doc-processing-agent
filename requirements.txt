@@ -1,6 +1,10 @@
 # Core Web & API
 fastapi>=0.110.0
 uvicorn[standard]>=0.28.0
+# Process manager for uvicorn workers in production (infra/systemd/finscan-api.service):
+# auto-restarts a crashed worker, graceful reload/shutdown, one supervisor
+# for N worker processes instead of raw `uvicorn --workers N`.
+gunicorn>=21.2.0
 python-multipart>=0.0.9
 pydantic>=2.6.0
 pydantic-settings>=2.2.0

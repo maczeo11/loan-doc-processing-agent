@@ -62,7 +62,7 @@ before running `ec2_setup.sh`/`deploy.sh`:
 cd /opt/finscan/app
 docker compose -f infra/docker-compose.yml stop api worker outbox-dispatcher migrate caddy
 docker compose -f infra/docker-compose.yml rm -f api worker outbox-dispatcher migrate caddy
-docker compose -f infra/docker-compose.yml up -d db redis   # now with published ports
+docker compose -f infra/docker-compose.yml up -d db pgbouncer redis   # now with published ports
 # Only relevant if STORAGE_BACKEND=local (production uses S3) — migrate the
 # old dossiers_storage Docker volume to a host directory:
 mkdir -p /opt/finscan/app/data/storage
@@ -80,13 +80,30 @@ Postgres/Redis data volumes (`postgres_data`, `redis_data`) are never touched.
 
 Internally: records the current release for rollback → `git fetch`+`checkout`
 → stamps `RELEASE_VERSION`/`GIT_SHA`/`BUILD_TIMESTAMP` into `.env` → ensures
-Postgres/Redis are up → `infra/setup_venv.sh` (idempotent — pip/npm caches
-make a no-op reinstall fast) → `alembic upgrade head` → `sudo systemctl
-restart finscan-api finscan-worker finscan-outbox-dispatcher` → recreates the
-Caddy container (picks up any Caddyfile/env changes) → polls
-`http://localhost/health` up to 30×2s → prunes dangling Docker
-images/build-cache on success (mostly routine hygiene now — stock images
-don't accumulate the way custom-built ones did).
+Postgres/PgBouncer/Redis are up → `infra/setup_venv.sh` (idempotent — pip/npm
+caches make a no-op reinstall fast) → `alembic upgrade head` (against
+`ALEMBIC_DATABASE_URL`, i.e. Postgres directly — never through PgBouncer's
+transaction pooling) → re-copies `infra/systemd/*.service` into
+`/etc/systemd/system/` + `daemon-reload` (so a unit-file change actually
+takes effect, not just a code change) → `sudo systemctl restart finscan-api
+finscan-worker finscan-outbox-dispatcher` (the API now runs under gunicorn
+supervising `API_WORKERS` uvicorn worker processes, not a single raw
+`uvicorn --workers` process) → recreates the Caddy container (picks up any
+Caddyfile/env changes) → polls `http://localhost/health` up to 30×2s → warms
+`http://localhost/health/ready` `2 × API_WORKERS` times so the first real
+request after a deploy doesn't land on a still-cold worker → prunes dangling
+Docker images/build-cache on success (mostly routine hygiene now — stock
+images don't accumulate the way custom-built ones did).
+
+**Why PgBouncer:** each gunicorn worker owns its own SQLAlchemy pool
+(`pool_size=10, max_overflow=20`), so at `API_WORKERS=4` the API alone can
+open up to 120 Postgres backend connections — before the worker and
+outbox-dispatcher processes are counted — against Postgres's default
+`max_connections=100`. PgBouncer (`infra/docker-compose.yml`, transaction
+pooling, `:6432`) multiplexes all of that onto a small number of real
+backend connections; the app's `DATABASE_URL` points here, `alembic` uses
+`ALEMBIC_DATABASE_URL` to reach Postgres on `:5432` directly since DDL
+doesn't tolerate transaction pooling.
 
 From Windows: `.\scripts\update-ec2.ps1` (runs `allow-my-ip.ps1` first, then
 SSHes in and runs `deploy.sh` remotely).

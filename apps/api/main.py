@@ -4,6 +4,7 @@ FinScan AI: FastAPI Application Entrypoint.
 Serves REST API and mounts React SPA from apps/ui/dist.
 """
 
+import logging
 import os
 from contextlib import asynccontextmanager
 from fastapi import Depends, FastAPI
@@ -21,8 +22,31 @@ from apps.api.middleware.rate_limit import close_redis_client
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    _warm_rag_index()
     yield
     await close_redis_client()
+
+
+def _warm_rag_index() -> None:
+    """
+    Eagerly loads the shared policy RAG index once per worker process, instead
+    of leaving it to load lazily on that worker's first /questions request.
+    Without this, whichever underwriter's question happens to land on a
+    freshly-started gunicorn worker pays the full policy-corpus parse/embed
+    cost inline with their request - worse right after every deploy, when
+    every worker is cold at once. Failure here must never block startup: the
+    lazy path in apps/api/routes/review.py still loads it correctly later.
+    """
+    try:
+        from core.rag.indexer import get_default_index_manager
+        from apps.api.routes.review import _resolve_policy_dir
+
+        get_default_index_manager().load_policy_corpus(policy_dir=_resolve_policy_dir())
+    except Exception:
+        logging.getLogger("finscan.api.startup").warning(
+            "RAG policy index warmup failed; will load lazily on first /questions call.",
+            exc_info=True,
+        )
 
 
 app = FastAPI(

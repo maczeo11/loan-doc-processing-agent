@@ -1,9 +1,10 @@
 [Unit]
-Description=FinScan AI - API (uvicorn)
-# db/redis are Docker containers with restart:unless-stopped; docker.service
-# starting does not guarantee THEY are healthy yet, but Restart=on-failure
-# below absorbs the race (uvicorn crash-loops a few seconds until Postgres/
-# Redis accept connections, then settles) - acceptable for a hackathon.
+Description=FinScan AI - API (gunicorn + uvicorn workers)
+# db/pgbouncer/redis are Docker containers with restart:unless-stopped;
+# docker.service starting does not guarantee THEY are healthy yet, but
+# Restart=on-failure below absorbs the race (workers crash-loop a few
+# seconds until Postgres/PgBouncer/Redis accept connections, then settles)
+# - acceptable for a hackathon.
 After=network-online.target docker.service
 Wants=network-online.target
 
@@ -13,7 +14,22 @@ User=ubuntu
 Group=ubuntu
 WorkingDirectory=/opt/finscan/app
 EnvironmentFile=/opt/finscan/app/.env
-ExecStart=/opt/finscan/app/.venv/bin/uvicorn apps.api.main:app --host 0.0.0.0 --port 8000 --workers 2
+# gunicorn supervises N uvicorn worker PROCESSES: auto-restarts one that
+# crashes without taking the others down, and does a graceful (finish
+# in-flight requests, then swap) reload/shutdown instead of uvicorn's own
+# --workers hard-killing everything. API_WORKERS comes from .env (rule of
+# thumb (2 x vCPU) + 1; defaults to 4 if unset). --timeout is gunicorn's
+# worker-silence kill threshold, not a request timeout - generous because a
+# slow LLM/RAG call on the /questions path must not get killed mid-flight.
+ExecStart=/bin/bash -lc 'exec /opt/finscan/app/.venv/bin/gunicorn apps.api.main:app \
+    -k uvicorn.workers.UvicornWorker \
+    --bind 0.0.0.0:8000 \
+    --workers "${API_WORKERS:-4}" \
+    --timeout 60 \
+    --graceful-timeout 30 \
+    --keep-alive 5 \
+    --access-logfile - \
+    --error-logfile -'
 Restart=on-failure
 RestartSec=3
 StandardOutput=journal

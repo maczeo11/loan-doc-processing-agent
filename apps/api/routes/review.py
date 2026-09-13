@@ -10,6 +10,8 @@ Endpoints:
 
 from typing import Optional, List, Dict, Any, Literal
 import asyncio
+import hashlib
+import json
 import os
 import uuid
 import logging
@@ -292,8 +294,28 @@ def _finding_evidence_citations(state_json: Dict[str, Any], cited_rule_ids: set)
     return out
 
 
+def _qa_cache_key(application_id: str, question: str, updated_at, history_present: bool) -> str:
+    """
+    Deterministic cache key for a (dossier-state, question) pair. Keying on
+    `app_model.updated_at` rather than a fixed TTL alone means the cache
+    self-invalidates the moment anything about the dossier changes
+    (reclassification, a re-run pipeline, a new review decision) instead of
+    ever risking a stale answer surviving a real state change. Questions with
+    chat history attached are never cached - the answer legitimately depends
+    on prior turns, not just the latest question text.
+    """
+    digest = hashlib.sha256(question.encode("utf-8")).hexdigest()[:24]
+    updated_marker = updated_at.isoformat() if updated_at else "never"
+    return f"finscan:qa:{application_id}:{updated_marker}:{digest}"
+
+
 @router.post("/applications/{id}/questions", response_model=QuestionResponse)
-async def ask_question(id: str, payload: QuestionRequest, session: AsyncSession = Depends(get_db)):
+async def ask_question(
+    id: str,
+    payload: QuestionRequest,
+    session: AsyncSession = Depends(get_db),
+    redis_client: aioredis.Redis = Depends(get_redis_client),
+):
     """
     RAG-grounded question answering over the credit policy corpus AND this
     application's own deterministic findings - the latter is what lets an
@@ -304,6 +326,10 @@ async def ask_question(id: str, payload: QuestionRequest, session: AsyncSession 
     firewalled through core/rag/grounding.py: it must cite at least one real
     policy chunk or finding rule_id, or it is withheld rather than returned
     as if it were evidence-backed (Prime Invariant: no hallucinated content).
+
+    Repeat questions on an unchanged dossier are served from Redis instead of
+    re-running retrieval/synthesis (and, if an LLM is configured, re-paying
+    for that call) - see _qa_cache_key for the invalidation rule.
     """
     from sqlalchemy import select as _select
 
@@ -332,12 +358,34 @@ async def ask_question(id: str, payload: QuestionRequest, session: AsyncSession 
     question = " ".join(question.split())
     raw_history = [m.model_dump() for m in payload.history] if payload.history else None
 
+    cache_key: Optional[str] = None
+    if redis_client is not None and not raw_history:
+        cache_key = _qa_cache_key(id, question, app_model.updated_at, history_present=False)
+        try:
+            cached = await redis_client.get(cache_key)
+        except Exception as cache_err:  # noqa: BLE001 - cache is an optimization, never a hard dependency
+            logger.debug(f"QA cache read failed for '{cache_key}': {cache_err}")
+            cached = None
+        if cached:
+            try:
+                return QuestionResponse.model_validate_json(cached)
+            except Exception:
+                pass  # Corrupt/old-shape cache entry - fall through and recompute.
+
+    async def _respond(response: QuestionResponse) -> QuestionResponse:
+        if cache_key is not None:
+            try:
+                await redis_client.setex(cache_key, settings.QA_CACHE_TTL_SECONDS, response.model_dump_json())
+            except Exception as cache_err:  # noqa: BLE001
+                logger.debug(f"QA cache write failed for '{cache_key}': {cache_err}")
+        return response
+
     try:
-        from core.rag.indexer import IndexManager
+        from core.rag.indexer import get_default_index_manager
         from core.rag.retriever import HybridRetriever
 
         policy_dir = _resolve_policy_dir()
-        manager = IndexManager()
+        manager = get_default_index_manager()
         manager.load_policy_corpus(policy_dir=policy_dir)
 
         # Index applicant's own documents for dossier retrieval
@@ -370,10 +418,10 @@ async def ask_question(id: str, payload: QuestionRequest, session: AsyncSession 
     # Only abstain immediately when there is truly nothing to answer from:
     # no policy passages, no dossier passages, AND no application findings to explain.
     if not hits and not findings_context and not settings.AGENTIC_QA_ENABLED:
-        return QuestionResponse(
+        return await _respond(QuestionResponse(
             answer="No relevant policy passages or dossier evidence found for this question. I abstain rather than guess.",
             citations=[],
-        )
+        ))
 
     # Experimental: read-only tool-calling agent (apps/api/agent.py), off by default.
     if settings.AGENTIC_QA_ENABLED:
@@ -389,11 +437,11 @@ async def ask_question(id: str, payload: QuestionRequest, session: AsyncSession 
         )
         if agentic_result is not None:
             cited_rules = {rid for rid in finding_rule_ids if f"[{rid}]" in agentic_result["answer"]}
-            return QuestionResponse(
+            return await _respond(QuestionResponse(
                 answer=agentic_result["answer"],
                 citations=agentic_result["citations"]
                 + _finding_evidence_citations(dict(app_model.state_json or {}), cited_rules),
-            )
+            ))
 
     citations: List[Dict[str, Any]] = []
     for hit in hits:
@@ -462,7 +510,7 @@ async def ask_question(id: str, payload: QuestionRequest, session: AsyncSession 
     if cited_rules:
         citations = citations + _finding_evidence_citations(dict(app_model.state_json or {}), cited_rules)
 
-    return QuestionResponse(answer=answer_text, citations=citations)
+    return await _respond(QuestionResponse(answer=answer_text, citations=citations))
 
 
 def _resolve_policy_dir() -> str:

@@ -30,6 +30,12 @@ class Settings(BaseSettings):
     BUILD_TIMESTAMP: str = "unknown"
     API_PORT: int = 8000
     DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/finscan"
+    # Migrations run DDL, which does not tolerate PgBouncer's transaction
+    # pooling well (a schema change must see its own prior statements on the
+    # SAME backend connection). Empty means "use DATABASE_URL as-is" (no
+    # PgBouncer in front, e.g. local dev); set this to the direct
+    # :5432 URL once DATABASE_URL points at PgBouncer's :6432 in production.
+    ALEMBIC_DATABASE_URL: str = ""
     DATABASE_ECHO: bool = False
     REDIS_URL: str = "redis://localhost:6379/0"
     REDIS_CONNECT_TIMEOUT_SECONDS: float = 2.0
@@ -77,6 +83,22 @@ class Settings(BaseSettings):
     # (apps/api/agent.py). Off by default; the endpoint falls back to the
     # existing single-shot LLM path on any failure regardless of this flag.
     AGENTIC_QA_ENABLED: bool = False
+
+    # How long an /applications/{id}/questions answer is served from Redis
+    # before falling back to a fresh retrieval+synthesis pass. Keyed on the
+    # dossier's updated_at too (see review.py:_qa_cache_key), so a real state
+    # change invalidates the cache immediately regardless of this TTL - this
+    # only bounds how long an answer to an UNCHANGED dossier can be reused.
+    QA_CACHE_TTL_SECONDS: int = 900
+
+    # asyncpg's per-connection prepared-statement cache is incompatible with
+    # PgBouncer's transaction pooling mode (a "prepared statement does not
+    # exist" error surfaces once a session's underlying backend connection
+    # rotates mid-session). 0 disables it. Safe to leave at 0 even against a
+    # direct (non-pooled) Postgres connection - it costs a little re-parse
+    # overhead per query, not correctness - so this defaults to 0 unconditionally
+    # rather than requiring every deployment to remember to set it.
+    DATABASE_STATEMENT_CACHE_SIZE: int = 0
 
     # Rate limits & spend guards
     MAX_ACTIVE_JOBS_PER_USER: int = 2

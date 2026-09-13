@@ -339,11 +339,25 @@ class IndexManager:
         """Clears all cached application indices."""
         self._app_indices.clear()
 
-    def load_policy_corpus(self, policy_dir: str = "policies", use_bge: Optional[bool] = None) -> IsolatedIndex:
+    def is_policy_loaded(self) -> bool:
+        """True once the shared policy index has at least one chunk indexed."""
+        return self._policy_index is not None and len(self._policy_index.chunks) > 0
+
+    def load_policy_corpus(self, policy_dir: str = "policies", use_bge: Optional[bool] = None, force: bool = False) -> IsolatedIndex:
         """
         Loads all markdown policy files from policy_dir into the shared policy index.
         `use_bge=False` forces TF-IDF; None auto-tries BGE unless FINSCAN_USE_BGE=0.
+
+        No-ops (besides returning the existing index) when the policy corpus is
+        already loaded, unless `force=True`. On a shared/singleton IndexManager
+        this is what makes reuse actually cheap: without it, every caller
+        (each /questions request, each LangGraph retrieve_policy_node run)
+        would re-parse every policy markdown file and rebuild BM25 from
+        scratch, even though the chunks never change at runtime.
         """
+        if not force and self.is_policy_loaded():
+            return self.get_policy_index()
+
         policy_index = self.get_policy_index()
         if not os.path.exists(policy_dir):
             logger.warning(f"Policy directory {policy_dir} does not exist.")
@@ -417,5 +431,25 @@ class IndexManager:
             logger.info(f"Indexed {len(all_chunks)} chunks from {len(document_texts)} docs for application {application_id}")
 
         return app_index
+
+
+# Process-wide singleton. `IndexManager()` used to be instantiated fresh on
+# every /questions call (apps/api/routes/review.py), which re-chunked and
+# re-embedded the entire policy corpus (markdown parsing + BGE/TF-IDF vector
+# build) from scratch on EVERY question - the actual dominant cost in that
+# endpoint, dwarfing anything a response cache alone could fix. One shared
+# instance keeps the policy index (and per-application dossier indices)
+# warm in memory for the life of the worker process instead of rebuilding it
+# per request. apps/api/main.py's startup hook calls load_policy_corpus()
+# once eagerly so even the FIRST request after a deploy is warm.
+_default_index_manager: Optional["IndexManager"] = None
+
+
+def get_default_index_manager() -> "IndexManager":
+    """Returns the process-wide IndexManager, creating it on first use."""
+    global _default_index_manager
+    if _default_index_manager is None:
+        _default_index_manager = IndexManager()
+    return _default_index_manager
 
 

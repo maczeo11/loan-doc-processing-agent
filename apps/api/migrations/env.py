@@ -30,6 +30,12 @@ def get_url() -> str:
     ini_url = config.get_main_option("sqlalchemy.url")
     if ini_url:
         return ini_url
+    # DDL against a PgBouncer transaction-pooled connection is unsafe (see
+    # Settings.ALEMBIC_DATABASE_URL) - prefer the direct-Postgres override
+    # when one is configured, over both the raw env var and the app's
+    # (possibly pooled) DATABASE_URL.
+    if settings.ALEMBIC_DATABASE_URL:
+        return settings.ALEMBIC_DATABASE_URL
     url = os.getenv("DATABASE_URL", settings.DATABASE_URL)
     return url
 

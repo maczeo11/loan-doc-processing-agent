@@ -46,7 +46,12 @@ def get_async_engine(
             future=True,
         )
     else:
-        # PostgreSQL with asyncpg connection pool
+        # PostgreSQL with asyncpg connection pool. statement_cache_size=0
+        # (Settings.DATABASE_STATEMENT_CACHE_SIZE) keeps this compatible with
+        # PgBouncer transaction pooling, where a session's backend connection
+        # can rotate between queries - asyncpg's default per-connection
+        # prepared-statement cache would otherwise intermittently fail with
+        # "prepared statement does not exist" once that happens.
         return create_async_engine(
             url,
             echo=echo_mode,
@@ -54,6 +59,7 @@ def get_async_engine(
             pool_size=10,
             max_overflow=20,
             future=True,
+            connect_args={"statement_cache_size": settings.DATABASE_STATEMENT_CACHE_SIZE},
         )
 
 

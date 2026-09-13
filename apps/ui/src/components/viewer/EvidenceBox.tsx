@@ -42,18 +42,22 @@ export const EvidenceBox: React.FC<EvidenceBoxProps> = ({
         top: `${bounds.top}px`,
         width: `${bounds.width}px`,
         height: `${bounds.height}px`,
+        backgroundColor: isSelected ? 'rgba(217, 119, 6, 0.16)' : 'rgba(37, 99, 235, 0.10)',
+        border: isSelected ? '2px solid rgb(217, 119, 6)' : '1.5px solid rgb(37, 99, 235)',
         boxShadow: isSelected
-          ? '0 0 0 2px var(--theme-unknown, #b45309), 0 0 10px 2px rgb(180 83 9 / 0.35)'
-          : '0 0 0 1px var(--theme-brand, #1d4ed8)',
+          ? '0 0 0 2px rgba(245, 158, 11, 0.4), 0 0 14px 3px rgba(217, 119, 6, 0.3)'
+          : '0 0 0 1px rgba(59, 130, 246, 0.3)',
       }}
-      className="absolute z-20 pointer-events-none rounded-[2px] bg-transparent"
+      className={`absolute z-20 pointer-events-none rounded-[2px] transition-all duration-150 ${
+        isSelected ? 'animate-pulse' : ''
+      }`}
       role="region"
       aria-label={`Evidence citation on page ${evidence.page_number}, ${confidencePct}% confidence`}
     >
       {/* Compact tag pill — outside the highlight, never over the text. */}
       <div
         className={`absolute left-0 z-30 flex items-center gap-1 whitespace-nowrap ${
-          flipBelow ? 'top-full mt-1' : '-top-5'
+          flipBelow ? 'top-full mt-1.5' : '-top-6'
         }`}
       >
         <span className="text-[9px] font-bold font-mono tracking-wider uppercase px-1.5 py-0.5 rounded-xs bg-theme-unknown text-white shadow">

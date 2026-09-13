@@ -13,6 +13,7 @@ export type PdfSourceType = 'real' | 'demo' | 'unavailable';
 
 interface UsePdfDocumentOptions {
   docId: string;
+  initialPage?: number;
   /**
    * Either an in-memory buffer, or `{applicationId, documentId}` which is
    * fetched through the authenticated API client. A plain URL string fetched
@@ -23,10 +24,10 @@ interface UsePdfDocumentOptions {
   isDemoMode: boolean;
 }
 
-export function usePdfDocument({ docId, pdfSource, isDemoMode }: UsePdfDocumentOptions) {
+export function usePdfDocument({ docId, initialPage, pdfSource, isDemoMode }: UsePdfDocumentOptions) {
   const [pdfDocument, setPdfDocument] = useState<pdfjsLib.PDFDocumentProxy | null>(null);
   const [numPages, setNumPages] = useState<number>(1);
-  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [currentPage, setCurrentPage] = useState<number>(initialPage && initialPage >= 1 ? initialPage : 1);
   const [zoom, setZoom] = useState<number>(100);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isRendering, setIsRendering] = useState<boolean>(false);
@@ -35,6 +36,10 @@ export function usePdfDocument({ docId, pdfSource, isDemoMode }: UsePdfDocumentO
   /** Object URL for a non-PDF (scanned image) document, else null. */
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [canvasDimensions, setCanvasDimensions] = useState<{ width: number; height: number }>({
+    width: 595,
+    height: 842,
+  });
+  const [unscaledDimensions, setUnscaledDimensions] = useState<{ width: number; height: number }>({
     width: 595,
     height: 842,
   });
@@ -51,10 +56,10 @@ export function usePdfDocument({ docId, pdfSource, isDemoMode }: UsePdfDocumentO
     });
   }, []);
 
-  // Reset to page 1 whenever docId changes
+  // Update page when docId or initialPage changes
   useEffect(() => {
-    setCurrentPage(1);
-  }, [docId]);
+    setCurrentPage(initialPage && initialPage >= 1 ? initialPage : 1);
+  }, [docId, initialPage]);
 
   /**
    * Shrink-to-fit on first render only. Never enlarges: a page narrower than
@@ -184,6 +189,11 @@ export function usePdfDocument({ docId, pdfSource, isDemoMode }: UsePdfDocumentO
         if (!ctx) return;
 
         const scale = zoom / 100;
+        const unscaledViewport = page.getViewport({ scale: 1 });
+        setUnscaledDimensions({
+          width: Math.floor(unscaledViewport.width),
+          height: Math.floor(unscaledViewport.height),
+        });
         const viewport = page.getViewport({ scale });
         const outputScale = window.devicePixelRatio || 1;
 
@@ -293,6 +303,7 @@ export function usePdfDocument({ docId, pdfSource, isDemoMode }: UsePdfDocumentO
     canvasRef,
     containerRef,
     canvasDimensions,
+    unscaledDimensions,
     pdfDocument,
     imageUrl,
     numPages,

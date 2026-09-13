@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import type { EvidenceRef, BoundingBox } from '../../types/contracts';
 import { EvidenceBox } from './EvidenceBox';
 import { AlertCircle } from 'lucide-react';
@@ -15,6 +15,8 @@ interface BoundingBoxOverlayProps {
   activeRuleId?: string | null;
   canvasWidth: number;
   canvasHeight: number;
+  unscaledPdfWidth?: number;
+  unscaledPdfHeight?: number;
   currentDocId: string;
   currentPage: number;
 }
@@ -22,7 +24,9 @@ interface BoundingBoxOverlayProps {
 function computePixelBounds(
   box: BoundingBox,
   renderedWidth: number,
-  renderedHeight: number
+  renderedHeight: number,
+  unscaledWidth?: number,
+  unscaledHeight?: number
 ): PixelBounds | null {
   if (
     box.x0 === undefined ||
@@ -48,9 +52,9 @@ function computePixelBounds(
     width = Math.round((box.x1 - box.x0) * renderedWidth);
     height = Math.round((box.y1 - box.y0) * renderedHeight);
   } else {
-    // PDF points: scale using page_width/page_height if available, otherwise default to 595 x 842 pt
-    const pageWidth = box.page_width || 595;
-    const pageHeight = box.page_height || 842;
+    // PDF points: scale using page_width/page_height if available, otherwise unscaledWidth/unscaledHeight or default 595 x 842 pt
+    const pageWidth = box.page_width || unscaledWidth || 595;
+    const pageHeight = box.page_height || unscaledHeight || 842;
     left = Math.round((box.x0 / pageWidth) * renderedWidth);
     top = Math.round((box.y0 / pageHeight) * renderedHeight);
     width = Math.round(((box.x1 - box.x0) / pageWidth) * renderedWidth);
@@ -71,13 +75,17 @@ export const BoundingBoxOverlay: React.FC<BoundingBoxOverlayProps> = ({
   activeRuleId,
   canvasWidth,
   canvasHeight,
+  unscaledPdfWidth,
+  unscaledPdfHeight,
   currentDocId,
   currentPage,
 }) => {
   // Clear/hide stale evidence if document or page does not match
   if (!activeEvidence) return null;
+  const docMatches =
+    activeEvidence.document_id?.toLowerCase() === currentDocId?.toLowerCase();
   if (
-    activeEvidence.document_id !== currentDocId ||
+    !docMatches ||
     activeEvidence.page_number !== currentPage
   ) {
     return null;
@@ -95,7 +103,13 @@ export const BoundingBoxOverlay: React.FC<BoundingBoxOverlayProps> = ({
     );
   }
 
-  const bounds = computePixelBounds(activeEvidence.bounding_box, canvasWidth, canvasHeight);
+  const bounds = computePixelBounds(
+    activeEvidence.bounding_box,
+    canvasWidth,
+    canvasHeight,
+    unscaledPdfWidth,
+    unscaledPdfHeight
+  );
   if (!bounds) return null;
 
   return (

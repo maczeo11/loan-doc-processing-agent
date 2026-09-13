@@ -20,9 +20,24 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({
   isDemoMode,
 }) => {
   const {
+    activeEvidence,
+    activeRuleId,
+    targetPageToNavigate,
+    clearTargetPage,
+    clearActiveEvidence,
+  } = useEvidenceNavigation();
+
+  const isCurrentDocCited =
+    activeEvidence &&
+    activeEvidence.document_id?.toLowerCase() === docId?.toLowerCase();
+
+  const initialPage = isCurrentDocCited ? activeEvidence.page_number : 1;
+
+  const {
     canvasRef,
     containerRef,
     canvasDimensions,
+    unscaledDimensions,
     pdfDocument,
     imageUrl,
     numPages,
@@ -39,24 +54,17 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({
     zoomOut,
     resetZoom,
     fitWidth,
-  } = usePdfDocument({ docId, pdfSource, isDemoMode });
-
-  const {
-    activeEvidence,
-    activeRuleId,
-    targetPageToNavigate,
-    clearTargetPage,
-    clearActiveEvidence,
-  } = useEvidenceNavigation();
+  } = usePdfDocument({ docId, initialPage, pdfSource, isDemoMode });
 
   // Navigate to target page when requested by evidence citation.
   useEffect(() => {
-    if (
-      targetPageToNavigate === null ||
-      !pdfDocument ||
+    if (targetPageToNavigate === null || !pdfDocument) {
+      return;
+    }
+    const docMatches =
       !activeEvidence ||
-      activeEvidence.document_id !== docId
-    ) {
+      activeEvidence.document_id?.toLowerCase() === docId?.toLowerCase();
+    if (!docMatches) {
       return;
     }
     if (currentPage === targetPageToNavigate) {
@@ -79,8 +87,7 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({
   ]);
 
   const hasActiveEvidenceOnCurrentPage =
-    activeEvidence &&
-    activeEvidence.document_id === docId &&
+    isCurrentDocCited &&
     activeEvidence.page_number === currentPage;
 
   return (
@@ -249,6 +256,8 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({
                 activeRuleId={activeRuleId}
                 canvasWidth={canvasDimensions.width}
                 canvasHeight={canvasDimensions.height}
+                unscaledPdfWidth={unscaledDimensions.width}
+                unscaledPdfHeight={unscaledDimensions.height}
                 currentDocId={docId}
                 currentPage={currentPage}
               />

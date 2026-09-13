@@ -57,16 +57,33 @@ app = FastAPI(
 )
 
 def _cors_origins() -> list[str]:
+    origins = [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ]
     domain = os.getenv("DOMAIN_NAME", "").strip()
     if domain and domain != "localhost":
-        return [f"https://{domain}", f"https://www.{domain}"]
-    # Local/dev same-origin (Vite proxy); explicit, no wildcard+credentials.
-    return ["http://localhost:3000", "http://127.0.0.1:3000"]
+        origins.extend([
+            f"http://{domain}",
+            f"https://{domain}",
+            f"http://www.{domain}",
+            f"https://www.{domain}",
+        ])
+    extra = os.getenv("CORS_ORIGINS", "").strip()
+    if extra:
+        for o in extra.split(","):
+            cleaned = o.strip()
+            if cleaned and cleaned != "*":
+                origins.append(cleaned)
+    return origins
 
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_origins(),
+    allow_origin_regex=os.getenv("CORS_ORIGIN_REGEX", r"https?://.*\.vercel\.app"),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

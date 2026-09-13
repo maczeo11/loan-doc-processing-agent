@@ -33,7 +33,7 @@ const PulseDot: React.FC = () => (
   </span>
 );
 
-const STATUS_SPECS: Partial<Record<ApplicationStatus, StatusSpec>> = {
+const STATUS_SPECS: Partial<Record<ApplicationStatus | 'REVIEWED_REJECTED', StatusSpec>> = {
   READY_FOR_REVIEW: {
     accent: 'unknown',
     label: 'Ready for Review',
@@ -64,6 +64,11 @@ const STATUS_SPECS: Partial<Record<ApplicationStatus, StatusSpec>> = {
     label: 'Reviewed & Signed Off',
     icon: <CheckCircle2 className="w-3.5 h-3.5" />,
   },
+  REVIEWED_REJECTED: {
+    accent: 'flag',
+    label: 'Rejected & Closed',
+    icon: <XCircle className="w-3.5 h-3.5" />,
+  },
   NEEDS_INFORMATION: {
     accent: 'unknown',
     label: 'Needs Information',
@@ -78,13 +83,20 @@ const STATUS_SPECS: Partial<Record<ApplicationStatus, StatusSpec>> = {
 
 interface StatusPillProps {
   status: ApplicationStatus;
+  /**
+   * REVIEWED covers both approve and reject outcomes (see App.tsx
+   * handleSubmitReview) — without this, a rejected dossier rendered the
+   * identical green "Reviewed & Signed Off" pill as an approved one.
+   */
+  reviewerDecision?: string | null;
   className?: string;
 }
 
-export const StatusPill: React.FC<StatusPillProps> = ({ status, className = '' }) => {
+export const StatusPill: React.FC<StatusPillProps> = ({ status, reviewerDecision, className = '' }) => {
+  const lookupKey = status === 'REVIEWED' && reviewerDecision === 'REJECTED' ? 'REVIEWED_REJECTED' : status;
   // Every ApplicationStatus has a spec; this covers unknown values from an
   // older or newer backend rather than printing a raw enum next to prose labels.
-  const spec: StatusSpec = STATUS_SPECS[status] ?? {
+  const spec: StatusSpec = STATUS_SPECS[lookupKey] ?? {
     accent: 'neutral',
     label: status,
     icon: <Clock className="w-3.5 h-3.5 text-theme-muted" />,

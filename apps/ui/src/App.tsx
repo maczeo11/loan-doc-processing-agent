@@ -629,6 +629,7 @@ function AppInner({
         selectedAppId={selectedAppId}
         onSelectAppId={handleSelectAppId}
         status={application.status}
+        reviewerDecision={application.reviewer_decision}
         createdAt={application.created_at}
         updatedAt={application.updated_at}
         onOpenShortcuts={() => setShortcutsOpen(true)}
@@ -684,16 +685,36 @@ function AppInner({
         </div>
       )}
 
-      {/* Elevated Pipeline Action Banner (F-04): Appears whenever application is in UPLOADED state */}
-      {application.status === 'UPLOADED' && (
-        <div className="bg-theme-brand/10 border-b border-theme-brand/30 px-4 py-2 flex items-center justify-between gap-3 shrink-0">
+      {/* Elevated Pipeline Action Banner: Appears on UPLOADED, or when re-run is warranted (NEEDS_INFO, FAILED) */}
+      {(application.status === 'UPLOADED' || application.status === 'NEEDS_INFORMATION' || application.status === 'FAILED') && (
+        <div className={`border-b px-4 py-2 flex items-center justify-between gap-3 shrink-0 ${
+          application.status === 'FAILED'
+            ? 'bg-rose-50 border-rose-200'
+            : application.status === 'NEEDS_INFORMATION'
+            ? 'bg-amber-50 border-amber-200'
+            : 'bg-theme-brand/10 border-theme-brand/30'
+        }`}>
           <div className="flex items-center gap-2 text-xs">
-            <span className="w-2 h-2 rounded-full bg-theme-brand animate-pulse shrink-0" />
+            <span className={`w-2 h-2 rounded-full shrink-0 ${
+              application.status === 'FAILED'
+                ? 'bg-rose-600'
+                : application.status === 'NEEDS_INFORMATION'
+                ? 'bg-amber-600 animate-pulse'
+                : 'bg-theme-brand animate-pulse'
+            }`} />
             <span className="font-mono font-bold text-theme-primary">
-              Dossier Ingested ({application.documents.length} {application.documents.length === 1 ? 'document' : 'documents'})
+              {application.status === 'UPLOADED'
+                ? `Dossier Ingested (${application.documents.length} ${application.documents.length === 1 ? 'document' : 'documents'})`
+                : application.status === 'NEEDS_INFORMATION'
+                ? `Supplemental Information Requested (${application.documents.length} ${application.documents.length === 1 ? 'document' : 'documents'})`
+                : 'Pipeline Execution Halted'}
             </span>
             <span className="text-theme-secondary hidden sm:inline">
-              · Ready for OCR perception, fact extraction, and deterministic credit rules.
+              {application.status === 'UPLOADED'
+                ? '· Ready for OCR perception, fact extraction, and deterministic credit rules.'
+                : application.status === 'NEEDS_INFORMATION'
+                ? '· New documents uploaded? Run pipeline to re-verify applicant dossier.'
+                : '· Re-run pipeline to retry perception and deterministic rules.'}
             </span>
           </div>
           <button
@@ -715,7 +736,7 @@ function AppInner({
             ) : (
               <>
                 <Play className="w-3.5 h-3.5 fill-current" />
-                <span>Run Verification Pipeline</span>
+                <span>{application.status === 'UPLOADED' ? 'Run Verification Pipeline' : 'Re-run Pipeline'}</span>
                 <ArrowRight className="w-3.5 h-3.5" />
               </>
             )}

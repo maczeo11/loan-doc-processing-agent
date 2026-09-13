@@ -311,15 +311,15 @@ async def test_invalid_state_transition_rejected_with_conflict(test_env):
     """
     session_factory, client = test_env
 
-    # 1. Seed application already in READY_FOR_REVIEW status
+    # 1. Seed application already in sealed REVIEWED status
     app_id = "APP-TERMINAL-01"
     async with session_factory() as session:
         app = ApplicationModel(
             id=app_id,
             applicant_name="Review Ready User",
             loan_amount=400000.0,
-            status="READY_FOR_REVIEW",
-            state_json={"status": "READY_FOR_REVIEW", "status_history": []},
+            status="REVIEWED",
+            state_json={"status": "REVIEWED", "status_history": []},
         )
         session.add(app)
         await session.commit()

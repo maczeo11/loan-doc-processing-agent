@@ -9,6 +9,7 @@ export interface DashboardApp {
   application_id: string;
   applicant_name: string;
   status: string;
+  reviewer_decision?: string | null;
   loan_amount?: number;
   loan_purpose?: string | null;
   created_at?: string;
@@ -223,7 +224,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                         {typeof a.loan_amount === 'number' ? formatCurrency(a.loan_amount) : '—'}
                       </td>
                       <td className="px-3 py-2.5">
-                        <StatusPill status={a.status as ApplicationStatus} />
+                        <StatusPill status={a.status as ApplicationStatus} reviewerDecision={a.reviewer_decision} />
                       </td>
                       <td className="px-3 py-2.5 font-mono text-theme-muted whitespace-nowrap">
                         {relativeAge(a.created_at)}

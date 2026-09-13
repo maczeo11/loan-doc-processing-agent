@@ -133,6 +133,10 @@ async def list_applications(
             "loan_amount": app.loan_amount,
             "loan_purpose": app.loan_purpose,
             "status": app.status,
+            # REVIEWED covers both APPROVED and REJECTED outcomes; the dashboard
+            # list needs this to avoid rendering an identical "signed off" pill
+            # for a rejected dossier.
+            "reviewer_decision": (app.state_json or {}).get("reviewer_decision"),
             "created_at": app.created_at.isoformat() if app.created_at else None,
         }
         for app in rows
@@ -226,8 +230,11 @@ async def trigger_processing(
                 status=app_model.status,
             )
 
-    # 3. Transition check: Only UPLOADED applications can be newly queued
-    if app_model.status != "UPLOADED":
+    # 3. Transition check: Prevent queueing only if already sealed (REVIEWED) or currently active
+    # Underwriters can freely re-run after uploading documents, reclassifying, or investigating
+    # in READY_FOR_REVIEW, NEEDS_INFORMATION, FAILED, and CANCELLED.
+    ALLOWED_PROCESS_STATUSES = {"UPLOADED", "READY_FOR_REVIEW", "NEEDS_INFORMATION", "FAILED", "CANCELLED"}
+    if app_model.status not in ALLOWED_PROCESS_STATUSES:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Application '{id}' in status '{app_model.status}' cannot be transitioned to QUEUED",

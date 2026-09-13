@@ -344,6 +344,36 @@ export const RightInspectorPane: React.FC<RightInspectorPaneProps> = ({
                     ? 'All checks verified. Ready for underwriter sign-off below.'
                     : 'Resolve flagged items or request information before signing.'}
               </p>
+
+              {/* Re-run Pipeline action button for actionable dossiers */}
+              {onProcessDossier && application.status !== 'REVIEWED' && application.status !== 'UPLOADED' && (
+                <div className="pt-2 border-t border-theme-border/60 mt-2">
+                  <button
+                    type="button"
+                    disabled={isProcessing || isReadOnlyPreset || application.documents.length === 0}
+                    onClick={() => onProcessDossier()}
+                    title={
+                      isReadOnlyPreset
+                        ? 'Offline preset — nothing to process on the backend'
+                        : 'Re-execute OCR perception, entity extraction, and deterministic credit rules'
+                    }
+                    className="w-full py-1.5 px-2.5 rounded-xs text-[11px] font-mono font-bold bg-theme-panel hover:bg-theme-card border border-theme-border hover:border-theme-brand text-theme-primary hover:text-theme-brand flex items-center justify-center gap-1.5 shadow-2xs transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isProcessing ? (
+                      <>
+                        <Loader2 className="w-3 h-3 animate-spin text-theme-brand" />
+                        <span>Re-running Pipeline…</span>
+                      </>
+                    ) : (
+                      <>
+                        <Play className="w-3 h-3 fill-current text-theme-brand" />
+                        <span>Re-run Verification Pipeline</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
+
               {uninspectedFlags > 0 && (
                 <p className="text-[10px] text-theme-flag font-mono mt-1">
                   {uninspectedFlags} flagged {uninspectedFlags === 1 ? 'finding has' : 'findings have'} unopened
@@ -418,13 +448,26 @@ export const RightInspectorPane: React.FC<RightInspectorPaneProps> = ({
       {/* Sticky Bottom HITL Underwriter Sign-Off Footer */}
       <div className="border-t border-theme-border bg-theme-panel p-3.5 space-y-2.5 z-20 flex-none shadow-xs">
         {application.status === 'REVIEWED' ? (
-          <div className="p-3 rounded-xs bg-theme-pass-bg border border-theme-pass-border text-xs text-theme-pass flex items-center justify-between font-mono font-bold">
-            <span className="flex items-center gap-2">
-              <CheckCircle className="w-4 h-4 text-theme-pass" />
-              <span>Dossier Decision Recorded: {application.reviewer_decision || 'APPROVED'}</span>
-            </span>
-            <span className="text-[10px] text-theme-muted font-normal">Thread Sealed</span>
-          </div>
+          application.reviewer_decision === 'REJECTED' ? (
+            <div className="p-3 rounded-xs bg-theme-flag-bg border border-theme-flag-border text-xs text-theme-flag flex items-center justify-between font-mono font-bold">
+              <span className="flex items-center gap-2">
+                <XCircle className="w-4 h-4 text-theme-flag" />
+                <span>Dossier Decision Recorded: REJECTED</span>
+              </span>
+              <span className="text-[10px] text-theme-muted font-normal">Thread Sealed</span>
+            </div>
+          ) : (
+            <div className="p-3 rounded-xs bg-theme-pass-bg border border-theme-pass-border text-xs text-theme-pass flex items-center justify-between font-mono font-bold">
+              <span className="flex items-center gap-2">
+                <CheckCircle className="w-4 h-4 text-theme-pass" />
+                {/* No decision on record but status is REVIEWED is an anomaly,
+                    not a silent "approved" default — surface it rather than
+                    fabricating a disposition that was never recorded. */}
+                <span>Dossier Decision Recorded: {application.reviewer_decision || 'UNKNOWN (see audit trail)'}</span>
+              </span>
+              <span className="text-[10px] text-theme-muted font-normal">Thread Sealed</span>
+            </div>
+          )
         ) : (
           <>
             <div className="flex items-center justify-between text-[11px] text-theme-secondary">

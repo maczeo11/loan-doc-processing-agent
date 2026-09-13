@@ -124,7 +124,7 @@ export const api = {
   /**
    * List recent applications
    */
-  async listApplications(): Promise<Array<{ application_id: string; applicant_name: string; loan_amount: number; status: string; created_at?: string }>> {
+  async listApplications(): Promise<Array<{ application_id: string; applicant_name: string; loan_amount: number; status: string; reviewer_decision?: string | null; created_at?: string }>> {
     const res = await authedFetch(`${BASE_URL}/applications`);
     return handleResponse(res);
   },

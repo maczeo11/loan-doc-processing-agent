@@ -11,6 +11,7 @@ interface HeaderProps {
   selectedAppId: string;
   onSelectAppId: (id: string) => void;
   status: ApplicationStatus;
+  reviewerDecision?: string | null;
   createdAt?: string;
   updatedAt?: string;
   onOpenShortcuts: () => void;
@@ -27,6 +28,7 @@ export const Header: React.FC<HeaderProps> = ({
   selectedAppId,
   onSelectAppId,
   status,
+  reviewerDecision,
   createdAt,
   updatedAt,
   onOpenShortcuts,
@@ -122,7 +124,7 @@ export const Header: React.FC<HeaderProps> = ({
           important signal on the screen, so it stays visible from md up; only
           the wider SLA readout waits for xl. */}
       <div className="hidden md:flex items-center gap-4 shrink-0">
-        <StatusPill status={status} />
+        <StatusPill status={status} reviewerDecision={reviewerDecision} />
         {/* The SLA readout is wide; at xl (1280) it crowded the header on the
             most common laptop width. It waits for 2xl now. */}
         <div className="hidden 2xl:block">

@@ -78,6 +78,13 @@ docs/hld/
 
 # Local study / viva-prep notes (never commit)
 study_mt/
+*.zip
+
+# AI / Agent config directories (never commit)
+.agents/
+.claude/
+.cursor/
+.copilot/
 
 
 # Local end-to-end demo scratch: generated PDFs, throwaway harness output

@@ -89,3 +89,8 @@ study_mt/
 
 # Local end-to-end demo scratch: generated PDFs, throwaway harness output
 demo_live/
+scratch/
+
+# PPT temp files
+~$*.pptx
+~$*.docx

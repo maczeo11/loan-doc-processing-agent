@@ -62,6 +62,10 @@ apps/ui/.next/
 *.gguf
 *.pt
 *.pth
+# The DistilBERT challenger was evaluated and rejected (see audit/v2/). Its weights
+# can never be committed, so keep the whole directory out rather than tracking a
+# tokenizer with no model behind it.
+ml/artifacts/distilbert/
 data/synthetic_dossiers/**/*.pdf
 !data/manifests/
 
@@ -74,7 +78,6 @@ htmlcov/
 .ruff_cache/
 mlruns/
 docs/hld/
-.agents/
 
 # Local study / viva-prep notes (never commit)
 study_mt/
@@ -94,3 +97,7 @@ scratch/
 # PPT temp files
 ~$*.pptx
 ~$*.docx
+
+# Presentation: sources are tracked, rendered slide images are not (regenerate
+# them from the .pptx via presentation_assets/build_deck.py).
+presentation_assets/preview/

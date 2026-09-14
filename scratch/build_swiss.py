@@ -763,6 +763,6 @@ T(s, gbox(3, 10, Inches(6.42), Inches(0.3)),
 T(s, Box(x, FOLIO_Y, w, Inches(0.4)), "17", size=26, color=RGBColor(0x45, 0x43, 0x3E), font=F_LT)
 carry_notes(s, 17)
 
-OUT_TEMP = os.path.join(OUT_DIR, "FinScan_Redesign_Swiss_new.pptx")
-prs.save(OUT_TEMP)
-print("saved", OUT_TEMP)
+OUT = os.path.join(OUT_DIR, "FinScan_Redesign_Swiss.pptx")
+prs.save(OUT)
+print("saved", OUT)

@@ -58,6 +58,17 @@ if git rev-parse --git-dir > /dev/null 2>&1; then
     git fetch --tags origin || true
     # Checkout target ref non-destructively
     git checkout "${TARGET_REF}"
+    # `git checkout <branch>` when that branch is ALREADY checked out is a
+    # no-op - it does not fast-forward the local ref to match origin. A repeat
+    # deploy of a branch name (e.g. "main") after a fetch above pulled in new
+    # remote commits would silently redeploy the box's stale local HEAD while
+    # every log line claimed success. Only applies when TARGET_REF really is
+    # a branch that exists both locally and on origin - a bare SHA or tag
+    # checkout is already exact and must not be merged with anything.
+    if git show-ref --verify --quiet "refs/heads/${TARGET_REF}" \
+        && git show-ref --verify --quiet "refs/remotes/origin/${TARGET_REF}"; then
+        git merge --ff-only "origin/${TARGET_REF}"
+    fi
 fi
 
 # 4. Apply Release Version Stamp

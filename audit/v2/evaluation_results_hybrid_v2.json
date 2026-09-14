@@ -5,12 +5,12 @@
     "macro_f1": 0.8619,
     "weighted_f1": 0.8839,
     "accuracy": 0.9048,
-    "p50_latency_ms": 10.38,
-    "p95_latency_ms": 64.31,
-    "mean_latency_ms": 15.77,
+    "p50_latency_ms": 14.93,
+    "p95_latency_ms": 90.98,
+    "mean_latency_ms": 23.1,
     "heap_delta_mb": 184.08,
-    "process_rss_mb": 696.62,
-    "ram_mb": 696.62,
+    "process_rss_mb": 696.81,
+    "ram_mb": 696.81,
     "total_samples": 63,
     "evaluated_classes": [
       "UNKNOWN",
@@ -125,7 +125,7 @@
   },
   "comparison_vs_baseline": {
     "winner": "BASELINE",
-    "rationale": "Baseline ships: Baseline Macro-F1 (0.9823) meets target (>= 0.90). Challenger gain (-0.1204) does not justify the resource overhead (Challenger Latency: 10.38ms vs Baseline: 6.16ms; Process RSS: 696.62MB vs 154.74MB).",
+    "rationale": "Baseline ships: Baseline Macro-F1 (0.9823) meets target (>= 0.90). Challenger gain (-0.1204) does not justify the resource overhead (Challenger Latency: 14.93ms vs Baseline: 7.76ms; Process RSS: 696.81MB vs 166.45MB).",
     "baseline_f1": 0.9823,
     "challenger_f1": 0.8619,
     "f1_delta": -0.1204

@@ -1,187 +1,200 @@
 # LangGraph Workflow Documentation
 
-**Stateful Orchestration with Human-in-the-Loop Checkpoints**
+**Authoritative Stateful Orchestration with Human-in-the-Loop Checkpoints**  
+*Owned by Member 2 (Bhanu Teja — Team Lead & Orchestration Lead)*
 
 ---
 
 ## 📋 Overview
 
-FinScan AI uses LangGraph for orchestrating the document processing pipeline. The StateGraph ensures transactional state management, checkpoint persistence, and explicit `interrupt()` points for human review.
+FinScan AI utilizes **LangGraph** (`StateGraph`) as its core orchestration engine. The stateful pipeline coordinates document perception, ML classification, fact extraction, deterministic rules, hybrid policy RAG, and auditable narrative synthesis. 
+
+The execution strictly enforces the **Prime Invariant**:
+> *"Deterministic code decides. AI explains. A human approves. Every number traces back to a page in a document."*
 
 ---
 
-## 🔄 StateGraph Architecture
+## 🔄 Lifecycle State Transitions
+
+The pipeline moves through 8 lifecycle states defined in [`core/contracts/state.py`](../core/contracts/state.py). Every transition is appended immutably to `status_history`.
 
 ```mermaid
 stateDiagram-v2
-    [*] --> UPLOADED: Application Created
-    
-    UPLOADED --> QUEUED: Job Published to Queue
-    
-    QUEUED --> PROCESSING: Worker Starts Processing
-    
-    PROCESSING --> Triage: triage_node
-    
-    Triage --> FAILED: Empty Dossier
-    Triage --> OCRClassify: Valid Manifest
-    
-    OCRClassify --> ExtractFacts: ocr_and_classify_node
-    
-    ExtractFacts --> EvaluateRules: extract_facts_node
-    
-    EvaluateRules --> RetrievePolicy: evaluate_rules_node
-    
-    RetrievePolicy --> Synthesize: retrieve_policy_node
-    
-    Synthesize --> ValidateGrounding: synthesize_summary_node
-    
-    ValidateGrounding --> READY_FOR_REVIEW: validate_grounding_node
-    
-    READY_FOR_REVIEW --> Halt: interrupt() Checkpoint
-    
-    Halt --> REVIEWED: Human Approves
-    Halt --> NEEDS_INFORMATION: Human Requests Info
-    Halt --> CANCELLED: Human Cancels
-    
+    [*] --> UPLOADED: Dossier Manifest Created
+    UPLOADED --> QUEUED: Outbox Job Enqueued
+    QUEUED --> PROCESSING: Worker Picks Up Lease
+
+    state PROCESSING {
+        [*] --> Triage: Node 1 (triage_node)
+        Triage --> OCRClassify: Valid Manifest
+        OCRClassify --> ExtractFacts: Node 2 (ocr_and_classify_node)
+        ExtractFacts --> EvaluateRules: Node 3 (extract_facts_node)
+        EvaluateRules --> RetrievePolicy: Node 4 (evaluate_rules_node)
+        RetrievePolicy --> SynthesizeSummary: Node 5 (retrieve_policy_node)
+        SynthesizeSummary --> ValidateGrounding: Node 6 (synthesize_summary_node)
+        ValidateGrounding --> [*]: Node 7 (validate_grounding_node)
+    }
+
+    Triage --> FAILED: Empty / Invalid Manifest
+    ValidateGrounding --> READY_FOR_REVIEW: Citation Gate Passed
+
+    state READY_FOR_REVIEW {
+        Paused: ⏸ interrupt_before=["human_review"]
+        Paused --> Checkpointed: Snapshot to SqliteSaver
+    }
+
+    READY_FOR_REVIEW --> REVIEWED: Underwriter Approves / Rejects
+    READY_FOR_REVIEW --> NEEDS_INFORMATION: Underwriter Requests Info
+    READY_FOR_REVIEW --> CANCELLED: Reviewer Cancels
+
     FAILED --> [*]
     REVIEWED --> [*]
     NEEDS_INFORMATION --> [*]
     CANCELLED --> [*]
-    
-    note right of Halt
-        System PAUSES here
-        Awaiting human decision
-    end note
 ```
 
 ---
 
-## 🧩 Node Execution Sequence
+## 🧩 Detailed Node Execution Pipeline
 
 ```mermaid
-graph TB
-    subgraph "Node 1: Triage"
-        T1[triage_node] --> T2{Dossier Valid?}
-        T2 -->|Empty| T3[Transition to FAILED]
-        T2 -->|Valid| T4[Continue to OCR]
+flowchart TD
+    Start([Worker: job_ref received]) --> N1[Node 1: triage_node]
+
+    %% Node 1
+    N1 -->|Empty dossier| FailEnd[Status: FAILED<br/>route_after_triage: __end__] --> EndNode([END])
+    N1 -->|Valid manifest| N2[Node 2: ocr_and_classify_node]
+
+    %% Node 2
+    subgraph Perception_Classification [Perception & Classification]
+        N2 --> Router[OCR Router: native PyMuPDF -> CPU Paddle/Tesseract]
+        Router --> CacheText[(Cache in document_texts)]
+        CacheText --> MLClass[TF-IDF + Logistic Regression Classifier]
+        MLClass --> RejectionGate{Confidence >= 0.40?}
+        RejectionGate -->|Yes| AssignClass[Assign Canonical Class]
+        RejectionGate -->|No / Exception| KeywordFallback[Keyword Heuristic Fallback]
+        AssignClass --> RAGIndex[Index Application Dossier]
+        KeywordFallback --> RAGIndex
     end
-    
-    subgraph "Node 2: OCR & Classify"
-        O1[ocr_and_classify_node] --> O2[Route PDF Pages]
-        O2 --> O3[Native Text: PyMuPDF]
-        O2 --> O4[Scanned: PaddleOCR]
-        O2 --> O5[Fallback: Textract]
-        O3 --> O6[Classify Pages]
-        O4 --> O6
-        O5 --> O6
+
+    RAGIndex --> N3[Node 3: extract_facts_node]
+
+    %% Node 3
+    subgraph Extraction [Fact Extraction with Provenance]
+        N3 --> ReuseCache[Reuse cached document_texts]
+        ReuseCache --> PExt[PayslipExtractor]
+        ReuseCache --> BExt[BankStatementExtractor]
+        ReuseCache --> TExt[TaxReturnExtractor]
+        ReuseCache --> IExt[IdCardExtractor]
+        PExt --> EvidenceRefs[Bind EvidenceRef: page_number + bbox]
+        BExt --> EvidenceRefs
+        TExt --> EvidenceRefs
+        IExt --> EvidenceRefs
     end
-    
-    subgraph "Node 3: Extract Facts"
-        E1[extract_facts_node] --> E2[Payslip Extractor]
-        E1 --> E3[Bank Statement Extractor]
-        E1 --> E4[Tax Return Extractor]
-        E1 --> E5[ID Card Extractor]
-        E2 --> E6[Bind EvidenceRefs]
-        E3 --> E6
-        E4 --> E6
-        E5 --> E6
+
+    EvidenceRefs --> N4[Node 4: evaluate_rules_node]
+
+    %% Node 4
+    subgraph Deterministic_Rules [Deterministic Rules Engine - HUMAN ONLY]
+        N4 --> R_COMP[RULE-COMP-01: Completeness Checklist]
+        N4 --> R_INC[RULE-INC-01: Net Salary vs Bank Credits within 5%]
+        N4 --> R_TAX[RULE-TAX-01: ITR Gross vs 12x Payslip Gross]
+        N4 --> R_ID1[RULE-ID-01: Fuzzy Name & PAN Match]
+        N4 --> R_ID2[RULE-ID-02: Cross-ID Consistency]
+        N4 --> R_BANK[RULE-BANK-01: Balance Arithmetic open+cr-dr=close]
+        R_COMP --> FindingsList[Aggregate Typed Findings: PASS / FLAG / UNKNOWN]
+        R_INC --> FindingsList
+        R_TAX --> FindingsList
+        R_ID1 --> FindingsList
+        R_ID2 --> FindingsList
+        R_BANK --> FindingsList
     end
-    
-    subgraph "Node 4: Evaluate Rules"
-        R1[evaluate_rules_node] --> R2[RULE-COMP-01]
-        R2 --> R3[RULE-INC-01]
-        R3 --> R4[RULE-TAX-01]
-        R4 --> R5[RULE-ID-01]
-        R5 --> R6[Aggregate Findings]
+
+    FindingsList --> N5[Node 5: retrieve_policy_node]
+
+    %% Node 5
+    subgraph RAG_Retrieval [Finding-Aware Policy RAG]
+        N5 --> QueryGen[Generate Queries from Rule Flags]
+        QueryGen --> BM25[BM25 Lexical Search]
+        QueryGen --> FAISS[FAISS Dense BGE-small Search]
+        BM25 --> RRF[Reciprocal Rank Fusion RRF]
+        FAISS --> RRF
+        RRF --> CanonicalBackstop[Merge Canonical Backstop Clauses]
     end
-    
-    subgraph "Node 5: Retrieve Policy"
-        P1[retrieve_policy_node] --> P2[Hybrid Search BM25+Dense]
-        P2 --> P3[RRF Fusion]
-        P3 --> P4[Ranked Policy Chunks]
+
+    CanonicalBackstop --> N6[Node 6: synthesize_summary_node]
+
+    %% Node 6
+    subgraph Synthesis [CAM Narrative Synthesis]
+        N6 --> MemoBuilder[build_appraisal_memo]
+        MemoBuilder --> PromptIsolation[Wrap untrusted data in context_data tags]
+        PromptIsolation --> LLMCall[OpenCodeZenLLM: Groq / Zen / Qwen]
+        LLMCall --> DraftMemo[CAM Markdown with Bracketed Citations]
     end
-    
-    subgraph "Node 6: Synthesize Summary"
-        S1[synthesize_summary_node] --> S2[LLM Generates Narrative]
-        S2 --> S3[Credit Appraisal Memo]
+
+    DraftMemo --> N7[Node 7: validate_grounding_node]
+
+    %% Node 7
+    subgraph Grounding_Gate [Citation Validation Firewall]
+        N7 --> ParseCitations[Parse citation tokens]
+        ParseCitations --> MatchAuth{All citations in retrieved_chunk_ids?}
+        MatchAuth -->|Unauthorized| StripClaims[Drop Ungrounded Claim Blocks]
+        MatchAuth -->|Authorized| RetainClaims[Validate & Sanitize Text]
+        StripClaims --> UpdateStatus[Status: READY_FOR_REVIEW<br/>summary_grounded=True]
+        RetainClaims --> UpdateStatus
     end
-    
-    subgraph "Node 7: Validate Grounding"
-        G1[validate_grounding_node] --> G2{All Claims Cited?}
-        G2 -->|No| G3[Strip Ungrounded Claims]
-        G2 -->|Yes| G4[Accept Memo]
-        G3 --> G4
-        G4 --> G5[State: READY_FOR_REVIEW]
-    end
-    
-    subgraph "Node 8: Human Review (INTERRUPT)"
-        H1[human_review_node] --> H2["interrupt() HALT"]
-        H2 --> H3{Wait for Resume}
-        H3 -->|APPROVED| H4[State: REVIEWED]
-        H3 -->|REJECTED| H5[State: FAILED]
-        H3 -->|NEEDS_INFO| H6[State: NEEDS_INFORMATION]
-    end
-    
-    T4 --> O1
-    O6 --> E1
-    E6 --> R1
-    R6 --> P1
-    P4 --> S1
-    S3 --> G1
-    G5 --> H1
-    
-    style H2 fill:#F44336,color:#FFF
-    style G1 fill:#FF9800
-    style R1 fill:#9C27B0
+
+    UpdateStatus --> InterruptHalt{interrupt_before Checkpoint}
+    InterruptHalt -->|Durable State Snapshot| SQLiteSave[(SqliteSaver: checkpoints.sqlite3)]
+    SQLiteSave --> PausedHalt([⏸ Execution Paused for Underwriter])
+
+    %% Node 8 Resume
+    PausedHalt -->|POST /applications/id/review| ResumeCall[resume_application_review]
+    ResumeCall --> N8[Node 8: human_review_node]
+    N8 --> DecisionSwitch{reviewer_decision}
+    DecisionSwitch -->|APPROVED / REJECTED| ReviewedStatus[Status: REVIEWED]
+    DecisionSwitch -->|NEEDS_INFO| NeedsInfoStatus[Status: NEEDS_INFORMATION]
+    ReviewedStatus --> CommitResult[(Commit to PostgreSQL)]
+    NeedsInfoStatus --> CommitResult
+    CommitResult --> FinalEnd([END])
 ```
 
 ---
 
-## 📦 State Schema
+## 📦 The Authoritative State Contract: `LoanApplicationState`
+
+Defined in [`core/contracts/state.py`](../core/contracts/state.py), this `TypedDict` is the single source of truth passed across all nodes:
 
 ```mermaid
 classDiagram
     class LoanApplicationState {
         +str application_id
         +ApplicationStatus status
-        +List~DocumentMeta~ documents
-        +Optional~Dict~ extracted_facts
-        +List~Finding~ findings
-        +Optional~str~ credit_appraisal_memo
-        +List~EvidenceRef~ evidence_refs
-        +Optional~Dict~ reviewer_decision
-        +int attempt_count
-        +datetime created_at
-        +datetime updated_at
-    }
-    
-    class ApplicationStatus {
-        <<enumeration>>
-        UPLOADED
-        QUEUED
-        PROCESSING
-        READY_FOR_REVIEW
-        NEEDS_INFORMATION
-        REVIEWED
-        FAILED
-        CANCELLED
-    }
-    
-    class DocumentMeta {
-        +str document_id
-        +str document_type
-        +str storage_key
-        +int page_count
-        +datetime uploaded_at
-    }
-    
-    class ExtractedFacts {
-        +Optional~PayslipFacts~ payslips
+        +List~StatusTransition~ status_history
+        +List~str~ document_ids
+        +Dict~str, str~ document_manifest
+        +Optional~Dict~ document_bytes
+        +Dict~str, str~ classified_types
+        +Optional~Dict~ classification_metadata
+        +Dict~str, int~ document_pages
+        +Dict~str, str~ ocr_routes
+        +Optional~Dict~ document_texts
+        +Optional~ApplicantFact~ applicant
+        +Optional~PayslipFacts~ payslip
         +Optional~BankStatementFacts~ bank_statement
         +Optional~TaxReturnFacts~ tax_return
-        +Optional~ApplicantFact~ applicant
+        +Optional~List~ identity_documents
+        +List~Finding~ findings
+        +List~str~ missing_documents
+        +List~str~ retrieved_chunk_ids
+        +Optional~str~ summary_markdown
+        +bool summary_grounded
+        +bool review_paused
+        +Optional~str~ reviewer_decision
+        +Optional~str~ reviewer_notes
+        +List~Dict~ corrections_applied
     }
-    
+
     class Finding {
         +str rule_id
         +str rule_name
@@ -190,250 +203,160 @@ classDiagram
         +List~EvidenceRef~ supporting_evidence
         +str policy_version
     }
-    
-    class FindingVerdict {
-        <<enumeration>>
-        pass
-        flag
-        unknown
+
+    class EvidenceRef {
+        +str document_id
+        +str document_type
+        +int page_number
+        +str quoted_span
+        +BoundingBox bounding_box
+        +str extraction_method
+        +float confidence
     }
-    
-    LoanApplicationState --> ApplicationStatus
-    LoanApplicationState --> DocumentMeta
-    LoanApplicationState --> ExtractedFacts
+
+    class BoundingBox {
+        +float x0
+        +float y0
+        +float x1
+        +float y1
+        +Optional~float~ page_width
+        +Optional~float~ page_height
+    }
+
     LoanApplicationState --> Finding
-    Finding --> FindingVerdict
+    Finding --> EvidenceRef
+    EvidenceRef --> BoundingBox
 ```
 
 ---
 
-## 🔀 Conditional Edge Routing
+## 💾 Checkpoint Persistence & Interrupt Mechanism
 
-```mermaid
-graph LR
-    subgraph "Triage Node Routing"
-        A[triage_node] --> B{Dossier Check}
-        B -->|Empty or Corrupted| C[FAILED State]
-        B -->|Valid Manifest| D[Continue to OCR]
-    end
-    
-    subgraph "Human Review Routing"
-        E[human_review_node] --> F{Reviewer Decision}
-        F -->|APPROVED| G[REVIEWED State]
-        F -->|REJECTED| H[FAILED State]
-        F -->|NEEDS_INFO| I[NEEDS_INFORMATION State]
-    end
-    
-    style B fill:#FFF9C4
-    style F fill:#FFF9C4
+The pipeline is compiled with:
+```python
+workflow.compile(
+    checkpointer=SqliteSaver(db_path="data/storage/checkpoints.sqlite3"),
+    interrupt_before=["human_review"],
+)
 ```
-
----
-
-## 💾 Checkpoint Persistence
 
 ```mermaid
 sequenceDiagram
-    participant N as LangGraph Node
-    participant S as StateGraph
-    participant C as PostgreSQL Checkpointer
-    participant DB as PostgreSQL Database
-    
-    N->>S: Execute Node Logic
-    S->>S: Update State Object
-    
-    S->>C: Save Checkpoint
-    C->>DB: BEGIN TRANSACTION
-    DB->>DB: UPDATE applications SET state = ?
-    DB->>DB: INSERT INTO checkpoints (thread_id, checkpoint)
-    DB->>C: COMMIT
-    
-    C-->>S: Checkpoint Saved
-    
-    alt Interrupt Point
-        S->>S: Pause Execution
-        S->>N: Return to Worker
-        N->>N: Wait for Resume Signal
-    else Continue
-        S->>N: Proceed to Next Node
-    end
-    
-    Note over S,DB: Atomic state persistence<br/>ensures crash recovery
-```
-
----
-
-## 🔄 Resume from Interrupt
-
-```mermaid
-sequenceDiagram
-    participant U as Underwriter
-    participant API as FastAPI Endpoint
+    autonumber
+    participant W as Worker Consumer
     participant LG as LangGraph Runtime
-    participant CP as Checkpointer
-    participant DB as PostgreSQL
-    
-    Note over LG,DB: System is PAUSED at interrupt()
-    
-    U->>API: POST /applications/{id}/review
-    API->>API: Validate decision: APPROVED|REJECTED|NEEDS_INFO
-    
-    API->>CP: Load Checkpoint (thread_id = app_id)
-    CP->>DB: SELECT checkpoint FROM checkpoints
-    DB-->>CP: Serialized State
-    CP-->>API: LoanApplicationState
-    
-    API->>LG: graph.update_state(config, {"reviewer_decision": decision})
-    LG->>DB: UPDATE state with decision
-    
-    API->>LG: graph.invoke(None, config=config)
-    
-    Note over LG: Resumes from interrupt point
-    
-    LG->>LG: Execute human_review_node
-    LG->>LG: Transition to REVIEWED/FAILED/NEEDS_INFORMATION
-    
-    LG->>CP: Save Final Checkpoint
-    CP->>DB: COMMIT Final State
-    
+    participant CP as SqliteSaver (checkpoints.sqlite3)
+    participant UI as Underwriter UI (React)
+    participant API as FastAPI (review.py)
+    participant DB as PostgreSQL 16
+
+    W->>LG: graph.invoke(initial_state, config={"thread_id": app_id})
+    Note over LG: Executes Nodes 1 through 7...
+    LG->>LG: Node 7: validate_grounding_node complete
+    Note over LG,CP: Hits interrupt_before=["human_review"]
+    LG->>CP: Snapshot state to checkpoints.sqlite3
+    LG-->>W: Returns partial state (review_paused=True, status="READY_FOR_REVIEW")
+    W->>DB: persist_pipeline_result(state)
+    W->>W: queue.ack(handle)
+
+    Note over UI,API: Underwriter reviews dossier, CAM memo, & bounding boxes
+
+    UI->>API: POST /applications/{id}/review (decision="APPROVED", notes="...")
+    API->>LG: resume_application_review(thread_id, decision, notes)
+    LG->>CP: Load checkpoint for thread_id
+    CP-->>LG: Frozen State
+    LG->>LG: graph.update_state({"reviewer_decision": decision, ...})
+    LG->>LG: Execute Node 8: human_review_node
+    LG->>LG: Transition status to REVIEWED
     LG-->>API: Final State
-    API-->>U: 200 OK + Updated Application
+    API->>DB: Commit status=REVIEWED, append audit log
+    API-->>UI: 200 OK
 ```
 
 ---
 
-## 🛡️ Error Handling & Recovery
+## 🛡️ Error Handling, DLQ Routing & Poison Messages
 
 ```mermaid
-graph TB
-    subgraph "Error Detection"
-        A[Node Execution] --> B{Exception?}
-        B -->|No| C[Continue Pipeline]
-        B -->|Yes| D{Error Type}
-    end
+flowchart TD
+    Start[Delivery Received] --> CheckAttempts{attempt_count > 3?}
+    CheckAttempts -->|Yes| DLQ[fail lease_handle, retryable=False<br/>Route to Dead Letter Queue DLQ]
+    CheckAttempts -->|No| Lease[Start LeaseHeartbeat Thread]
     
-    subgraph "Error Classification"
-        D -->|Retryable| E[Transient Error]
-        D -->|Non-Retryable| F[Permanent Failure]
-        
-        E --> G[Extend Lease]
-        G --> H[Retry Node]
-        
-        F --> I[Transition to FAILED]
-        I --> J[Log to Audit]
-        J --> K[Notify via DLQ]
-    end
+    Lease --> RunGraph[Execute LangGraph Pipeline]
+    RunGraph --> CheckResult{Execution Successful?}
     
-    subgraph "Recovery Strategies"
-        H --> L{"Retry Count <= 3?"}
-        L -->|Yes| A
-        L -->|No| M[Route to DLQ]
-        
-        M --> N[Manual Investigation]
-        N --> O[Fix & Reprocess]
-    end
+    CheckResult -->|Success| CommitDB[Commit State to PostgreSQL 16]
+    CommitDB --> AckQueue[queue.ack lease_handle]
     
-    style D fill:#FFF9C4
-    style E fill:#FFCCBC
-    style F fill:#E57373
-    style O fill:#C8E6C9
+    CheckResult -->|Exception Caught| Rollback[Rollback DB Transaction]
+    Rollback --> FailRetry[queue.fail lease_handle, retryable=True<br/>Reset visibility timeout for redelivery]
+    
+    style DLQ fill:#FFCDD2,color:#B71C1C
+    style AckQueue fill:#C8E6C9,color:#1B5E20
+    style FailRetry fill:#FFF9C4,color:#F57F17
 ```
 
 ---
 
-## 🔍 Idempotency Guarantees
+## 📊 Node Performance & Latency Budgets
 
 ```mermaid
-graph LR
-    subgraph "Duplicate Job Scenario"
-        A[Job Arrives] --> B{Job ID in DB?}
-        B -->|No| C[Process Normally]
-        B -->|Yes| D{Already Processed?}
-        
-        D -->|Yes| E[Skip Processing]
-        D -->|No| F{In Progress?}
-        
-        F -->|Yes| G[Wait for Completion]
-        F -->|No| H[Resume Processing]
-        
-        C --> I[Save Results]
-        E --> J[Return Existing Results]
-        G --> K[Poll for Results]
-        H --> I
-    end
-    
-    style B fill:#FFF9C4
-    style D fill:#FFF9C4
-    style F fill:#FFF9C4
-    style I fill:#81C784
-    style J fill:#64B5F6
+gantt
+    title FinScan AI Pipeline Node Latency Budget (Target: < 25s CPU)
+    dateFormat  X
+    axisFormat %s s
+
+    section Ingestion
+    Triage (Node 1)                 :0, 1
+    section Perception
+    OCR & Classification (Node 2)   :1, 10
+    section Extraction
+    Fact Extraction (Node 3)        :10, 14
+    section Deterministic Rules
+    Rules Engine (Node 4)           :14, 15
+    section Policy RAG
+    Hybrid Policy RAG (Node 5)      :15, 17
+    section Synthesis
+    CAM Memo Builder (Node 6)       :17, 21
+    section Safety Firewall
+    Grounding Gate (Node 7)         :21, 22
+    section HITL Checkpoint
+    Interrupt & SQLite Snapshot     :22, 23
 ```
 
 ---
 
-## 📊 Node Execution Metrics
+## 🚫 Inviolable Architectural Anti-Patterns
 
-```mermaid
-graph TB
-    subgraph "Performance Benchmarks"
-        A[OCR & Classify] --> A1["~5-10s<br/>(10-15 pages/min)"]
-        B[Extract Facts] --> B1["~2-3s<br/>(rule-based extraction)"]
-        C[Evaluate Rules] --> C1["<1s<br/>(deterministic math)"]
-        D[Retrieve Policy] --> D1["~200ms<br/>(FAISS search)"]
-        E[Synthesize Summary] --> E1["~3-5s<br/>(LLM generation)"]
-        F[Validate Grounding] --> F1["<1s<br/>(citation check)"]
-    end
-    
-    subgraph "Total Pipeline Time"
-        Total --> T1["Normal Case: 15-20s"]
-        Total --> T2["With OCR: 30-90s"]
-        Total --> T3["With Textract: 60-120s"]
-    end
-    
-    A1 --> Total
-    B1 --> Total
-    C1 --> Total
-    D1 --> Total
-    E1 --> Total
-    F1 --> Total
-    
-    style T1 fill:#C8E6C9
-    style T2 fill:#FFF9C4
-    style T3 fill:#FFCCBC
-```
-
----
-
-## 🚫 Anti-Patterns to Avoid
-
-### ❌ DON'T: Let LLM Make Financial Decisions
-
+### ❌ Anti-Pattern 1: Autonomous Lending Decisions
 ```mermaid
 graph LR
-    A[Extracted Facts] --> X[LLM: Calculate DTI]
-    X --> Y[LLM: Approve/Reject]
-    Y --> Z[Risk: Hallucination!]
-    
-    style Z fill:#E57373
+    Facts[Extracted Facts] --> LLM[LLM / Black-box Model]
+    LLM --> Decision[Approved / Rejected]
+    Decision --> Harm[❌ VIOLATION: Zero Hallucinated Decisions]
+    style Harm fill:#FFCDD2,color:#B71C1C
 ```
 
-### ✅ DO: Deterministic Rules + LLM Explanation
-
+### ✅ Correct Pattern: Deterministic Rules + LLM Explanation + Human Sign-off
 ```mermaid
 graph LR
-    A[Extracted Facts] --> B[Deterministic Rule<br/>Calculate DTI]
-    B --> C[Rule Verdict: pass/flag]
-    C --> D[LLM: Explain Why]
-    D --> E[Auditable Result]
-    
-    style E fill:#81C784
+    Facts[Extracted Facts] --> Rules[Deterministic Code in core/rules/]
+    Rules --> Verdict[Verdict: PASS / FLAG with EvidenceRefs]
+    Verdict --> LLM[LLM: Explains & Cites Policy]
+    LLM --> Gate[Grounding Citation Gate]
+    Gate --> Human[Underwriter Approves at interrupt checkpoint]
+    style Human fill:#C8E6C9,color:#1B5E20
 ```
 
 ---
 
-## 📚 Related Documentation
+## 📚 Related Source Files
 
-- [System Overview](system_overview.md) - Complete pipeline architecture
-- **Contracts reference** - state schema in [`core/contracts/state.py`](../core/contracts/state.py); evidence/facts/findings alongside it
-- [Worker Implementation](worker_queue_architecture.md) - Consumer loop details
-- **Resume endpoint** - see [`apps/api/routes/review.py`](../apps/api/routes/review.py)
+- **Orchestration Definition**: [`core/graph/workflow.py`](../core/graph/workflow.py)
+- **Node Functions**: [`core/graph/nodes.py`](../core/graph/nodes.py)
+- **State Contracts**: [`core/contracts/state.py`](../core/contracts/state.py)
+- **Facts & Evidence Models**: [`core/contracts/facts.py`](../core/contracts/facts.py) and [`core/contracts/evidence.py`](../core/contracts/evidence.py)
+- **Durable Checkpointer**: [`core/graph/checkpoint.py`](../core/graph/checkpoint.py)
+- **Worker Execution Loop**: [`worker/consumer.py`](../worker/consumer.py)
+- **Underwriter Sign-off Route**: [`apps/api/routes/review.py`](../apps/api/routes/review.py)

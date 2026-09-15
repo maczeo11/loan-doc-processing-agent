@@ -109,6 +109,39 @@ flowchart TD
     Review -->|Information Requested| NeedsInfo[NEEDS_INFORMATION] --> Done
 ```
 
+### 📄 Document Page Classification Pipeline (Station 2)
+
+Before documents are routed to fact extractors, Station 2 classifies incoming pages using an ultra-fast, typo-resilient **TF-IDF + Logistic Regression** baseline ($0.9875$ Macro-F1, $1.2\text{ ms}$ latency, $15\text{ MB}$ RAM):
+
+```
+[ Raw English Page Text ]
+          │
+          ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│  Step 2.1: Feature Extraction via TF-IDF (FeatureUnion)                │  <─── ALGORITHM: TF-IDF Feature Engineering
+│  • Turns words into 30,000 numbers (x₁ to x₃₀,₀₀₀)                     │       (Converts text to vector space)
+│  • 12k Word N-Grams (1-2) + 18k Char N-Grams (3-5, OCR typo-immune)    │
+└───────────────────────────────────┬────────────────────────────────────┘
+                                    │ Outputs: 30,000 features [x₁, x₂, ..., x₃₀,₀₀₀]
+                                    ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│  Step 2.2: Computing Class Logits (The Dot Product)                    │  <─── ALGORITHM: Logistic Regression (Linear Component)
+│  • Multiplies 30,000 features by learned weights: z_k = ∑(w_ik × x_i)+b│       (Computes raw evidence for each class)
+│  • Produces 5 raw scores: z₁, z₂, z₃, z₄, z₅                           │
+└───────────────────────────────────┬────────────────────────────────────┘
+                                    │ Outputs: 5 raw logits
+                                    ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│  Step 2.3: Probability Calibration via Softmax                         │  <─── ALGORITHM: Logistic Regression (Softmax Function)
+│  • Normalizes scores into probabilities: P(Class k) = e^(z_k) / ∑ e^(z)│       (Outputs calibrated percentages 0% to 100%)
+│  • Winning label with highest confidence (e.g. Payslip = 98.12%)       │
+└────────────────────────────────────────────────────────────────────────┘
+```
+
+* **Step 2.1: Feature Extraction via TF-IDF (FeatureUnion) [ALGORITHM: TF-IDF Feature Engineering]:** Transforms raw text into 30,000 sparse numerical features ($x_i$) via word n-grams (1-2 words) and sub-word character n-grams (3-5 chars).
+* **Step 2.2: Computing Class Logits (The Dot Product) [ALGORITHM: Logistic Regression — Linear Component]:** Calculates raw class evidence ($z_k = \sum w_{ik} x_i + b_k$) by taking the dot product with weights learned via L-BFGS optimization.
+* **Step 2.3: Probability Calibration via Softmax [ALGORITHM: Logistic Regression — Softmax Activation]:** Converts raw logits into calibrated probability distributions ($0.0$ to $1.0$), taking the class with the highest probability as the predicted document type and confidence score.
+
 ---
 
 ## 🛠️ Technology Stack

@@ -88,6 +88,8 @@ study_mt/
 .claude/
 .cursor/
 .copilot/
+AGENTS.md
+agents.md
 
 
 # Local end-to-end demo scratch: generated PDFs, throwaway harness output
